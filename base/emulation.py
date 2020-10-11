@@ -39,7 +39,7 @@ class emulator(object):
         self.x = x
         
         try:
-            emusoftware = importlib.import_module('statfuncs.emulationsubfuncs.' + software)
+            emusoftware = importlib.import_module('base.emulationsubfuncs.' + software)
         except:
             raise ValueError('Module not found!')
             
@@ -76,33 +76,3 @@ class emulator(object):
         return self.predictor(self.model,
                               copy.deepcopy(theta),
                               copy.deepcopy(options))
-
-def loglik(emumodel, theta, y=None, S=None):
-    """
-    Return posterior of function evaluation at the new parameters.
-
-    Parameters
-    ----------
-    emumodel : Pred
-        A fitted emulator model defined as an emulation class.
-    theta : array of float
-        Some matrix of parameters where function evaluations as starting points.
-    y : Observations
-        A vector of the same length as x with observations. 'None' is equivlent to a vector of
-        zeros.
-    S : Observation Covariance Matrix
-        A matrix of the same length as x with observations. 'None' is equivlent to the
-        identity matrix.
-
-    Returns
-    -------
-    post: vector of unnormlaized log posterior
-    """
-    if theta.ndim == 1:
-        theta = theta.reshape((1,theta.shape[0]))
-    
-    loglik = emulation_smart_loglik(semumodel, theta)
-    
-    logpost = loglik
-    
-    return logpost

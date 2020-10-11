@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Header here."""
 import numpy as np
-from statfuncs.samplingsubfuncs.plumleesamp import plumleepostsampler
+from base.utilitiessubfuncs.plumleeMCMC import plumleepostsampler
 
 def postsampler(thetastart, logpriorfunc, loglikfunc, options=None):
     """
@@ -20,7 +20,7 @@ def postsampler(thetastart, logpriorfunc, loglikfunc, options=None):
     theta : matrix of sampled paramter values
     """
     def logpostfunc(thetaval):
-        return logpriorfunc(thetaval) + loglikfunc(thetaval)
+        return (logpriorfunc(thetaval) + loglikfunc(thetaval))
 
     if options is None:
         numsamp = 5000
