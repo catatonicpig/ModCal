@@ -5,14 +5,14 @@ import scipy.stats as sps
 import sys
 import os
 
+from balldroptestfuncs import balldropmodel_linear,\
+    balldropmodel_quad, balldropmodel_drag, balldroptrue
 PACKAGE_PARENT = '..'
 SCRIPT_DIR = os.path.dirname(os.path.realpath(os.path.join(os.getcwd(), os.path.expanduser(__file__))))
 sys.path.append(os.path.normpath(os.path.join(SCRIPT_DIR, PACKAGE_PARENT)))
 from base.utilities import postsampler
 from base.emulation import emulator
 from base.calibration import calibrator
-from testing.balldrop import balldropmodel_linear,\
-    balldropmodel_quad, balldropmodel_drag, balldroptrue
 
 class priorphys:
     def logpdf(theta):
@@ -143,13 +143,12 @@ class priorstat:
     def rvs(n):
         return sps.gamma.rvs(4, 0, 1, size = n).reshape(-1,1)
 
-#speed up computation
+#low rank bias to speed up computation
 CorrMatDeltaT = np.exp(-np.abs(np.subtract.outer(xtot[:,0],xtot[:,0])))* (1 + 1/40*np.abs(np.subtract.outer(xtot[:,0],xtot[:,0])))
 CorrMatDeltaH = np.exp(-1/40*np.abs(np.subtract.outer(xtot[:,1],xtot[:,1]))) * (1 + 1/40*np.abs(np.subtract.outer(xtot[:,1],xtot[:,1])))
 CorrMatDelta = CorrMatDeltaT * CorrMatDeltaH
 W,V = np.linalg.eigh(CorrMatDelta)
 CorrMatHalf = (V[:,-20:] @ np.diag(np.sqrt(W[-20:]))).T
-CorrMatHalf.T @ CorrMatHalf
 
 cal_lin_plus = calibrator(emu_lin, y, x,
                        thetaprior = priorphys,
@@ -197,13 +196,3 @@ def two2d(axis, theta):
 two2d(axes[0], priorphys.rvs(4000))
 two2d(axes[1], thetapostclosed)
 two2d(axes[2], thetaphipostopen[:,:2])
-
-
-
-# # def dpriorstat(n):
-# #     return np.vstack((sps.gamma.rvs(4, 0, 1, size=n),
-# #                       sps.gamma.rvs(4, 0, 1, size=n),
-# #                       sps.gamma.rvs(4, 0, 1, size=n))).T
-
-
-# # #NEED TO DECIDE A NEW HEIGHT TO DROP IT AT
