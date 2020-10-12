@@ -73,6 +73,8 @@ class emulator(object):
                                   copy.deepcopy(options))
         
     def predict(self, theta, options=None):
+        if theta.ndim < 1.5:
+            theta = theta.reshape([-1, self.theta.shape[1]])
         return self.predictor(self.model,
                               copy.deepcopy(theta),
                               copy.deepcopy(options))

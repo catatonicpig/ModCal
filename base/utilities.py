@@ -3,7 +3,7 @@
 import numpy as np
 from base.utilitiessubfuncs.plumleeMCMC import plumleepostsampler
 
-def postsampler(thetastart, logpriorfunc, loglikfunc, options=None):
+def postsampler(thetastart, logpostfunc, options=None):
     """
     Return draws from the posterior.
 
@@ -19,8 +19,6 @@ def postsampler(thetastart, logpriorfunc, loglikfunc, options=None):
     -------
     theta : matrix of sampled paramter values
     """
-    def logpostfunc(thetaval):
-        return (logpriorfunc(thetaval) + loglikfunc(thetaval))
 
     if options is None:
         numsamp = 5000

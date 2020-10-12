@@ -10,58 +10,65 @@ SCRIPT_DIR = os.path.dirname(os.path.realpath(os.path.join(os.getcwd(), os.path.
 sys.path.append(os.path.normpath(os.path.join(SCRIPT_DIR, PACKAGE_PARENT)))
 from base.utilities import postsampler
 from base.emulation import emulator
-from base.calibration import loglik
+from base.calibration import calibrator
 from testing.balldrop import balldropmodel_linear,\
     balldropmodel_quad, balldropmodel_drag, balldroptrue
 
-def lpriorphys(theta):
-    return (sps.gamma.logpdf(theta[:,0], 6, 0, 2) +
+class priorphys:
+    def logpdf(theta):
+        return np.squeeze(sps.gamma.logpdf(theta[:,0], 10, 0, 1) +
             sps.gamma.logpdf(theta[:,1], 1, 0, 40))
-def dpriorphys(n):
-    return np.vstack((sps.gamma.rvs(6, 0, 2, size=n),
+    def rvs(n):
+        return np.vstack((sps.gamma.rvs(10, 0, 1, size=n),
                      sps.gamma.rvs(1, 0, 40, size=n))).T
 
-x = np.array([[ 0.1, 10. ],
-       [ 0.2, 10. ],
-       [ 0.3, 10. ],
-       [ 0.4, 10. ],
-       [ 0.5, 10. ],
-       [ 0.6, 10. ],
-       [ 0.7, 10. ],
-       [ 0.8, 10. ],
-       [ 0.9, 10. ],
-       [ 1. , 10. ],
-       [ 1.1, 10. ],
-       [ 0.1, 20. ],
-       [ 0.4, 20. ],
-       [ 0.7, 20. ],
-       [ 1. , 20. ],
-       [ 1.3, 20. ],
-       [ 1.6, 20. ],
-       [ 1.9, 20. ],
-       [ 0.1, 40. ],
-       [ 0.5, 40. ],
-       [ 0.9, 40. ],
-       [ 1.3, 40. ],
-       [ 1.7, 40. ],
-       [ 2.1, 40. ],
-       [ 2.5, 40. ],
-       [ 2.9, 40. ]])
+tvec = np.concatenate((np.arange(0.1,1.2,0.1),
+                  np.arange(0.1,2.2,0.1),
+                  np.arange(0.1,2.6,0.1),
+                  np.arange(0.1,3.2,0.1)))
+hvec = np.concatenate((10*np.ones(11),
+                  20*np.ones(21),
+                  30*np.ones(25),
+                  40*np.ones(31)))
+xtot = np.vstack((tvec,hvec)).T
 
 #NEED TO EMULATE EACH MODEL
-thetacompexp = dpriorphys(50)
-fcompexp = balldropmodel_linear(thetacompexp, x) 
-emu_lin = emulator(thetacompexp, fcompexp)
+thetacompexp = priorphys.rvs(50)
+emu_lin = emulator(thetacompexp, balldropmodel_linear(thetacompexp, xtot), xtot)
+emu_quad = emulator(thetacompexp, balldropmodel_quad(thetacompexp, xtot), xtot)
+emu_drag = emulator(thetacompexp, balldropmodel_drag(thetacompexp, xtot), xtot)
 
-fcompexp = balldropmodel_quad(thetacompexp, x) 
-emu_quad = emulator(thetacompexp, fcompexp)
-
-fcompexp = balldropmodel_drag(thetacompexp, x) 
-emu_drag = emulator(thetacompexp, fcompexp)
 
 # #NEED TO CALIBRATE EACH MODEL
 import matplotlib.pyplot as plt
-sigma2 = 4
+sigma2 = 2
+
+x = np.array([[ 0.1, 10. ],
+        [ 0.2, 10. ],
+        [ 0.3, 10. ],
+        [ 0.4, 10. ],
+        [ 0.5, 10. ],
+        [ 0.6, 10. ],
+        [ 0.7, 10. ],
+        [ 0.8, 10. ],
+        [ 0.9, 10. ],
+        [ 1. , 10. ],
+        [ 1.1, 10. ],
+        [ 0.1, 20. ],
+        [ 0.4, 20. ],
+        [ 0.7, 20. ],
+        [ 1. , 20. ],
+        [ 1.3, 20. ],
+        [ 1.6, 20. ],
+        [ 1.9, 20. ],
+        [ 0.1, 40. ],
+        [ 0.5, 40. ],
+        [ 0.9, 40. ],
+        [ 1.3, 40. ],
+        [ 1.7, 40. ],
+        [ 2.1, 40. ],
+        [ 2.5, 40. ],
+        [ 2.9, 40. ]])
 y = np.array([[11.5],
         [11.2],
         [ 9.6],
@@ -89,70 +96,92 @@ y = np.array([[11.5],
         [13.1],
         [ 6.8]])
 
+emu_lin.predict(thetacompexp[0,:])
+obsvar = sigma2*np.ones(y.shape[0])
 
-Sinv = 1/sigma2*np.eye(y.shape[0])
-ldetS = y.shape[0] * np.log(1/sigma2)
+Spred = np.zeros((xtot.shape[0],x.shape[0]))
+cal_lin = calibrator(emu_lin, y, x,
+                       thetaprior = priorphys,
+                       phiprior = None,
+                       passoptions = {'obsvar': obsvar})
+cal_quad = calibrator(emu_quad, y, x,
+                       thetaprior = priorphys,
+                       phiprior = None,
+                       passoptions = {'obsvar': obsvar})
+cal_drag = calibrator(emu_drag, y, x,
+                       thetaprior = priorphys,
+                       phiprior = None,
+                       passoptions = {'obsvar': obsvar})
 
-def llik1(theta):\
-    return loglik(emu_quad, theta, y, Sinv, ldetS)
-thetapost1 = postsampler(dpriorphys(1000), lpriorphys, llik1)
+A = cal_lin.predict(xtot)
+plt.plot(xtot[:,0],A['mean'],'bo')
+plt.plot(xtot[:,0],A['mean']+3*np.sqrt(A['var']),'b-')
+plt.plot(xtot[:,0],A['mean']-3*np.sqrt(A['var']),'b-')
 
-def llikclosed(theta):
-    term1 = loglik(emu_lin, theta, y, Sinv,ldetS)
-    term2 = loglik(emu_quad, theta, y, Sinv,ldetS)
-    term3 = loglik(emu_drag, theta, y, Sinv,ldetS)
+def lpostclosed(theta):
+    term1 = cal_lin.logpost(theta, None)
+    term2 = cal_quad.logpost(theta, None)
+    term3 = cal_drag.logpost(theta, None)
     terms = np.vstack((term1,term2,term3))
     tm = np.max(terms,0)
     termsadj = terms - tm
     logpost = tm + np.log(np.sum(np.exp(termsadj),0))
+    indsing = np.where(np.isnan(logpost))[0]
+    logpost[indsing] = -np.inf
     return logpost
-thetapostclosed = postsampler(dpriorphys(1000), lpriorphys, llikclosed)
+thetapostclosed = postsampler(priorphys.rvs(1000), lpostclosed)
 
-def lpriorstat(phi):
-    return (sps.gamma.logpdf(phi[:,0], 4, 0, 1) +
-            sps.gamma.logpdf(phi[:,1], 4, 0, 1) +
-            sps.gamma.logpdf(phi[:,2], 4, 0, 1))
-def dpriorstat(n):
-    return np.vstack((sps.gamma.rvs(4, 0, 1, size=n),
-                      sps.gamma.rvs(4, 0, 1, size=n),
-                      sps.gamma.rvs(4, 0, 1, size=n))).T
+mean1 = cal_lin.predict(xtot,thetapostclosed, None)
+plt.plot(xtot[:,0],mean1['mean'],'bo')
+plt.plot(xtot[:,0],mean1['mean']+3*np.sqrt(A['var']),'b-')
+plt.plot(xtot[:,0],mean1['mean']-3*np.sqrt(A['var']),'b-')
 
-def lprioropen(thetaphi):
-    return (lpriorphys(thetaphi[:,:2]) + lpriorstat(thetaphi[:,2:]))
-def dprioropen(n):
-    return np.vstack((dpriorphys(n).T, dpriorstat(n).T)).T
+
+class priorstat:
+    def logpdf(phi):
+        return np.squeeze(sps.gamma.logpdf(phi, 4, 0, 1))
+    def rvs(n):
+        return sps.gamma.rvs(4, 0, 1, size = n).reshape(-1,1)
 
 #speed up computation
-CorrMatDeltaT = np.exp(-4*np.abs(np.subtract.outer(x[:,0],x[:,0])))
-CorrMatDeltaH = np.exp(-1/40*np.abs(np.subtract.outer(x[:,1],x[:,1])))
+CorrMatDeltaT = np.exp(-np.abs(np.subtract.outer(xtot[:,0],xtot[:,0])))* (1 + 1/40*np.abs(np.subtract.outer(xtot[:,0],xtot[:,0])))
+CorrMatDeltaH = np.exp(-1/40*np.abs(np.subtract.outer(xtot[:,1],xtot[:,1]))) * (1 + 1/40*np.abs(np.subtract.outer(xtot[:,1],xtot[:,1])))
 CorrMatDelta = CorrMatDeltaT * CorrMatDeltaH
-W, V = np.linalg.eigh(CorrMatDelta)
+W,V = np.linalg.eigh(CorrMatDelta)
+CorrMatHalf = (V[:,-20:] @ np.diag(np.sqrt(W[-20:]))).T
+CorrMatHalf.T @ CorrMatHalf
 
-def loglikopen(thetaphi):
+cal_lin_plus = calibrator(emu_lin, y, x,
+                       thetaprior = priorphys,
+                       phiprior = priorstat,
+                       passoptions = {'obsvar': obsvar, 'covhalf': CorrMatHalf})
+cal_quad_plus = calibrator(emu_quad, y, x,
+                       thetaprior = priorphys,
+                       phiprior = priorstat,
+                       passoptions = {'obsvar': obsvar, 'covhalf': CorrMatHalf})
+cal_drag_plus = calibrator(emu_drag, y, x,
+                       thetaprior = priorphys,
+                       phiprior = priorstat,
+                       passoptions = {'obsvar': obsvar, 'covhalf': CorrMatHalf})
+
+def lpostopen(thetaphi):
     theta = thetaphi[:,:2]
     phi = np.abs(thetaphi[:,2:])
-    term1 = np.zeros(thetaphi.shape[0])
-    term2 = np.zeros(thetaphi.shape[0])
-    term3 = np.zeros(thetaphi.shape[0])
-    for k in range(0,thetaphi.shape[0]):
-        term1[k] = loglik(emu_lin, theta[k,:], y, 
-                          V @ (V * (1/(phi[k,0]*W+sigma2))).T,
-                          np.sum(np.log(phi[k,0]*W+sigma2)))
-        term2[k] = loglik(emu_quad, theta[k,:], y,
-                          V @ (V * (1/(phi[k,1]*W+sigma2))).T,
-                          np.sum(np.log(phi[k,1]*W+sigma2)))
-        term3[k] = loglik(emu_drag, theta[k,:], y,
-                          V @ (V * (1/(phi[k,2]*W+sigma2))).T,
-                          np.sum(np.log(phi[k,2]*W+sigma2)))
+    term1 = cal_lin_plus.logpost(theta, phi[:,0])
+    term2 = cal_quad_plus.logpost(theta, phi[:,1])
+    term3 = cal_drag_plus.logpost(theta, phi[:,2])
     terms = np.vstack((term1,term2,term3))
     tm = np.max(terms,0)
     termsadj = terms - tm
     logpost = tm + np.log(np.sum(np.exp(termsadj),0))
+    indsing = np.where(np.isnan(logpost))[0]
+    logpost[indsing] = -np.inf
     return logpost
+thetaphipostopen = postsampler(np.hstack((priorphys.rvs(1000),
+                                          priorstat.rvs(1000),
+                                          priorstat.rvs(1000),
+                                          priorstat.rvs(1000))), lpostopen)
 
-thetapostopen = postsampler(dprioropen(1000), lprioropen, loglikopen)
-
-# print(np.mean(thetapostopen,0))
 
 fig, axes = plt.subplots(ncols=3, nrows=1, figsize=(21, 5))
 
@@ -165,10 +194,16 @@ def two2d(axis, theta):
     axis.pcolormesh(xi, yi, zi.reshape(xi.shape), shading='gouraud', cmap=plt.cm.BuGn_r)
     axis.contour(xi, yi, zi.reshape(xi.shape))
 
-two2d(axes[0], dpriorphys(4000))
+two2d(axes[0], priorphys.rvs(4000))
 two2d(axes[1], thetapostclosed)
-two2d(axes[2], thetapostopen[:,:2])
+two2d(axes[2], thetaphipostopen[:,:2])
 
 
-#plt.plot(x[:,0],y)
-#NEED TO DECIDE A NEW HEIGHT TO DROP IT AT
+
+# # def dpriorstat(n):
+# #     return np.vstack((sps.gamma.rvs(4, 0, 1, size=n),
+# #                       sps.gamma.rvs(4, 0, 1, size=n),
+# #                       sps.gamma.rvs(4, 0, 1, size=n))).T
+
+
+# # #NEED TO DECIDE A NEW HEIGHT TO DROP IT AT

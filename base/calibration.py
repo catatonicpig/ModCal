@@ -1,82 +1,117 @@
 # -*- coding: utf-8 -*-
 """Header here."""
 import numpy as np
+import importlib
+import base.emulation
+import copy
+from base.utilities import postsampler
 
-def loglik(emulator, theta, y=None, Sinv=None):
-    """
-    Return posterior of function evaluation at the new parameters.
 
-    Parameters
-    ----------
-    emumodel : Pred
-        A fitted emulator model defined as an emulation class.
-    theta : array of float
-        Some matrix of parameters where function evaluations as starting points.
-    y : Observations
-        A vector of the same length as x with observations. 'None' is equivlent to a vector of
-        zeros.
-    Sinv : Observation Precision Matrix
-        A matrix of the same length as \"emulator.x\" with observations. 'None' is equivlent to the
-        identity matrix.
 
-    Returns
-    -------
-    post: vector of unnormlaized log posterior
-    """
-    if theta.ndim == 1:
-        theta = theta.reshape((1,theta.shape[0]))
+class calibrator(object):
+    """Calibrator."""
+
+    def __init__(self, emu=None,
+                 y=None, x=None,
+                 thetaprior=None,
+                 phiprior=None,
+                 passoptions=None,
+                 options=None,
+                 software='plumleecali'):
         
+        if y is None:
+            raise ValueError('You have not provided any y.')
         
+        if emu is None:
+            raise ValueError('You have not provided any emulator.')
         
-    predinfo = emulator.predict(theta)
-    loglik = np.zeros(predinfo['mean'].shape[0])
-    for k in range(0, predinfo['mean'].shape[0]):
-        mu = predinfo['mean'][k,:]
-        U = predinfo['covdecomp'][k,:,:]
-        Am = Sinv @ U.T
-        W, V = np.linalg.eigh(np.eye(U.shape[0]) + U @ Am)
-        Amp = y.T @ Am @ V
-        loglik[k] += -0.5*(Amp @ (Amp * (1/W)).T)
-        loglik[k] = np.sum(np.log(W))
-    return loglik
-
-
-def loglik(emulator, theta, y=None, Sinv=None, ldetS=None):
-    """
-    Return posterior of function evaluation at the new parameters.
-
-    Parameters
-    ----------
-    emumodel : Pred
-        A fitted emulator model defined as an emulation class.
-    theta : array of float
-        Some matrix of parameters where function evaluations as starting points.
-    y : Observations
-        A vector of the same length as x with observations. 'None' is equivlent to a vector of
-        zeros.
-    Sinv : Observation Precision Matrix
-        A matrix of the same length as \"emulator.x\" with observations. 'None' is equivlent to the
-        identity matrix.
-
-    Returns
-    -------
-    post: vector of unnormlaized log posterior
-    """
-    if theta.ndim == 1:
-        theta = theta.reshape((1,theta.shape[0]))
+        if thetaprior is None:
+            print('You have not provided any prior function, stopping...')
         
+        try:
+            ftry = emu.predict(emu.theta[0,:])['mean']
+        except:
+            raise ValueError('Your provided emulator failed to predict.')
         
+        self.y = y
+        self.emu = emu
         
-    predinfo = emulator.predict(theta)
-    loglik = np.zeros(predinfo['mean'].shape[0])
-    for k in range(0, predinfo['mean'].shape[0]):
-        mu = np.squeeze(predinfo['mean'][k,:])
-        U = predinfo['covdecomp'][k,:,:]
-        Am = Sinv @ U.T
-        W, V = np.linalg.eigh(np.eye(U.shape[0]) + U @ Am)
-        Amp = (np.squeeze(y)-mu).T @ Am @ V.T
-        loglik[k] += -0.5*(np.squeeze(y)-mu).T @ (Sinv @ (np.squeeze(y)-mu))
-        loglik[k] += -0.5*ldetS
-        loglik[k] += 0.5*(Amp @ (Amp * (1/W)).T)
-        loglik[k] += -0.5*np.sum(np.log(W))
-    return loglik
+        if x is None and (y.shape[0] != ftry.shape[0]):
+            raise ValueError('If x is not provided, predictions must ' +
+                             'align with y and emu.predict()')
+        
+        if x is not None and (x.shape[0] != y.shape[0]):
+            raise ValueError('If x is provided, predictions must align with y and emu.predict()')
+        elif x is not None:
+            matchingvec = np.where(((x[:, None] > emu.x-10**(-8)) *
+                                    (x[:, None] < emu.x+10**(-8))).all(2))
+            xind = matchingvec[1][matchingvec[0]]
+            if xind.shape[0] < x.shape[0]:
+                raise ValueError('If x is provided, it must be a subset of emu.x')
+            self.xind = xind
+            self.x = x
+        else:
+            self.xind = range(0, x.shape[0])
+            self.x = emu.x
+        
+        try:
+            self.calsoftware = importlib.import_module('base.calibrationsubfuncs.' + software)
+        except:
+            raise ValueError('Module not found!')
+        
+        self.calsoftware.loglik
+        self.calsoftware.predict
+        self.passoptions = passoptions
+        
+        if phiprior is None:
+            class phiprior:
+                def logpdf(phi):
+                    return 0
+                def rvs(n):
+                    return None
+            self.phiprior = phiprior
+        else:
+            self.phiprior = phiprior
+        
+        self.thetaprior = thetaprior
+        if phiprior.rvs(1) is not None:
+            self.thetaphidraw = postsampler(np.hstack((self.thetaprior.rvs(1000),
+                                                       self.phiprior.rvs(1000))),
+                                            self.logpostfull)
+            self.thetadraw = self.thetaphidraw[:,:self.emu.theta.shape[1]]
+            self.phidraw = self.thetaphidraw[:,(self.emu.theta.shape[1]):]
+        else:
+            self.thetadraw = postsampler(self.thetaprior.rvs(1000), self.logpostfull)
+            self.phidraw = None
+    
+    def logprior(self, theta, phi):
+        return (self.thetaprior.logpdf(copy.deepcopy(theta)) +
+                self.phiprior.logpdf(copy.deepcopy(phi)))
+    
+    def logpost(self, theta, phi, passoptions=None):
+        if passoptions is None:
+            passoptions = self.passoptions
+        return (self.logprior(theta, phi) +
+            self.calsoftware.loglik(self.emu, theta, phi, self.y, self.xind, passoptions))
+    
+    def logpostfull(self, thetaphi, passoptions=None):
+        if self.phiprior.rvs(1) is not None:
+            theta = thetaphi[:,:(self.emu.theta.shape[1])]
+            phi = thetaphi[:,(self.emu.theta.shape[1]):]
+        else:
+            theta = thetaphi
+            phi = None
+        if passoptions is None:
+            passoptions = self.passoptions
+        return self.logpost(theta, phi, passoptions)
+    
+    def predict(self, x, theta = None, phi = None, passoptions=None):
+        matchingvec = np.where(((x[:, None] > self.emu.x-10**(-8)) *
+                                (x[:, None] <  self.emu.x+10**(-8))).all(2))
+        xind = matchingvec[1][matchingvec[0]]
+        if theta is None:
+            theta = self.thetadraw
+            phi = self.phidraw
+        if passoptions is None:
+            passoptions = self.passoptions
+        return (self.calsoftware.predict(xind, self.emu, theta, phi, self.y, self.xind, passoptions))

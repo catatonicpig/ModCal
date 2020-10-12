@@ -8,7 +8,7 @@ Created on Fri Sep 11 14:40:38 2020
 import numpy as np
 import scipy.optimize as spo
 
-def build(theta, f, x=None,  options=None):    
+def build(theta, f, x=None,  options=None):
     """Return a Gaussian Process emulator model."""
     emuinfo = {}
     emuinfo['offset'] = np.zeros(f.shape[1])
@@ -20,7 +20,6 @@ def build(theta, f, x=None,  options=None):
         emuinfo['offset'][k] = np.mean(f[:, k])
         emuinfo['scale'][k] = np.std(f[:, k])
     fstand = (fstand - emuinfo['offset']) / emuinfo['scale']
-    
     Vecs, Vals, _ = np.linalg.svd((fstand / np.sqrt(fstand.shape[0])).T)
     Vals = np.append(Vals, np.zeros(Vecs.shape[1] - Vals.shape[0]))
     Valssq = (fstand.shape[0]*(Vals ** 2) + 0.001) /\
