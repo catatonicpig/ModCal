@@ -18,13 +18,13 @@ def build(theta, f, x=None,  options=None):
     fstand = 1*f
     for k in range(0, f.shape[1]):
         emuinfo['offset'][k] = np.mean(f[:, k])
-        emuinfo['scale'][k] = np.std(f[:, k])
+        emuinfo['scale'][k] = 0.9*np.std(f[:, k]) + 0.1*np.std(f)
     fstand = (fstand - emuinfo['offset']) / emuinfo['scale']
     Vecs, Vals, _ = np.linalg.svd((fstand / np.sqrt(fstand.shape[0])).T)
     Vals = np.append(Vals, np.zeros(Vecs.shape[1] - Vals.shape[0]))
-    Valssq = (fstand.shape[0]*(Vals ** 2) + 0.001) /\
-        (fstand.shape[0] + 0.001)
-    numVals = 1 + np.sum(np.cumsum(Valssq) < 0.9999*np.sum(Valssq))
+    Valssq = (fstand.shape[0]*(Vals ** 2) + 0.01) /\
+        (fstand.shape[0] + 0.01)
+    numVals = 1 + np.sum(np.cumsum(Valssq) < 0.9995*np.sum(Valssq))
     numVals = np.maximum(np.minimum(2,fstand.shape[1]),numVals)
     emuinfo['Cs'] = Vecs * np.sqrt(Valssq)
     emuinfo['PCs'] = emuinfo['Cs'][:, :numVals]
@@ -33,6 +33,7 @@ def build(theta, f, x=None,  options=None):
     fhat= pcaval @ emuinfo['PCs'].T
     emuinfo['extravar'] = np.mean((fstand-fhat) ** 2,0) *\
         (emuinfo['scale'] ** 2)
+        
     emuinfo['var0'] = np.ones(numVals)
     hypinds = np.zeros(numVals)
     emulist = [dict() for x in range(0, numVals)]
@@ -68,8 +69,6 @@ def predict(emumodel, theta,  options=None):
                 emulation_smart_covmat(theta, emumodel['theta'], 
                                        emumodels[k]['hypcov'])
         r = np.squeeze(rsave[emumodels[k]['hypind']])
-        #print(emumodels[k]['hypind'])
-        #print(emumodels[(emumodels[k]['hypind'])])
         Rinv = 1*emumodels[(emumodels[k]['hypind'])]['Rinv']
         predvecs[:, k] = r @ emumodels[k]['pw']
         predvars[:, k] = emumodel['var0'][k] - np.sum(r.T * (Rinv @ r.T), 0)
@@ -112,12 +111,12 @@ def emulation_covmat(x1, x2, gammav, returndir = False):
 def emulation_smart_fit(theta, pcaval, hypstarts=None, hypinds=None):
     """Return a fitted model from the emulator model using smart method."""
     subemuinfo = {}
-    subemuinfo['hypregmean'] = np.append(0.5 + np.log(np.std(theta, 0)), (0, -5))
+    subemuinfo['hypregmean'] = np.append(0.5 + np.log(np.std(theta, 0)), (0, -10))
     subemuinfo['hypregLB'] = np.append(-1 + np.log(np.std(theta, 0)), (-10, -20))
     subemuinfo['hypregUB'] = np.append(3 + np.log(np.std(theta, 0)), (1, -4))
     subemuinfo['hypregstd'] = (subemuinfo['hypregUB'] - subemuinfo['hypregLB']) / 3
     subemuinfo['hypregstd'][-2] = 2
-    subemuinfo['hypregstd'][-1] = 2
+    subemuinfo['hypregstd'][-1] = 0.5
     subemuinfo['hyp'] = 1*subemuinfo['hypregmean']
     nhyptrain = np.min((20*theta.shape[1], theta.shape[0]))
     thetac = np.random.choice(theta.shape[0], nhyptrain, replace=False)

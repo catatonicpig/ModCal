@@ -9,7 +9,7 @@ def balldropmodel_linear(theta, x):
     for k in range(0, theta.shape[0]):
         t = x[:, 0]
         h0 = x[:, 1]
-        vter = theta[k, 0]
+        vter = theta[k, 1]
         # g = 'nan'
         f[k, :] = h0 - vter * t
     return f
@@ -47,7 +47,7 @@ def balldropmodel_drag(theta, x):
 
 def balldroptrue(x):
     """Place description here."""
-    vter = 40
+    vter = 7
     g = 10
     tau = vter/g
     t = x[:, 0]

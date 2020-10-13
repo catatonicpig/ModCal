@@ -21,7 +21,7 @@ def plumleepostsampler(thetastart, logpostfunc, numsamp, tarESS):
     -------
     theta : matrix of sampled paramter values
     """
-    numchain = 25
+    numchain = 100
     maxiters = 10
     keepgoing = True
     while keepgoing:
@@ -79,7 +79,7 @@ def plumleepostsampler(thetastart, logpostfunc, numsamp, tarESS):
         thetasave = np.reshape(thetasave,(-1,thetac.shape[1]))
         accr = numtimes / numsamppc
         if iters > 0.5:
-            if accr > 0.1 and (np.mean(ESS) > tarESS or numsamppc > 200):
+            if accr > 0.1 and (np.mean(ESS) > tarESS or numsamppc > 800):
                 break
             if (accr < 0.23):
                 rho = rho*np.max((np.exp((np.log(accr+0.01)-np.log(0.26))*2),0.25))
