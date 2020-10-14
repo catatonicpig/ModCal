@@ -2,7 +2,7 @@
 """Header here."""
 import numpy as np
 
-def loglik(emulator, theta, phi, y, xind, modelnum, options):
+def loglik(emulator, theta, phi, y, xind, options):
     """
     Return posterior of function evaluation at the new parameters.
 
@@ -32,7 +32,14 @@ def loglik(emulator, theta, phi, y, xind, modelnum, options):
     else:
         raise ValueError('Must provide obsvar at this moment.')
     
+
     
+    if type(emulator) is tuple:
+        predinfo = [dict() for x in range(len(emulator))]
+        for k in range(0,len(emulator)):
+            predinfo[k] = emulator[k].predict(theta)
+    else:
+        predinfo = emulator.predict(theta)
     
     predinfo = emulator.predict(theta)
     loglik = np.zeros(predinfo['mean'].shape[0])
@@ -61,7 +68,7 @@ def loglik(emulator, theta, phi, y, xind, modelnum, options):
     #print(loglik)
     return loglik
 
-def predict(xindnew, emulator, theta, phi, y, xind, modelnum,  options):
+def predict(xindnew, emulator, theta, phi, y, xind, options):
     """
     Return posterior of function evaluation at the new parameters.
 
@@ -90,15 +97,15 @@ def predict(xindnew, emulator, theta, phi, y, xind, modelnum,  options):
     else:
         raise ValueError('Must provide obsvar at this moment.')
     
-    predinfo = emulator.predict(theta)
-    preddict = {}
-    
-            
-    preddict['meanfull'] = predinfo['mean']
-    preddict['varfull'] = predinfo['var'] 
-    
-    Sinv = np.diag(1/obsvar)
-    for k in range(0, predinfo['mean'].shape[0]):
+    if type(emulator) is tuple:
+        predinfo = [dict() for x in range(len(emulator))]
+        for k in range(0,len(emulator)):
+            predinfo[k] = emulator[k].predict(theta)
+    else:
+        predinfo = emulator.predict(theta)
+    meanvec = np.zeros((theta.shape[0],xindnew.shape[0]))
+    varvec = np.zeros((theta.shape[0],xindnew.shape[0]))
+    for k in range(0, theta.shape[0]):
         Sinv = np.diag(1/(obsvar))
         ldetS = np.sum(np.log(obsvar))
         if 'corrf' in options.keys() and phi is not None:
