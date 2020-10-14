@@ -16,11 +16,11 @@ from base.calibration import calibrator
 
 class priorphys:
     def logpdf(theta):
-        return np.squeeze(sps.gamma.logpdf(theta[:,0], 5, 0, 2) +
-            sps.gamma.logpdf(theta[:,1], 4, 0, 3))
+        return np.squeeze(sps.gamma.logpdf(theta[:,0], 2, 0, 5) +
+            sps.gamma.logpdf(theta[:,1], 2, 0, 20))
     def rvs(n):
-        return np.vstack((sps.gamma.rvs(5, 0, 2, size=n),
-                     sps.gamma.rvs(4, 0, 3, size=n))).T
+        return np.vstack((sps.gamma.rvs(2, 0, 5, size=n),
+                     sps.gamma.rvs(2, 0, 20, size=n))).T
 
 tvec = np.concatenate((np.arange(0.2,5.2,0.2),
                   np.arange(0.2,5.2,0.2),
@@ -60,9 +60,32 @@ x = np.array([[ 0.2, 10. ],
         [ 1.0, 40. ],
         [ 1.4, 40. ],
         [ 1.8, 40. ],
-        [ 2.8, 40. ]])
+        [ 2.8, 40. ],
+        [ 3.4, 40. ]])
 y = balldroptrue(x) + sps.norm.rvs(0, np.sqrt(sigma2),size=x.shape[0])
-
+y = np.array([[ 9.03],
+       [ 7.55],
+       [ 7.2 ],
+       [ 6.44],
+       [ 4.36],
+       [ 2.85],
+       [ 1.87],
+       [17.41],
+       [18.69],
+       [17.66],
+       [15.51],
+       [14.34],
+       [10.34],
+       [ 6.81],
+       [-1.04],
+       [40.56],
+       [36.94],
+       [38.62],
+       [34.9 ],
+       [31.99],
+       [27.74],
+       [14.56],
+       [ 5.25]])
 obsvar = sigma2*np.ones(y.shape[0])
 
 
@@ -76,8 +99,8 @@ class priorstat:
 
 def corr_f(x,k):
     corrdict = {}
-    C0 = np.exp(-1/3*np.abs(np.subtract.outer(x[:,0],x[:,0])))*(1+1/3*np.abs(np.subtract.outer(x[:,0],x[:,0])))
-    C0 = 0.999*C0 + 0.001 * np.diag(np.diag(C0))
+    C0 = np.exp(-1/4*np.abs(np.subtract.outer(x[:,0],x[:,0])))*(1+1/4*np.abs(np.subtract.outer(x[:,0],x[:,0])))
+    C0 = 0.9999999*C0 + 0.0000001 * np.diag(np.diag(C0))
     C1 = 0.25*(np.abs(np.subtract.outer(x[:,1],x[:,1]))<10**(-4))
     if k == 0:
         adj = np.abs(20*(x[:,0] - 2*(1-np.exp(-x[:,0]/2))) - 20 * x[:,0])
@@ -116,7 +139,7 @@ from scipy.stats import kde
 def two2d(axis, theta):
     nbins = 50
     k = kde.gaussian_kde(theta.T)
-    xi, yi = np.mgrid[0:13:nbins*1j, 0:20:nbins*1j]
+    xi, yi = np.mgrid[0:15:nbins*1j, 0:80:nbins*1j]
     zi = k(np.vstack([xi.flatten(), yi.flatten()]))
     axis.pcolormesh(xi, yi, zi.reshape(xi.shape), shading='gouraud', cmap=plt.cm.BuGn_r)
     axis.contour(xi, yi, zi.reshape(xi.shape))
@@ -141,7 +164,7 @@ def plotpreds(axis, preddict):
         axis.plot(xtot[inds,0],uppercurve, 'k-', alpha=0.6,linewidth=0.5)
         axis.plot(xtot[inds,0],lowercurve, 'k-', alpha=0.6,linewidth=0.5)
     axis.plot(x,y, 'ko')
-    axis.set_xlim([0,3.0])
+    axis.set_xlim([0,3.5])
     axis.set_ylim([0,41])
 
 fig, axes = plt.subplots(ncols=4, nrows=1, figsize=(21, 5))    
