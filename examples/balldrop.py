@@ -37,7 +37,7 @@ emu_lin = emulator(thetacompexp, balldropmodel_linear(thetacompexp, xtot), xtot)
 emu_quad = emulator(thetacompexp, balldropmodel_quad(thetacompexp, xtot), xtot)
 
 import matplotlib.pyplot as plt
-sigma2 = 16
+sigma2 = 1
 
 x = np.array([[ 0.2, 10. ],
         [ 0.4, 10. ],
@@ -55,38 +55,36 @@ x = np.array([[ 0.2, 10. ],
         [ 2.0, 20. ],
         [ 2.4, 20. ],
         [ 0.2, 40. ],
-        [ 0.4, 40. ],
         [ 0.6, 40. ],
         [ 0.8, 40. ],
         [ 1.0, 40. ],
         [ 1.4, 40. ],
-        [ 2.0, 40. ],
-        [ 2.6, 40. ],
-        [ 3.2, 40. ],
-        [ 3.8, 40. ],
-        [ 4.4, 40. ]])
-y = balldroptrue(x) + sps.norm.rvs(0, np.sqrt(sigma2),size=x.shape[0])/4
+        [ 1.8, 40. ],
+        [ 2.8, 40. ]])
+y = balldroptrue(x) + sps.norm.rvs(0, np.sqrt(sigma2),size=x.shape[0])
 
 obsvar = sigma2*np.ones(y.shape[0])
 
 
 class priorstat:
     def logpdf(phi):
-        return np.squeeze(sps.gamma.logpdf(phi[:,0], 1, 0, 2)
-                          +sps.gamma.logpdf(phi[:,1], 1, 0, 2))                          
+        return np.squeeze(sps.gamma.logpdf(phi[:,0], 1, 0, 1)
+                          +sps.gamma.logpdf(phi[:,1], 1, 0, 1))                          
     def rvs(n):
-        return np.vstack((sps.gamma.rvs(1, 0, 2, size = n),
-                         sps.gamma.rvs(1, 0, 2, size = n))).T
+        return np.vstack((sps.gamma.rvs(1, 0, 1, size = n),
+                         sps.gamma.rvs(1, 0, 1, size = n))).T
 
 def corr_f(x,k):
     corrdict = {}
-    C0 = np.exp(-np.abs(np.subtract.outer(x[:,0],x[:,0])))
+    C0 = np.exp(-1/3*np.abs(np.subtract.outer(x[:,0],x[:,0])))*(1+1/3*np.abs(np.subtract.outer(x[:,0],x[:,0])))
+    C0 = 0.999*C0 + 0.001 * np.diag(np.diag(C0))
+    C1 = 0.25*(np.abs(np.subtract.outer(x[:,1],x[:,1]))<10**(-4))
     if k == 0:
-        corrdict['C'] = np.diag(np.abs(x[:,0]-6)) @\
-             C0 @ np.diag(np.abs(x[:,0]-6)) 
+        adj = np.abs(20*(x[:,0] - 2*(1-np.exp(-x[:,0]/2))) - 20 * x[:,0])
+        corrdict['C'] = C1 + np.diag(adj) @ C0 @ np.diag(adj)
     if k == 1:
-        corrdict['C'] = np.diag(np.abs(x[:,0])) @\
-             C0 @ np.diag(np.abs(x[:,0])) 
+        adj = np.abs(20*(x[:,0] - 2*(1-np.exp(-x[:,0]/2))) - 5 * x[:,0] ** 2)
+        corrdict['C'] = C1 + np.diag(adj) @ C0 @ np.diag(adj)
     return corrdict
 
 cal_quad= calibrator(emu_quad, y, x,
@@ -143,7 +141,7 @@ def plotpreds(axis, preddict):
         axis.plot(xtot[inds,0],uppercurve, 'k-', alpha=0.6,linewidth=0.5)
         axis.plot(xtot[inds,0],lowercurve, 'k-', alpha=0.6,linewidth=0.5)
     axis.plot(x,y, 'ko')
-    axis.set_xlim([0,4.5])
+    axis.set_xlim([0,3.0])
     axis.set_ylim([0,41])
 
 fig, axes = plt.subplots(ncols=4, nrows=1, figsize=(21, 5))    

@@ -40,8 +40,8 @@ def loglik(emulator, theta, phi, y, xind, modelnum, options):
         Sinv = np.diag(1/(obsvar))
         ldetS = np.sum(np.log(obsvar))
         if 'corrf' in options.keys() and phi is not None:
-            obsvarm = obsvar + phi[k,modelnum]
-            Snew = np.diag(obsvarm) + options['corrf'](emulator.x, modelnum)['C'][xind,:][:,xind]
+            obsvarm = obsvar
+            Snew = np.diag(obsvarm) + phi[k,modelnum]*options['corrf'](emulator.x, modelnum)['C'][xind,:][:,xind]
             #print(Snew)
             Sinvu = np.linalg.inv(Snew)
             ldetSu = np.linalg.slogdet(Snew)[1]
@@ -102,16 +102,13 @@ def predict(xindnew, emulator, theta, phi, y, xind, modelnum,  options):
         Sinv = np.diag(1/(obsvar))
         ldetS = np.sum(np.log(obsvar))
         if 'corrf' in options.keys() and phi is not None:
-            obsvarm = obsvar + phi[k,modelnum]
-            Sinv = np.diag(1/(obsvarm))
-            ldetS = np.sum(np.log(obsvarm))
-            Ch = options['corrf'](emulator.x, modelnum)['Chalf']
-            C = options['corrf'](emulator.x, modelnum)['C']
-            Tr = Sinv @ Ch[xind]
-            Sinvu = Sinv - np.outer(Tr, Tr) /(1+np.sum(Tr*Ch[xind]))
+            obsvarm = obsvar 
+            Snew = np.diag(obsvarm) + phi[k,modelnum]*options['corrf'](emulator.x, modelnum)['C'][xind,:][:,xind]
+            Sinvu = np.linalg.inv(Snew)
+            C =  phi[k,modelnum]*options['corrf'](emulator.x, modelnum)['C']
             mu = np.squeeze(predinfo['mean'][k,:])[xind]
-            preddict['meanfull'][k,:] += 0*C[xindnew,:][:,xind] @ Sinvu @ (np.squeeze(y) - mu) 
-            preddict['varfull'][k,:] += 0*np.diag(C[xindnew,xindnew] -
+            preddict['meanfull'][k,:] += C[xindnew,:][:,xind] @ Sinvu @ (np.squeeze(y) - mu) 
+            preddict['varfull'][k,:] += np.diag(C[xindnew,:][:,xindnew] -
                                                 C[xindnew,:][:,xind] @ Sinvu @\
                                                     C[xind,:][:,xindnew])
                 

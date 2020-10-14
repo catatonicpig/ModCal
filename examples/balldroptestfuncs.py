@@ -47,10 +47,10 @@ def balldropmodel_drag(theta, x):
 
 def balldroptrue(x):
     """Place description here."""
-    vter = 7
+    vter = 20
     g = 10
     tau = vter/g
     t = x[:, 0]
     h0 = x[:, 1]
-    y = h0 - vter*(t - tau*(1-np.exp(-t/tau)))
+    y = h0 + (h0-25)*0.05 - vter*(t - tau*(1-np.exp(-t/tau)))
     return y
