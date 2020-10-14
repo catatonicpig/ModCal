@@ -2,7 +2,7 @@
 """Header here."""
 import numpy as np
 
-def loglik(emulator, theta, phi, y, xind, modelnum, options):
+def loglik(emulator, theta, phi, y, xind, options):
     """
     Return posterior of function evaluation at the new parameters.
 
@@ -32,36 +32,64 @@ def loglik(emulator, theta, phi, y, xind, modelnum, options):
     else:
         raise ValueError('Must provide obsvar at this moment.')
     
-    
-    
-    predinfo = emulator.predict(theta)
-    loglik = np.zeros(predinfo['mean'].shape[0])
-    for k in range(0, predinfo['mean'].shape[0]):
-        Sinv = np.diag(1/(obsvar))
-        ldetS = np.sum(np.log(obsvar))
-        if 'corrf' in options.keys() and phi is not None:
-            obsvarm = obsvar + phi[k,modelnum]
-            Snew = np.diag(obsvarm) + options['corrf'](emulator.x, modelnum)['C'][xind,:][:,xind]
-            #print(Snew)
-            Sinvu = np.linalg.inv(Snew)
-            ldetSu = np.linalg.slogdet(Snew)[1]
-        else:
-            Sinvu = Sinv
-            ldetSu = ldetS
-            
-        mu = np.squeeze(predinfo['mean'][k,:])[xind]
-        U = (predinfo['covdecomp'][k,:,:])[:,xind]
-        Am = Sinvu @ U.T
-        W, V = np.linalg.eigh(np.eye(U.shape[0]) + U @ Am)
-        Amp = (np.squeeze(y)-mu).T @ Am @ V.T
-        loglik[k] = -0.5*(np.squeeze(y)-mu).T @ (Sinvu @ (np.squeeze(y)-mu))
-        loglik[k] += -0.5*ldetSu
-        loglik[k] += 0.5*(Amp @ (Amp * (1/W)).T)
-        loglik[k] += -0.5*np.sum(np.log(W))
-    #print(loglik)
-    return loglik
 
-def predict(xindnew, emulator, theta, phi, y, xind, modelnum,  options):
+    
+    if type(emulator) is tuple:
+        predinfo = [dict() for x in range(len(emulator))]
+        for k in range(0,len(emulator)):
+            predinfo[k] = emulator[k].predict(theta)
+    else:
+        predinfo = emulator.predict(theta)
+    
+    loglikr = np.zeros(theta.shape[0])
+    for k in range(0, theta.shape[0]):
+        if 'corrf' in options.keys():
+            if type(emulator) is tuple:
+                TotMatInv = np.diag(1/obsvar)
+                SInv = np.diag(1/obsvar)
+                ldetSu = np.sum(np.log(obsvar))
+                term1 = 0
+                resid = np.zeros((y.shape[0],len(emulator)))
+                residinv = np.zeros((y.shape[0],len(emulator)))
+                for l in range(0,len(emulator)):
+                    Sdisc = options['corrf'](emulator[l].x, l)['C'][xind,:][:,xind]
+                    A1 = np.squeeze(predinfo[l]['covdecomp'][k,:,xind])
+                    Sdisc +=  A1 @ A1.T
+                    Sdinv = np.linalg.inv(Sdisc)
+                    TotMatInv += Sdinv
+                    mu = np.squeeze(predinfo[l]['mean'][k,:])[xind]
+                    resid[:, l] = np.squeeze(y)-mu
+                    residinv[:, l] =Sdinv @ resid[:, l]
+                    ldetSu += np.linalg.slogdet(Sdisc)[1]
+                    term1 += np.sum(residinv[:, l] * resid[:, l])
+                Qv2 = np.sum(residinv,1)
+                ldetSu += np.linalg.slogdet(TotMatInv)[1]
+                term1 -= Qv2.T @ np.linalg.solve(TotMatInv,Qv2)
+            else:
+                TotMatInv = np.diag(1/obsvar)
+                SInv = np.diag(1/obsvar)
+                ldetSu = np.sum(np.log(obsvar))
+                term1 = 0
+                resid = np.zeros((y.shape[0],len(emulator)))
+                residinv = np.zeros((y.shape[0],len(emulator)))
+                Sdisc = options['corrf'](emulator.x, l)['C'][xind,:][:,xind]
+                A1 = np.squeeze(predinfo['covdecomp'][k,:,xind])
+                Sdisc +=  A1 @ A1.T
+                Sdinv = np.linalg.inv(Sdisc)
+                TotMatInv += Sdinv
+                mu = np.squeeze(predinfo['mean'][k,:])[xind]
+                resid[:, l] = np.squeeze(y)-mu
+                residinv[:, l] =Sdinv @ resid[:, l]
+                ldetSu += np.linalg.slogdet(Sdisc)[1]
+                term1 += np.sum(residinv[:, l] * resid[:, l])
+                Qv2 = np.sum(residinv,1)
+                ldetSu += np.linalg.slogdet(TotMatInv)[1]
+                term1 -= Qv2.T @ np.linalg.solve(TotMatInv,Qv2)
+        loglikr[k] += -0.5 * term1
+        loglikr[k] += -0.5 * ldetSu
+    return loglikr
+
+def predict(xindnew, emulator, theta, phi, y, xind, options):
     """
     Return posterior of function evaluation at the new parameters.
 
@@ -90,32 +118,46 @@ def predict(xindnew, emulator, theta, phi, y, xind, modelnum,  options):
     else:
         raise ValueError('Must provide obsvar at this moment.')
     
-    predinfo = emulator.predict(theta)
-    preddict = {}
-    
-            
-    preddict['meanfull'] = predinfo['mean']
-    preddict['varfull'] = predinfo['var'] 
-    
-    Sinv = np.diag(1/obsvar)
-    for k in range(0, predinfo['mean'].shape[0]):
+    if type(emulator) is tuple:
+        predinfo = [dict() for x in range(len(emulator))]
+        for k in range(0,len(emulator)):
+            predinfo[k] = emulator[k].predict(theta)
+    else:
+        predinfo = emulator.predict(theta)
+    meanvec = np.zeros((theta.shape[0],xindnew.shape[0]))
+    varvec = np.zeros((theta.shape[0],xindnew.shape[0]))
+    for k in range(0, theta.shape[0]):
         Sinv = np.diag(1/(obsvar))
         ldetS = np.sum(np.log(obsvar))
-        if 'corrf' in options.keys() and phi is not None:
-            obsvarm = obsvar + phi[k,modelnum]
-            Sinv = np.diag(1/(obsvarm))
-            ldetS = np.sum(np.log(obsvarm))
-            Ch = options['corrf'](emulator.x, modelnum)['Chalf']
-            C = options['corrf'](emulator.x, modelnum)['C']
-            Tr = Sinv @ Ch[xind]
-            Sinvu = Sinv - np.outer(Tr, Tr) /(1+np.sum(Tr*Ch[xind]))
-            mu = np.squeeze(predinfo['mean'][k,:])[xind]
-            preddict['meanfull'][k,:] += 0*C[xindnew,:][:,xind] @ Sinvu @ (np.squeeze(y) - mu) 
-            preddict['varfull'][k,:] += 0*np.diag(C[xindnew,xindnew] -
-                                                C[xindnew,:][:,xind] @ Sinvu @\
-                                                    C[xind,:][:,xindnew])
-                
-    preddict['mean'] = np.mean(preddict['meanfull'],0)
-    varterm1 = np.var(predinfo['mean'],0)
-    preddict['var'] = np.mean(preddict['varfull'],0) + varterm1
+        if 'corrf' in options.keys():
+            if type(emulator) is tuple:
+                TotMatInv = np.diag(1/obsvar)
+                SInv = np.diag(1/obsvar)
+                resid = np.zeros((y.shape[0],len(emulator)))
+                residinv = np.zeros((y.shape[0],len(emulator)))
+                T1 = np.zeros((xindnew.shape[0],y.shape[0]))
+                T2 = np.zeros((xindnew.shape[0],xindnew.shape[0]))
+                for l in range(0,len(emulator)):
+                    Sdisc = options['corrf'](emulator[l].x, l)['C'][xind,:][:,xind]
+                    A1 = np.squeeze(predinfo[l]['covdecomp'][k,:,xind])
+                    Sdisc +=  A1 @ A1.T
+                    Sdinv = np.linalg.inv(Sdisc)
+                    Sdisc2 = options['corrf'](emulator[l].x, l)['C'][xindnew,:][:,xind]
+                    A12 = np.squeeze(predinfo[l]['covdecomp'][k,:,xindnew])
+                    Sdisc2 +=  A12 @ A1.T
+                    Sdisc3 = options['corrf'](emulator[l].x, l)['C'][xindnew,:][:,xindnew]
+                    Sdisc3 +=  A12 @ A12.T
+                    TotMatInv += Sdinv
+                    mu = np.squeeze(predinfo[l]['mean'][k,:])[xind]
+                    mun = np.squeeze(predinfo[l]['mean'][k,:])[xindnew]
+                    resid[:, l] = np.squeeze(y)-mu
+                    residinv[:, l] =Sdinv @ resid[:, l]
+                    meanvec[k,:] += mun + Sdisc2 @ residinv[:, l]
+                    T1 += Sdisc2 @ Sdinv
+                    T2 += Sdisc3 - Sdisc2 @ Sdinv @ Sdisc2.T
+                Qv2 = np.sum(residinv,1)
+                meanvec[k,:] -= T1 @ np.linalg.solve(TotMatInv,Qv2)
+                varadj = np.diag(T2 + T1 @ np.linalg.solve(TotMatInv,T1.T))
+    preddict = {}
+    preddict['mean'] = np.mean(meanvec,0)
     return preddict
