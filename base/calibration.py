@@ -97,7 +97,27 @@ class calibrator(object):
         else:
             self.thetadraw = postsampler(self.thetaprior.rvs(1000), self.logpostfull)
             self.phidraw = None
-            
+        
+        if self.modelcount > 1.5:
+            if passoptions is None:
+                passoptions = self.passoptions
+            L0 = self.logprior(self.thetadraw , self.phidraw) 
+            La = np.tile(L0.reshape((-1,1)), (1,self.modelcount))
+            for k in range(0, self.modelcount):
+                if self.phidraw is not None:
+                    La[:,k] += self.calsoftware.loglik(self.emu[k], 
+                                                   self.thetadraw , self.phidraw, 
+                                                   self.y, self.xind, k,
+                                                   passoptions)
+                else:
+                    La[:,k] += self.calsoftware.loglik(self.emu[k], 
+                                                   self.thetadraw, None, 
+                                                   self.y, self.xind, k,
+                                                   passoptions)
+            Lm = np.max(La, 1)
+            G = np.sum(np.exp(La-Lm[:,None]),1)
+            L0 = np.log(G) + Lm
+            self.probdraw = np.exp(La - L0[:,None])
     def logprior(self, theta, phi):
         return (self.thetaprior.logpdf(copy.deepcopy(theta)) +
                 self.phiprior.logpdf(copy.deepcopy(phi)))
@@ -107,16 +127,33 @@ class calibrator(object):
             passoptions = self.passoptions
         L0 = self.logprior(theta, phi) 
         inds = np.where(np.isfinite(L0))[0]
-        if phi is not None:
-            L0[inds] += self.calsoftware.loglik(self.emu, 
-                                       theta[inds,:], None, 
-                                       self.y, self.xind, 
-                                       passoptions)
+        if self.modelcount < 1.5:
+            if phi is not None:
+                L0[inds] += self.calsoftware.loglik(self.emu0, 
+                                               theta[inds,:], phi[inds,:], 
+                                               self.y, self.xind, 0,
+                                               passoptions)
+            else:
+                L0[inds] += self.calsoftware.loglik(self.emu0, 
+                                               theta[inds,:], None, 
+                                               self.y, self.xind, 0,
+                                               passoptions)
         else:
-            L0[inds] += self.calsoftware.loglik(self.emu, 
-                                       theta[inds,:], phi[inds,:], 
-                                       self.y, self.xind, 
-                                       passoptions)
+            La = np.tile(L0.reshape((-1,1)), (1,self.modelcount))
+            for k in range(0, self.modelcount):
+                if phi is not None:
+                    La[inds,k] += self.calsoftware.loglik(self.emu[k], 
+                                                   theta[inds,:], phi[inds,:], 
+                                                   self.y, self.xind, k,
+                                                   passoptions)
+                else:
+                    La[inds,k] += self.calsoftware.loglik(self.emu[k], 
+                                                   theta[inds,:], None, 
+                                                   self.y, self.xind, k,
+                                                   passoptions)
+            Lm = np.max(La[inds], 1)
+            G = np.exp(La[inds,:]-Lm[:,None])
+            L0[inds] = np.log(np.sum(G,1)) + Lm
         return L0
     
     def logpostfull(self, thetaphi, passoptions=None):
@@ -137,8 +174,30 @@ class calibrator(object):
         if theta is None:
             theta = self.thetadraw
             phi = self.phidraw
+            if self.modelcount > 1.5:
+                probdraw = self.probdraw
         if passoptions is None:
             passoptions = self.passoptions
-        return (self.calsoftware.predict(xind, self.emu, theta, phi, 
-                                         self.y, self.xind, passoptions))
+        if self.modelcount < 1.5:
+            return (self.calsoftware.predict(xind, self.emu, theta, phi, 
+                                             self.y, self.xind, 0, passoptions))
+        else:
+            preddict = {}
+            emupreddict = self.calsoftware.predict(xind, self.emu[0], theta, 
+                                                   phi, self.y, self.xind, 
+                                                   0, passoptions)
+            meancalcvec = (probdraw[:,0])[:,None] * emupreddict['meanfull']
+            varcalcvec = (probdraw[:,0])[:,None]  * (
+                    emupreddict['meanfull'] ** 2 + emupreddict['varfull'])
+            for k in range(1, self.modelcount):
+                emupreddict = self.calsoftware.predict(xind, self.emu[k], theta, 
+                                                   phi, self.y, self.xind, 
+                                                   k, passoptions)
+                meancalcvec += (probdraw[:,k])[:,None] * emupreddict['meanfull']
+                varcalcvec += (probdraw[:,k])[:,None]  * (
+                    emupreddict['meanfull'] ** 2 + emupreddict['varfull'])
+            preddict['mean'] = np.mean(meancalcvec,0)
+            preddict['var'] = np.mean(varcalcvec- meancalcvec ** 2,0) +\
+                        np.var(meancalcvec,0)
+            return preddict
              
