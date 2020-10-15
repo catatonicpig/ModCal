@@ -32,7 +32,7 @@ def loglik(emulator, theta, phi, y, xind, options):
     else:
         raise ValueError('Must provide obsvar at this moment.')
     
-    obsvar = 100*obsvar
+    obsvar = 1000*obsvar
     
     if type(emulator) is tuple:
         predinfo = [dict() for x in range(len(emulator))]
@@ -50,7 +50,7 @@ def loglik(emulator, theta, phi, y, xind, options):
             for l in range(0,len(emulator)):
                 resid[l*xind.shape[0]:(l+1)*xind.shape[0]] = np.squeeze(y) - predinfo[l]['mean'][k,xind]
                 A1 = np.squeeze(predinfo[l]['covdecomp'][k,:,xind])
-                covmat = 1000*A1 @ A1.T
+                covmat = A1 @ A1.T
                 covmatinv[l*xind.shape[0]:(l+1)*xind.shape[0],
                           l*xind.shape[0]:(l+1)*xind.shape[0]] =\
                               np.linalg.inv(0.5*covmat + 0.5*
@@ -62,17 +62,21 @@ def loglik(emulator, theta, phi, y, xind, options):
             RQ = np.vstack((RQT,RQB))
             n = R.shape[0]
             Jm = np.hstack((np.eye(n),-np.eye(n)))
-            RQu = RQ - (Jm @ RQ).T @ np.linalg.solve(Jm @ RQ @ Jm.T, Jm @ RQ)
-            
-            dhat = 
-            print(np.linalg.eigh(CovMatInv3)[0])
-            #print(np.linalg.eigh(np.linalg.inv(covmatinv) )[0])
+            RQp = RQ + np.linalg.inv(covmatinv)
+            eps = 10
+            RQup = RQp - (Jm @ RQp).T @ np.linalg.solve(Jm @ RQp @ Jm.T, Jm @ RQp)
+            RQupp = RQ - (Jm @ RQ).T @ np.linalg.solve(Jm @ RQp @ Jm.T, Jm @ RQp)
+            dhat3 = (Jm @ RQp).T @ np.linalg.solve(R+Q+2*eps*np.eye(n), f1-f2)
+            dhat4 = np.vstack((R,-Q)) @ np.linalg.solve(R+Q+2*eps*np.eye(n), f1-f2)
+            dhat = dhat4 + RQupp[:,inds] @ np.linalg.solve(RQup[inds,:][:,inds], f1[inds] - y[inds] - dhat3[inds])
 
-            print(1/np.linalg.eigh(np.linalg.inv(covmatinv) + Jm.T @ np.diag(obsvar) @ Jm)[0])
-
-            print(np.sum(resid * (CovMatInv3 @ resid)))
-            asdasd
-            asdasda
+            print(np.linalg.inv(covmatinv))
+            SigMat = np.linalg.inv(covmatinv) + RQu
+            print(np.sum(resid ** 2))
+            print(np.diag(SigMat))
+            print(np.sum(resid * np.linalg.solve(SigMat,resid)))
+            print(SigMat)
+            asdad
         loglikr[k] += -0.5 * term1
         loglikr[k] += -0.5 * ldetSu
     return loglikr

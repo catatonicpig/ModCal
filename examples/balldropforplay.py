@@ -111,12 +111,12 @@ def corr_f(x,k):
     #C2 = np.exp(-np.abs(np.subtract.outer(x[:,0],x[:,0])))*(1+np.abs(np.subtract.outer(x[:,0],x[:,0])))
     #C3 = 0.0001*(np.abs(np.subtract.outer(x[:,1],x[:,1]))<10**(-4))
     if k == 0:
-        C0 = np.exp(-20*np.abs(np.subtract.outer(x[:,0],x[:,0])))*(1+20*np.abs(np.subtract.outer(x[:,0],x[:,0])))
-        adj = (y-f1)
+        C0 = np.exp(-8*np.abs(np.subtract.outer(x[:,0],x[:,0])))*(1+8*np.abs(np.subtract.outer(x[:,0],x[:,0])))
+        adj = (y-f1)/10
         corrdict['C'] = C1 + np.diag(adj) @ C0 @ np.diag(adj)
     if k == 1:
-        C0 = np.exp(-2*np.abs(np.subtract.outer(x[:,0],x[:,0])))*(1+2*np.abs(np.subtract.outer(x[:,0],x[:,0])))
-        adj = (y-f2)
+        C0 = np.exp(-8*np.abs(np.subtract.outer(x[:,0],x[:,0])))*(1+8*np.abs(np.subtract.outer(x[:,0],x[:,0])))
+        adj = (y-f2)/10
         corrdict['C'] = C1 + np.diag(adj) @ C0 @ np.diag(adj)
     return corrdict
 
@@ -181,10 +181,26 @@ weg = np.where(np.abs(W) > (10 ** (-4)))[0]
 dhat2 = (Jm @ RQ).T @ np.linalg.solve(Jm @ RQ @ Jm.T, Jm @ mval)
 dhat = dhat2 + RQu[:,inds] @ np.linalg.solve(RQu[inds,:][:,inds], f1[inds] - y[inds] - dhat2[inds])
 
-print(dhat2[120:140])
-print(dhat[120:140])
+#print(dhat2[0:10])
+#print(dhat[0:10])
 
 dhato = R[:,inds] @ np.linalg.solve(R[inds,:][:,inds], residval[:x.shape[0]])
-print(dhato[120:140])
-print(f1[120:140] -y[120:140])
+#print(dhato[00:10])
+print(f1[0:10] -y[0:10])
 
+eps = 100
+f1cov = eps*np.eye(x.shape[0])
+f2cov = eps*np.eye(x.shape[0])
+
+
+RQp = RQ + eps*np.eye(RQ.shape[0])
+RQup = RQp - (Jm @ RQp).T @ np.linalg.solve(Jm @ RQp @ Jm.T, Jm @ RQp)
+RQupp = RQ - (Jm @ RQ).T @ np.linalg.solve(Jm @ RQp @ Jm.T, Jm @ RQp)
+dhat3 = (Jm @ RQp).T @ np.linalg.solve(Jm @ RQp @ Jm.T, Jm @ mval)
+
+dhat4 = np.vstack((R,-Q)) @ np.linalg.solve(R+Q+2*eps*np.eye(n), f1-f2)
+dhat = dhat4 + RQupp[:,inds] @ np.linalg.solve(RQup[inds,:][:,inds], f1[inds] - y[inds] - dhat3[inds])
+
+print(dhat4[0:10])
+print(dhat2[0:10])
+print(dhat[0:10])
