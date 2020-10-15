@@ -18,11 +18,11 @@ class priorphys:
     def logpdf(theta):
         return np.squeeze(sps.gamma.logpdf(theta[:,0], 2, 0, 5) +
             sps.gamma.logpdf(theta[:,1], 1, 0, 40) +
-            sps.norm.logpdf(theta[:,2], 0, 2))
+            sps.norm.logpdf(theta[:,2], 0, 10))
     def rvs(n):
         return np.vstack((sps.gamma.rvs(2, 0, 5, size=n),
                      sps.gamma.rvs(1, 0, 40, size=n),
-                     sps.norm.rvs(0, 2, size=n))).T
+                     sps.norm.rvs(0, 10, size=n))).T
 
 tvec = np.concatenate((np.arange(0.1,5.6,0.1),
                   np.arange(0.1,5.6,0.1),
@@ -113,9 +113,9 @@ obsvar = sigma2*np.ones(y.shape[0])
 
 class priorstat1d:
     def logpdf(phi):
-        return np.squeeze(sps.gamma.logpdf(phi, 1, 0, 0.25))
+        return np.squeeze(sps.gamma.logpdf(phi, 1, 0, 4))
     def rvs(n):
-        return sps.gamma.rvs(1, 0, 0.25, size = n).reshape((-1,1))
+        return sps.gamma.rvs(1, 0, 4, size = n).reshape((-1,1))
 
 class priorstat2d:
     def logpdf(phi):
@@ -127,13 +127,13 @@ class priorstat2d:
 
 def corr_f(x,k):
     corrdict = {}
-    C0 = np.exp(-1/3*np.abs(np.subtract.outer(x[:,0],x[:,0])))*(1+1/3*np.abs(np.subtract.outer(x[:,0],x[:,0])))
+    C0 = np.exp(-np.abs(np.subtract.outer(x[:,0],x[:,0])))*(1+np.abs(np.subtract.outer(x[:,0],x[:,0])))
     C1 = 0.0001*(np.abs(np.subtract.outer(x[:,1],x[:,1]))<10**(-4))
     if k == 0:
-        adj = np.exp(5-x[:,0])/4
+        adj = np.exp(6-x[:,0])/4
         corrdict['C'] = C1 + np.diag(adj) @ C0 @ np.diag(adj)
     if k == 1:
-        adj = np.exp(x[:,0])/2
+        adj = np.exp(x[:,0])
         corrdict['C'] = C1 + np.diag(adj) @ C0 @ np.diag(adj)
     return corrdict
 
@@ -142,8 +142,9 @@ cal_BMM = calibrator((emu_lin,emu_quad), y, x,
                        phiprior = priorstat2d,
                        passoptions = {'obsvar': obsvar, 'corrf': corr_f})
 
-
-
+print(cal_BMM.thetadraw)
+print(cal_BMM.phidraw)
+asdasd
 cal_lin = calibrator(emu_lin, y, x,
                        thetaprior = priorphys,
                        phiprior = priorstat1d,

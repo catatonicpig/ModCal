@@ -115,7 +115,7 @@ def corr_f(x,k):
         adj = (y-f1)/10
         corrdict['C'] = C1 + np.diag(adj) @ C0 @ np.diag(adj)
     if k == 1:
-        C0 = np.exp(-8*np.abs(np.subtract.outer(x[:,0],x[:,0])))*(1+8*np.abs(np.subtract.outer(x[:,0],x[:,0])))
+        C0 = np.exp(-np.abs(np.subtract.outer(x[:,0],x[:,0])))*(1+np.abs(np.subtract.outer(x[:,0],x[:,0])))
         adj = (y-f2)/10
         corrdict['C'] = C1 + np.diag(adj) @ C0 @ np.diag(adj)
     return corrdict

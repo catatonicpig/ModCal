@@ -66,8 +66,8 @@ class calibrator(object):
             self.x = x
         else:
             self.xind = range(0, x.shape[0])
-            self.x = emu0.x
-        
+            self.x = self.emu0.x
+        print(phiprior)
         try:
             self.calsoftware = importlib.import_module('base.calibrationsubfuncs.' + software)
         except:
@@ -89,6 +89,7 @@ class calibrator(object):
         
         self.thetaprior = thetaprior
         if phiprior.rvs(1) is not None:
+            print('here')
             self.thetaphidraw = postsampler(np.hstack((self.thetaprior.rvs(1000),
                                                        self.phiprior.rvs(1000))),
                                             self.logpostfull)
@@ -107,7 +108,7 @@ class calibrator(object):
             passoptions = self.passoptions
         L0 = self.logprior(theta, phi) 
         inds = np.where(np.isfinite(L0))[0]
-        if phi is not None:
+        if phi is None:
             L0[inds] += self.calsoftware.loglik(self.emu, 
                                        theta[inds,:], None, 
                                        self.y, self.xind, 

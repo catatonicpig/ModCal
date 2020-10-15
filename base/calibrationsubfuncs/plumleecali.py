@@ -32,8 +32,6 @@ def loglik(emulator, theta, phi, y, xind, options):
     else:
         raise ValueError('Must provide obsvar at this moment.')
     
-    obsvar = 1000*obsvar
-    
     if type(emulator) is tuple:
         predinfo = [dict() for x in range(len(emulator))]
         for k in range(0,len(emulator)):
@@ -43,42 +41,45 @@ def loglik(emulator, theta, phi, y, xind, options):
     
     loglikr = np.zeros(theta.shape[0])
     for k in range(0, theta.shape[0]):
-        if 'corrf' in options.keys():
-            covmatinv = np.zeros((len(emulator)*xind.shape[0],
-                                 len(emulator)*xind.shape[0]))
+        if type(emulator) is tuple:
+            covmats = [np.array(0) for x in range(len(emulator))]
+            covmatsinv = [np.array(0) for x in range(len(emulator))]
+            mus = [np.array(0) for x in range(len(emulator))]
             resid= np.zeros(len(emulator)*xind.shape[0])
+            totInv = np.zeros((xind.shape[0],xind.shape[0]))
+            term1 = np.zeros((xind.shape[0],xind.shape[0]))
+            term2 = np.zeros((xind.shape[0],xind.shape[0]))
+            term3 = np.zeros((xind.shape[0]))
             for l in range(0,len(emulator)):
-                resid[l*xind.shape[0]:(l+1)*xind.shape[0]] = np.squeeze(y) - predinfo[l]['mean'][k,xind]
+                mus[l] = np.squeeze(y) - predinfo[l]['mean'][k,xind]
                 A1 = np.squeeze(predinfo[l]['covdecomp'][k,:,xind])
-                covmat = A1 @ A1.T
-                covmatinv[l*xind.shape[0]:(l+1)*xind.shape[0],
-                          l*xind.shape[0]:(l+1)*xind.shape[0]] =\
-                              np.linalg.inv(0.5*covmat + 0.5*
-                                            np.diag(np.diag(covmat)))
-            R = np.diag(obsvar)
-            Q = np.diag(obsvar)
-            RQT = np.hstack((R, 0*R))
-            RQB = np.hstack((0*Q, Q))
-            RQ = np.vstack((RQT,RQB))
-            n = R.shape[0]
-            Jm = np.hstack((np.eye(n),-np.eye(n)))
-            RQp = RQ + np.linalg.inv(covmatinv)
-            eps = 10
-            RQup = RQp - (Jm @ RQp).T @ np.linalg.solve(Jm @ RQp @ Jm.T, Jm @ RQp)
-            RQupp = RQ - (Jm @ RQ).T @ np.linalg.solve(Jm @ RQp @ Jm.T, Jm @ RQp)
-            dhat3 = (Jm @ RQp).T @ np.linalg.solve(R+Q+2*eps*np.eye(n), f1-f2)
-            dhat4 = np.vstack((R,-Q)) @ np.linalg.solve(R+Q+2*eps*np.eye(n), f1-f2)
-            dhat = dhat4 + RQupp[:,inds] @ np.linalg.solve(RQup[inds,:][:,inds], f1[inds] - y[inds] - dhat3[inds])
-
-            print(np.linalg.inv(covmatinv))
-            SigMat = np.linalg.inv(covmatinv) + RQu
-            print(np.sum(resid ** 2))
-            print(np.diag(SigMat))
-            print(np.sum(resid * np.linalg.solve(SigMat,resid)))
-            print(SigMat)
-            asdad
-        loglikr[k] += -0.5 * term1
-        loglikr[k] += -0.5 * ldetSu
+                covmats[l] = np.diag(obsvar)
+                covmats[l] += A1 @ A1.T
+                if 'corrf' in options.keys():
+                    covmats[l] += phi[k,l]*options['corrf'](emulator[l].x[xind,:], l)['C']
+                else:
+                    covmats[l] += phi[k,l]*np.eye(obsvar.shape[0])
+                covmatsinv[l] = np.linalg.inv(covmats[l])
+                totInv += covmatsinv[l]
+                if l > 0.5:
+                    term1 += covmats[0] @ covmatsinv[l] @ covmats[0]
+                    term2 += covmats[0] @ covmatsinv[l]
+                    term3 += -covmatsinv[l] @ (mus[l] - mus[0])
+            S0 = covmats[0] - (term1 - term2 @ np.linalg.solve(totInv, term2.T))
+            m0 = covmats[0] @ term3 - term2 @ np.linalg.solve(totInv, term3)
+            mut = mus[0]
+        else:
+            m0 = np.squeeze(y)*0
+            mut = np.squeeze(y) - predinfo[l]['mean'][k,xind]
+            A1 = np.squeeze(predinfo['covdecomp'][k,:,xind])
+            S0 = np.diag(obsvar)
+            S0 += A1 @ A1.T
+            if 'corrf' in options.keys():
+                covmats[l] += phi[k,l] * options['corrf'](emulator[l].x[xind,:], l)['C']
+            else:
+                covmats[l] += phi[k,l]*np.eye(obsvar.shape[0])
+        loglikr[k] += -0.5*np.sum((mut-m0) * np.linalg.solve(S0,mut-m0))
+        loglikr[k] += -0.5*np.linalg.slogdet(S0)[0]
     return loglikr
 
 def predict(xindnew, emulator, theta, phi, y, xind, options):
@@ -109,47 +110,53 @@ def predict(xindnew, emulator, theta, phi, y, xind, options):
         obsvar = options['obsvar']
     else:
         raise ValueError('Must provide obsvar at this moment.')
-    
+        
     if type(emulator) is tuple:
         predinfo = [dict() for x in range(len(emulator))]
         for k in range(0,len(emulator)):
             predinfo[k] = emulator[k].predict(theta)
     else:
         predinfo = emulator.predict(theta)
-    meanvec = np.zeros((theta.shape[0],xindnew.shape[0]))
-    varvec = np.zeros((theta.shape[0],xindnew.shape[0]))
+    
     for k in range(0, theta.shape[0]):
-        Sinv = np.diag(1/(obsvar))
-        ldetS = np.sum(np.log(obsvar))
-        if 'corrf' in options.keys():
-            if type(emulator) is tuple:
-                TotMatInv = np.diag(1/obsvar)
-                SInv = np.diag(1/obsvar)
-                resid = np.zeros((y.shape[0],len(emulator)))
-                residinv = np.zeros((y.shape[0],len(emulator)))
-                T1 = np.zeros((xindnew.shape[0],y.shape[0]))
-                T2 = np.zeros((xindnew.shape[0],xindnew.shape[0]))
-                for l in range(0,len(emulator)):
-                    Sdisc = options['corrf'](emulator[l].x, l)['C'][xind,:][:,xind]
-                    A1 = np.squeeze(predinfo[l]['covdecomp'][k,:,xind])
-                    Sdisc +=  A1 @ A1.T
-                    Sdinv = np.linalg.inv(Sdisc)
-                    Sdisc2 = options['corrf'](emulator[l].x, l)['C'][xindnew,:][:,xind]
-                    A12 = np.squeeze(predinfo[l]['covdecomp'][k,:,xindnew])
-                    Sdisc2 +=  A12 @ A1.T
-                    Sdisc3 = options['corrf'](emulator[l].x, l)['C'][xindnew,:][:,xindnew]
-                    Sdisc3 +=  A12 @ A12.T
-                    TotMatInv += Sdinv
-                    mu = np.squeeze(predinfo[l]['mean'][k,:])[xind]
-                    mun = np.squeeze(predinfo[l]['mean'][k,:])[xindnew]
-                    resid[:, l] = np.squeeze(y)-mu
-                    residinv[:, l] =Sdinv @ resid[:, l]
-                    meanvec[k,:] += mun + Sdisc2 @ residinv[:, l]
-                    T1 += Sdisc2 @ Sdinv
-                    T2 += Sdisc3 - Sdisc2 @ Sdinv @ Sdisc2.T
-                Qv2 = np.sum(residinv,1)
-                meanvec[k,:] -= T1 @ np.linalg.solve(TotMatInv,Qv2)
-                varadj = np.diag(T2 + T1 @ np.linalg.solve(TotMatInv,T1.T))
-    preddict = {}
-    preddict['mean'] = np.mean(meanvec,0)
-    return preddict
+        if type(emulator) is tuple:
+            covmats = [np.array(0) for x in range(len(emulator))]
+            covmatsinv = [np.array(0) for x in range(len(emulator))]
+            mus = [np.array(0) for x in range(len(emulator))]
+            resid= np.zeros(len(emulator)*xind.shape[0])
+            totInv = np.zeros((xind.shape[0],xind.shape[0]))
+            term1 = np.zeros((xind.shape[0],xind.shape[0]))
+            term2 = np.zeros((xind.shape[0],xind.shape[0]))
+            term3 = np.zeros((xind.shape[0]))
+            for l in range(0,len(emulator)):
+                mus[l] = np.squeeze(y) - predinfo[l]['mean'][k,xind]
+                A1 = np.squeeze(predinfo[l]['covdecomp'][k,:,xind])
+                covmats[l] = np.diag(obsvar)
+                covmats[l] += A1 @ A1.T
+                if 'corrf' in options.keys():
+                    covmats[l] += phi[k,l] * options['corrf'](emulator[l].x[xind,:], l)['C']
+                else:
+                    covmats[l] += phi[k,l]*np.eye(obsvar.shape[0])
+                covmatsinv[l] = np.linalg.inv(covmats[l])
+                totInv += covmatsinv[l]
+                if l > 0.5:
+                    term1 += covmats[0] @ covmatsinv[l] @ covmats[0]
+                    term2 += covmats[0] @ covmatsinv[l]
+                    term3 += covmatsinv[l] @ (mus[l] - mus[0])
+            S0 = covmats[0] - (term1 - term2 @ np.linalg.solve(totInv, term2.T))
+            m0 = covmats[0] @ term3 - term2 @ np.linalg.solve(totInv, term3)
+            m0 = covmats[0] @ np.linalg.solve(covmats[0] +covmats[1],mus[0] - mus[l])
+            mut = m0
+        else:
+            m0 = np.squeeze(y)*0
+            mut = np.squeeze(y) - predinfo[l]['mean'][k,xind]
+            A1 = np.squeeze(predinfo['covdecomp'][k,:,xind])
+            S0 = np.diag(obsvar)
+            S0 += A1 @ A1.T
+            if 'corrf' in options.keys():
+                covmats[l] += phi[k,l] * options['corrf'](emulator[l].x[xind,:], l)['C']
+            else:
+                covmats[l] += phi[k,l]*np.eye(obsvar.shape[0])
+        loglikr[k] += -0.5*np.sum((mut-m0) * np.linalg.solve(S0,mut-m0))
+        loglikr[k] += -0.5*np.linalg.slogdet(S0)[0]
+    return loglikr
