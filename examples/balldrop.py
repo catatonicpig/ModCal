@@ -18,11 +18,11 @@ class priorphys:
     def logpdf(theta):
         return np.squeeze(sps.gamma.logpdf(theta[:,0], 2, 0, 5) +
             sps.gamma.logpdf(theta[:,1], 1, 0, 40) +
-            sps.norm.logpdf(theta[:,2], 0, 10))
+            sps.norm.logpdf(theta[:,2], 0, 20))
     def rvs(n):
         return np.vstack((sps.gamma.rvs(2, 0, 5, size=n),
                      sps.gamma.rvs(1, 0, 40, size=n),
-                     sps.norm.rvs(0, 10, size=n))).T
+                     sps.norm.rvs(0, 20, size=n))).T
 
 tvec = np.concatenate((np.arange(0.1,5.6,0.1),
                   np.arange(0.1,5.6,0.1),
@@ -38,13 +38,13 @@ thetacompexp = priorphys.rvs(100)
 emu_lin = emulator(thetacompexp, balldropmodel_linear(thetacompexp, xtot), xtot)
 emu_quad = emulator(thetacompexp, balldropmodel_quad(thetacompexp, xtot), xtot)
 
+
 import matplotlib.pyplot as plt
-sigma2 = 1
+sigma2 = 4
 
 x = np.array([[ 0.1, 20. ],
               [ 0.2, 20. ],
               [ 0.3, 20. ],
-        [ 0.4, 20. ],
         [ 0.5, 20. ],
         [ 0.6, 20. ],
         [ 0.8, 20. ],
@@ -54,7 +54,6 @@ x = np.array([[ 0.1, 20. ],
         [ 0.1, 40. ],
         [ 0.2, 40. ],
         [ 0.3, 40. ],
-        [ 0.4, 40. ],
         [ 0.5, 40. ],
         [ 0.6, 40. ],
         [ 0.8, 40. ],
@@ -64,11 +63,8 @@ x = np.array([[ 0.1, 20. ],
         [ 2.4, 40. ],
         [ 3.0, 40. ],
         [ 0.1, 80. ],
-        [ 0.2, 80. ],
         [ 0.3, 80. ],
-        [ 0.4, 80. ],
         [ 0.5, 80. ],
-        [ 0.6, 80. ],
         [ 0.8, 80. ],
         [ 1.0, 80. ],
         [ 1.4, 80. ],
@@ -76,14 +72,11 @@ x = np.array([[ 0.1, 20. ],
         [ 2.2, 80. ],
         [ 2.7, 80. ],
         [ 3.2, 80. ],
-        [ 3.5, 80. ],
         [ 3.7, 80. ],
         [ 4.2, 80. ],
-        [ 4.7, 80. ],
+        [ 4.5, 80. ],
         [ 4.9, 80. ],
-        [ 5.0, 80. ],
-        [ 5.1, 80. ],
-        [ 5.2, 80. ]])
+        [ 5.1, 80. ]])
 y = balldroptruealt(x) + sps.norm.rvs(0, np.sqrt(sigma2),size=x.shape[0])
 # y = np.array([[ 9.01],
 #        [ 7.64],
@@ -111,6 +104,12 @@ y = balldroptruealt(x) + sps.norm.rvs(0, np.sqrt(sigma2),size=x.shape[0])
 obsvar = sigma2*np.ones(y.shape[0])
 #plt.plot(x[:,0],y, 'ko')
 
+
+# balldroptruealt(x)- balldropmodel_quad(np.array((10,20,0)).reshape(1,-1), x)
+
+# balldroptruealt(x)- balldropmodel_linear(np.array((10,20,0)).reshape(1,-1), x) -\
+#     np.mean(balldroptruealt(x[-2:,:])- balldropmodel_linear(np.array((10,20,0)).reshape(1,-1), x[-2:,:]))
+
 class priorstat1d:
     def logpdf(phi):
         return np.squeeze(sps.gamma.logpdf(phi, 1, 0, 4))
@@ -125,36 +124,82 @@ class priorstat2d:
 
 
 
-def corr_f(x,k):
+def corr_lin(x):
     corrdict = {}
-    C0 = np.exp(-np.abs(np.subtract.outer(x[:,0],x[:,0])))*(1+np.abs(np.subtract.outer(x[:,0],x[:,0])))
-    C1 = 0.0001*(np.abs(np.subtract.outer(x[:,1],x[:,1]))<10**(-4))
-    if k == 0:
-        adj = np.exp(6-x[:,0])/4
-        corrdict['C'] = C1 + np.diag(adj) @ C0 @ np.diag(adj)
-    if k == 1:
-        adj = np.exp(x[:,0])
-        corrdict['C'] = C1 + np.diag(adj) @ C0 @ np.diag(adj)
+    C0 = np.exp(-1/3*np.abs(np.subtract.outer(x[:,0],x[:,0])))*(1+1/3*np.abs(np.subtract.outer(x[:,0],x[:,0])))
+    adj = np.exp(5.5-x[:,0])/10
+    corrdict['C'] = np.diag(adj) @ C0 @ np.diag(adj)
     return corrdict
 
-cal_BMM = calibrator((emu_lin,emu_quad), y, x,
+def corr_quad(x):
+    corrdict = {}
+    C0 = np.exp(-1/3*np.abs(np.subtract.outer(x[:,0],x[:,0])))*(1+1/3*np.abs(np.subtract.outer(x[:,0],x[:,0])))
+    adj =  np.exp((x[:,0]-1)*2)/100
+    corrdict['C'] = np.diag(adj) @ C0 @ np.diag(adj)
+    return corrdict
+
+def corr_f(x,k):
+    if k == 1:
+        return corr_lin(x)
+    if k == 0:
+        return corr_quad(x)
+
+fig, axes = plt.subplots(ncols=5, nrows=1, figsize=(21, 5))
+
+cal_BMM = calibrator((emu_quad,emu_lin), y, x,
                        thetaprior = priorphys,
                        phiprior = priorstat2d,
                        passoptions = {'obsvar': obsvar, 'corrf': corr_f})
 
-print(cal_BMM.thetadraw)
-print(cal_BMM.phidraw)
-asdasd
+
+def plotpreds(axis, preddict):
+    for k in (20,40,60,80):
+        inds = np.where(xtot[:,1] == k)[0]
+        uppercurve = preddict['mean'][inds] + 3*np.sqrt(preddict['var'][inds])
+        lowercurve = preddict['mean'][inds] - 3*np.sqrt(preddict['var'][inds])
+        axis.fill_between(xtot[inds,0], lowercurve, uppercurve, color='k', alpha=0.2)
+        axis.plot(xtot[inds,0],preddict['mean'][inds],'k-')
+        axis.plot(xtot[inds,0],uppercurve, 'k-', alpha=0.6,linewidth=0.5)
+        axis.plot(xtot[inds,0],lowercurve, 'k-', alpha=0.6,linewidth=0.5)
+    axis.plot(x,y, 'ko')
+    axis.set_xlim([0,5.6])
+    axis.set_ylim([0,85])
+
+fig, axes = plt.subplots(ncols=5, nrows=1, figsize=(21, 5))
+plotpreds(axes[0], cal_BMM.predict(xtot))
+
 cal_lin = calibrator(emu_lin, y, x,
                        thetaprior = priorphys,
                        phiprior = priorstat1d,
-                       passoptions = {'obsvar': obsvar})
+                       passoptions = {'obsvar': obsvar, 'corrf': corr_lin})
+
+plotpreds(axes[1], cal_lin.predict(xtot))
 
 cal_quad= calibrator(emu_quad, y, x,
                        thetaprior = priorphys,
                        phiprior = priorstat1d,
-                       passoptions = {'obsvar': obsvar})
+                       passoptions = {'obsvar': obsvar, 'corrf': corr_quad})
 
+
+plotpreds(axes[2], cal_quad.predict(xtot))
+
+
+from scipy.stats import kde
+def two2d(axis, theta):
+    nbins = 50
+    k = kde.gaussian_kde(theta.T)
+    xi, yi = np.mgrid[0:15:nbins*1j, 0:60:nbins*1j]
+    zi = k(np.vstack([xi.flatten(), yi.flatten()]))
+    axis.pcolormesh(xi, yi, zi.reshape(xi.shape), shading='gouraud', cmap=plt.cm.BuGn_r)
+    axis.contour(xi, yi, zi.reshape(xi.shape))
+
+fig, axes = plt.subplots(ncols=5, nrows=1, figsize=(21, 5))
+two2d(axes[0], priorphys.rvs(4000)[:,:2])
+two2d(axes[1], cal_lin.thetadraw[:,:2])
+two2d(axes[2], cal_quad.thetadraw[:,:2])
+two2d(axes[3], cal_BMM.thetadraw[:,:2])
+
+asdad
  
 cal_BMA = calibrator((emu_lin,emu_quad), y, x,
                        thetaprior = priorphys,

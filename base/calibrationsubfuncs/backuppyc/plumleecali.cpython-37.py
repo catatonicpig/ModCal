@@ -1,3 +1,9 @@
+# uncompyle6 version 3.7.4
+# Python bytecode 3.7 (3394)
+# Decompiled from: Python 3.7.6 (default, Jan  8 2020, 20:23:39) [MSC v.1916 64 bit (AMD64)]
+# Embedded file name: C:\Users\FloYd\Documents\GithubFiles\ModCal\base\calibrationsubfuncs\plumleecali.py
+# Compiled at: 2020-10-15 17:06:27
+# Size of source mod 2**32: 7872 bytes
 """Header here."""
 import numpy as np
 
