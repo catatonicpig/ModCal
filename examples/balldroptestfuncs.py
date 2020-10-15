@@ -8,7 +8,7 @@ def balldropmodel_linear(theta, x):
     f = np.zeros((theta.shape[0], x.shape[0]))
     for k in range(0, theta.shape[0]):
         t = x[:, 0]
-        h0 = x[:, 1]
+        h0 = x[:, 1] + theta[k,2]
         vter = theta[k, 1]
         # g = 'nan'
         f[k, :] = h0 - vter * t
@@ -45,12 +45,27 @@ def balldropmodel_drag(theta, x):
     return f
 
 
+def balldroptruealt(x):
+    """Place description here."""
+    
+    def logcosh(x):
+        # preventing crashing
+        s = np.sign(x) * x
+        p = np.exp(-2 * s)
+        return s + np.log1p(p) - np.log(2)
+    t = x[:, 0]
+    h0 = x[:, 1]
+    vter = 20
+    g = 10
+    y = h0 - (vter ** 2) / g * logcosh(g * t / vter)
+    return y
+
 def balldroptrue(x):
     """Place description here."""
-    vter = 20
+    vter = 200
     g = 10
     tau = vter/g
     t = x[:, 0]
     h0 = x[:, 1]
-    y = h0 + (h0-25)*0.05 - vter*(t - tau*(1-np.exp(-t/tau)))
+    y = h0 - vter*(t - tau*(1-np.exp(-t/tau)))
     return y
