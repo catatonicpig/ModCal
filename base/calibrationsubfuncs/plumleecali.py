@@ -32,7 +32,7 @@ def loglik(emulator, theta, phi, y, xind, options):
     else:
         raise ValueError('Must provide obsvar at this moment.')
     
-
+    obsvar = 100*obsvar
     
     if type(emulator) is tuple:
         predinfo = [dict() for x in range(len(emulator))]
@@ -44,47 +44,35 @@ def loglik(emulator, theta, phi, y, xind, options):
     loglikr = np.zeros(theta.shape[0])
     for k in range(0, theta.shape[0]):
         if 'corrf' in options.keys():
-            if type(emulator) is tuple:
-                TotMatInv = np.diag(1/obsvar)
-                SInv = np.diag(1/obsvar)
-                ldetSu = np.sum(np.log(obsvar))
-                term1 = 0
-                resid = np.zeros((y.shape[0],len(emulator)))
-                residinv = np.zeros((y.shape[0],len(emulator)))
-                for l in range(0,len(emulator)):
-                    Sdisc = options['corrf'](emulator[l].x, l)['C'][xind,:][:,xind]
-                    A1 = np.squeeze(predinfo[l]['covdecomp'][k,:,xind])
-                    Sdisc +=  A1 @ A1.T
-                    Sdinv = np.linalg.inv(Sdisc)
-                    TotMatInv += Sdinv
-                    mu = np.squeeze(predinfo[l]['mean'][k,:])[xind]
-                    resid[:, l] = np.squeeze(y)-mu
-                    residinv[:, l] =Sdinv @ resid[:, l]
-                    ldetSu += np.linalg.slogdet(Sdisc)[1]
-                    term1 += np.sum(residinv[:, l] * resid[:, l])
-                Qv2 = np.sum(residinv,1)
-                ldetSu += np.linalg.slogdet(TotMatInv)[1]
-                term1 -= Qv2.T @ np.linalg.solve(TotMatInv,Qv2)
-            else:
-                TotMatInv = np.diag(1/obsvar)
-                SInv = np.diag(1/obsvar)
-                ldetSu = np.sum(np.log(obsvar))
-                term1 = 0
-                resid = np.zeros((y.shape[0],len(emulator)))
-                residinv = np.zeros((y.shape[0],len(emulator)))
-                Sdisc = options['corrf'](emulator.x, l)['C'][xind,:][:,xind]
-                A1 = np.squeeze(predinfo['covdecomp'][k,:,xind])
-                Sdisc +=  A1 @ A1.T
-                Sdinv = np.linalg.inv(Sdisc)
-                TotMatInv += Sdinv
-                mu = np.squeeze(predinfo['mean'][k,:])[xind]
-                resid[:, l] = np.squeeze(y)-mu
-                residinv[:, l] =Sdinv @ resid[:, l]
-                ldetSu += np.linalg.slogdet(Sdisc)[1]
-                term1 += np.sum(residinv[:, l] * resid[:, l])
-                Qv2 = np.sum(residinv,1)
-                ldetSu += np.linalg.slogdet(TotMatInv)[1]
-                term1 -= Qv2.T @ np.linalg.solve(TotMatInv,Qv2)
+            covmatinv = np.zeros((len(emulator)*xind.shape[0],
+                                 len(emulator)*xind.shape[0]))
+            resid= np.zeros(len(emulator)*xind.shape[0])
+            for l in range(0,len(emulator)):
+                resid[l*xind.shape[0]:(l+1)*xind.shape[0]] = np.squeeze(y) - predinfo[l]['mean'][k,xind]
+                A1 = np.squeeze(predinfo[l]['covdecomp'][k,:,xind])
+                covmat = 1000*A1 @ A1.T
+                covmatinv[l*xind.shape[0]:(l+1)*xind.shape[0],
+                          l*xind.shape[0]:(l+1)*xind.shape[0]] =\
+                              np.linalg.inv(0.5*covmat + 0.5*
+                                            np.diag(np.diag(covmat)))
+            R = np.diag(obsvar)
+            Q = np.diag(obsvar)
+            RQT = np.hstack((R, 0*R))
+            RQB = np.hstack((0*Q, Q))
+            RQ = np.vstack((RQT,RQB))
+            n = R.shape[0]
+            Jm = np.hstack((np.eye(n),-np.eye(n)))
+            RQu = RQ - (Jm @ RQ).T @ np.linalg.solve(Jm @ RQ @ Jm.T, Jm @ RQ)
+            
+            dhat = 
+            print(np.linalg.eigh(CovMatInv3)[0])
+            #print(np.linalg.eigh(np.linalg.inv(covmatinv) )[0])
+
+            print(1/np.linalg.eigh(np.linalg.inv(covmatinv) + Jm.T @ np.diag(obsvar) @ Jm)[0])
+
+            print(np.sum(resid * (CovMatInv3 @ resid)))
+            asdasd
+            asdasda
         loglikr[k] += -0.5 * term1
         loglikr[k] += -0.5 * ldetSu
     return loglikr

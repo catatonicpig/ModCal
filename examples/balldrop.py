@@ -111,51 +111,18 @@ y = balldroptruealt(x) + sps.norm.rvs(0, np.sqrt(sigma2),size=x.shape[0])
 obsvar = sigma2*np.ones(y.shape[0])
 #plt.plot(x[:,0],y, 'ko')
 
-
-# yt = balldroptruealt(xtot)
-# ft = np.squeeze(balldropmodel_linear(np.array([10,20,0]).reshape([1,-1]), xtot))
-
-# diffadj = (yt - ft) + (ft[-1] - yt[-1])
-
-# plt.plot(xtot[:,0],diffadj,'.')
-# plt.plot(xtot[:,0],-np.exp(5-xtot[:,0])/4,'.')
-
-# yt = balldroptruealt(xtot)
-# ft = np.squeeze(balldropmodel_quad(np.array([10,20,0]).reshape([1,-1]), xtot))
-
-# diffadj = (yt - ft) 
-# plt.plot(xtot[:,0],diffadj,'.')
-# plt.plot(xtot[:,0],np.exp(xtot[:,0])/2,'.')
-# asdad
-
 class priorstat1d:
     def logpdf(phi):
         return np.squeeze(sps.gamma.logpdf(phi, 1, 0, 0.25))
     def rvs(n):
         return sps.gamma.rvs(1, 0, 0.25, size = n).reshape((-1,1))
 
-
-cal_lin = calibrator(emu_lin, y, x,
-                       thetaprior = priorphys,
-                       phiprior = priorstat1d,
-                       passoptions = {'obsvar': obsvar})
-
-cal_quad= calibrator(emu_quad, y, x,
-                       thetaprior = priorphys,
-                       phiprior = priorstat1d,
-                       passoptions = {'obsvar': obsvar})
 class priorstat2d:
     def logpdf(phi):
         return np.squeeze(priorstat1d.logpdf(phi[:,0])+priorstat1d.logpdf(phi[:,1]))
     def rvs(n):
         return np.hstack((priorstat1d.rvs(n),priorstat1d.rvs(n)))
 
-
- 
-cal_BMA = calibrator((emu_lin,emu_quad), y, x,
-                       thetaprior = priorphys,
-                       phiprior = priorstat2d,
-                       passoptions = {'obsvar': obsvar})
 
 
 def corr_f(x,k):
@@ -174,6 +141,24 @@ cal_BMM = calibrator((emu_lin,emu_quad), y, x,
                        thetaprior = priorphys,
                        phiprior = priorstat2d,
                        passoptions = {'obsvar': obsvar, 'corrf': corr_f})
+
+
+
+cal_lin = calibrator(emu_lin, y, x,
+                       thetaprior = priorphys,
+                       phiprior = priorstat1d,
+                       passoptions = {'obsvar': obsvar})
+
+cal_quad= calibrator(emu_quad, y, x,
+                       thetaprior = priorphys,
+                       phiprior = priorstat1d,
+                       passoptions = {'obsvar': obsvar})
+
+ 
+cal_BMA = calibrator((emu_lin,emu_quad), y, x,
+                       thetaprior = priorphys,
+                       phiprior = priorstat2d,
+                       passoptions = {'obsvar': obsvar})
 
 from scipy.stats import kde
 def two2d(axis, theta):

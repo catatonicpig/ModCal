@@ -101,18 +101,22 @@ obsvar = sigma2*np.ones(y.shape[0])
 # asdad
 
 
+f1 = np.squeeze(balldropmodel_linear(np.array([10,20,0]).reshape([1,-1]), xtot))
+f2 = np.squeeze(balldropmodel_quad(np.array([10,20,0]).reshape([1,-1]), xtot))
+y = np.squeeze(balldroptruealt(xtot))
 
 def corr_f(x,k):
     corrdict = {}
-    C0 = np.exp(-1/3*np.abs(np.subtract.outer(x[:,0],x[:,0])))*(1+1/3*np.abs(np.subtract.outer(x[:,0],x[:,0])))
     C1 = 0.1*(np.abs(np.subtract.outer(x[:,1],x[:,1]))<10**(-4))
     #C2 = np.exp(-np.abs(np.subtract.outer(x[:,0],x[:,0])))*(1+np.abs(np.subtract.outer(x[:,0],x[:,0])))
     #C3 = 0.0001*(np.abs(np.subtract.outer(x[:,1],x[:,1]))<10**(-4))
     if k == 0:
-        adj = np.exp(5-x[:,0])/4
+        C0 = np.exp(-20*np.abs(np.subtract.outer(x[:,0],x[:,0])))*(1+20*np.abs(np.subtract.outer(x[:,0],x[:,0])))
+        adj = (y-f1)
         corrdict['C'] = C1 + np.diag(adj) @ C0 @ np.diag(adj)
     if k == 1:
-        adj = np.exp(x[:,0])/2
+        C0 = np.exp(-2*np.abs(np.subtract.outer(x[:,0],x[:,0])))*(1+2*np.abs(np.subtract.outer(x[:,0],x[:,0])))
+        adj = (y-f2)
         corrdict['C'] = C1 + np.diag(adj) @ C0 @ np.diag(adj)
     return corrdict
 
@@ -132,23 +136,22 @@ Jm = np.hstack((np.eye(n),-np.eye(n)))
 RQu = RQ - (Jm @ RQ).T @ np.linalg.solve(Jm @ RQ @ Jm.T, Jm @ RQ)
 
 
-RQu = RQ - (Jm @ RQ).T @ np.linalg.solve(R+Q, Jm @ RQ)
+#RQu = RQ - 0.999999* (Jm @ RQ).T @ np.linalg.solve(R+Q, Jm @ RQ)
 
-RQinv = np.linalg.inv(RQ)
-RpQinv = np.linalg.inv(R+Q)
+# RQinv = np.linalg.inv(RQ)
+# RpQinv = np.linalg.inv(R+Q)
 
-RET = np.hstack((spla.sqrtm(R), 0*R))
-REB = np.hstack((0*Q, spla.sqrtm(Q)))
-RE = np.vstack((RQT,RQB))
-PERT = RE @ Jm.T
+# RET = np.hstack((spla.sqrtm(R), 0*R))
+# REB = np.hstack((0*Q, spla.sqrtm(Q)))
+# RE = np.vstack((RQT,RQB))
+# PERT = RE @ Jm.T
 
-RQu = RE @ (np.eye(2*n) - PERT @  np.linalg.solve(PERT.T @ PERT, PERT.T)) @ RE
+#RQu = RE @ (np.eye(2*n) - 0.999999*PERT @  np.linalg.solve(PERT.T @ PERT, PERT.T)) @ RE
 
-U,W,Vt = np.linalg.svd(PERT)
+#U,W,Vt = np.linalg.svd(PERT)
 
-W = np.append(0.001 * np.ones(n), np.ones(n))
-RQu = RE @ (U[:,n:]  @ U[:,n:].T) @ RE
-
+#W = np.append(0.001 * np.ones(n), np.ones(n))
+#RQu = RE @ (U[:,n:]  @ U[:,n:].T) @ RE
 
 n0 = xtot.shape[0]
 
@@ -160,13 +163,13 @@ ft1 = np.squeeze(balldropmodel_linear(np.array([10,20,0]).reshape([1,-1]), x))
 ft2 = np.squeeze(balldropmodel_quad(np.array([10,20,0]).reshape([1,-1]), x))
 yt = np.squeeze(balldroptruealt(x))
 
-residval = np.hstack((yt - ft1,yt - ft2))
+residval = -np.hstack((yt - ft1,yt - ft2))
 modval = np.hstack((ft1,ft2))
 
 n0 = xtot.shape[0]
 
-f1 = np.squeeze(balldropmodel_linear(np.array([10,20,0]).reshape([1,-1]), xtot))
-f2 = np.squeeze(balldropmodel_quad(np.array([10,20,0]).reshape([1,-1]), xtot))
+mval = np.hstack((f1,f2))
+
 
 mval = np.hstack((f1,f2))
 indst = np.hstack((inds,n0+inds))
@@ -175,8 +178,13 @@ W,V = np.linalg.eigh(RQu[indst,:][:,indst])
 
 weg = np.where(np.abs(W) > (10 ** (-4)))[0]
 
-dhat = RQu[:,indst] @ (V[:,weg] @ ((np.diag(1/W[weg]) @ V[:,weg].T) @ residval))
-dhatR = R @ np.linalg.solve(R + Q, f1-f2)
-print( dhat[:10]- dhat[ n0:(n0+10)])
-print(f1-f2)
-print(f1[:10] - f2[:10])
+dhat2 = (Jm @ RQ).T @ np.linalg.solve(Jm @ RQ @ Jm.T, Jm @ mval)
+dhat = dhat2 + RQu[:,inds] @ np.linalg.solve(RQu[inds,:][:,inds], f1[inds] - y[inds] - dhat2[inds])
+
+print(dhat2[120:140])
+print(dhat[120:140])
+
+dhato = R[:,inds] @ np.linalg.solve(R[inds,:][:,inds], residval[:x.shape[0]])
+print(dhato[120:140])
+print(f1[120:140] -y[120:140])
+
