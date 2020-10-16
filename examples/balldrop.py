@@ -24,14 +24,14 @@ class priorphys:
                      sps.gamma.rvs(1, 0, 40, size=n),
                      sps.norm.rvs(0, 20, size=n))).T
 
-tvec = np.concatenate((np.arange(0.1,5.6,0.1),
-                  np.arange(0.1,5.6,0.1),
-                  np.arange(0.1,5.6,0.1),
-                  np.arange(0.1,5.6,0.1)))
-hvec = np.concatenate((20*np.ones(55),
-                  40*np.ones(55),
-                  60*np.ones(55),
-                  80*np.ones(55)))
+tvec = np.concatenate((np.arange(0.1,2.0,0.1),
+                  np.arange(0.1,3.1,0.1),
+                  np.arange(0.1,4.0,0.1),
+                  np.arange(0.1,5.2,0.1)))
+hvec = np.concatenate((20*np.ones(19),
+                  40*np.ones(30),
+                  60*np.ones(39),
+                  80*np.ones(51)))
 xtot = np.vstack((tvec,hvec)).T
 
 thetacompexp = priorphys.rvs(100)
@@ -151,6 +151,16 @@ cal_BMM = calibrator((emu_quad,emu_lin), y, x,
                        phiprior = priorstat2d,
                        passoptions = {'obsvar': obsvar, 'corrf': corr_f})
 
+def corr_f2(x,k):
+    if k == 0:
+        return corr_lin(x)
+    if k == 1:
+        return corr_quad(x)
+
+cal_BMM2 = calibrator((emu_lin,emu_quad), y, x,
+                       thetaprior = priorphys,
+                       phiprior = priorstat2d,
+                       passoptions = {'obsvar': obsvar, 'corrf': corr_f2})
 
 def plotpreds(axis, preddict):
     for k in (20,40,60,80):
@@ -167,13 +177,15 @@ def plotpreds(axis, preddict):
 
 fig, axes = plt.subplots(ncols=5, nrows=1, figsize=(21, 5))
 plotpreds(axes[0], cal_BMM.predict(xtot))
+plotpreds(axes[1], cal_BMM2.predict(xtot))
+plotpreds(axes[2], cal_BMM2.predict(xtot, cal_BMM.thetadraw, cal_BMM.phidraw))
 
 cal_lin = calibrator(emu_lin, y, x,
                        thetaprior = priorphys,
                        phiprior = priorstat1d,
                        passoptions = {'obsvar': obsvar, 'corrf': corr_lin})
 
-plotpreds(axes[1], cal_lin.predict(xtot))
+plotpreds(axes[3], cal_lin.predict(xtot))
 
 cal_quad= calibrator(emu_quad, y, x,
                        thetaprior = priorphys,
@@ -181,7 +193,7 @@ cal_quad= calibrator(emu_quad, y, x,
                        passoptions = {'obsvar': obsvar, 'corrf': corr_quad})
 
 
-plotpreds(axes[2], cal_quad.predict(xtot))
+plotpreds(axes[4], cal_quad.predict(xtot))
 
 
 from scipy.stats import kde
@@ -198,48 +210,4 @@ two2d(axes[0], priorphys.rvs(4000)[:,:2])
 two2d(axes[1], cal_lin.thetadraw[:,:2])
 two2d(axes[2], cal_quad.thetadraw[:,:2])
 two2d(axes[3], cal_BMM.thetadraw[:,:2])
-
-asdad
- 
-cal_BMA = calibrator((emu_lin,emu_quad), y, x,
-                       thetaprior = priorphys,
-                       phiprior = priorstat2d,
-                       passoptions = {'obsvar': obsvar})
-
-from scipy.stats import kde
-def two2d(axis, theta):
-    nbins = 50
-    k = kde.gaussian_kde(theta.T)
-    xi, yi = np.mgrid[0:15:nbins*1j, 0:60:nbins*1j]
-    zi = k(np.vstack([xi.flatten(), yi.flatten()]))
-    axis.pcolormesh(xi, yi, zi.reshape(xi.shape), shading='gouraud', cmap=plt.cm.BuGn_r)
-    axis.contour(xi, yi, zi.reshape(xi.shape))
-
-fig, axes = plt.subplots(ncols=5, nrows=1, figsize=(21, 5))
-two2d(axes[0], priorphys.rvs(4000)[:,:2])
-two2d(axes[1], cal_lin.thetadraw[:,:2])
-two2d(axes[2], cal_quad.thetadraw[:,:2])
-two2d(axes[3], cal_BMA.thetadraw[:,:2])
-two2d(axes[4], cal_BMM.thetadraw[:,:2])
-
-
-
-
-def plotpreds(axis, preddict):
-    for k in (20,40,60,80):
-        inds = np.where(xtot[:,1] == k)[0]
-        uppercurve = preddict['mean'][inds] + 3*np.sqrt(preddict['var'][inds])
-        lowercurve = preddict['mean'][inds] - 3*np.sqrt(preddict['var'][inds])
-        axis.fill_between(xtot[inds,0], lowercurve, uppercurve, color='k', alpha=0.2)
-        axis.plot(xtot[inds,0],preddict['mean'][inds],'k-')
-        axis.plot(xtot[inds,0],uppercurve, 'k-', alpha=0.6,linewidth=0.5)
-        axis.plot(xtot[inds,0],lowercurve, 'k-', alpha=0.6,linewidth=0.5)
-    axis.plot(x,y, 'ko')
-    axis.set_xlim([0,5.6])
-    axis.set_ylim([0,85])
-
-fig, axes = plt.subplots(ncols=4, nrows=1, figsize=(21, 5))    
-plotpreds(axes[0], cal_lin.predict(xtot))
-plotpreds(axes[1], cal_quad.predict(xtot))
-plotpreds(axes[2], cal_BMA.predict(xtot))
-plotpreds(axes[3], cal_BMM.predict(xtot))
+two2d(axes[4], cal_BMM2.thetadraw[:,:2])

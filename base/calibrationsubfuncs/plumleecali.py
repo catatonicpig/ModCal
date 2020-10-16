@@ -43,29 +43,30 @@ def loglik(emulator, theta, phi, y, xind, options):
             covmatsinv = [np.array(0) for x in range(len(emulator))]
             mus = [np.array(0) for x in range(len(emulator))]
             resid = np.zeros(len(emulator) * xind.shape[0])
-            totInv = np.zeros((xind.shape[0], xind.shape[0]))
-            term2 = np.zeros(xind.shape[0])
+            totInv = np.zeros((emulator[0].x.shape[0], emulator[0].x.shape[0]))
+            term2 = np.zeros(emulator[0].x.shape[0])
             for l in range(0, len(emulator)):
-                mus[l] = np.squeeze(y) - predinfo[l]['mean'][(k, xind)]
-                A1 = np.squeeze(predinfo[l]['covdecomp'][k, :, xind])
-                covmats[l] = A1 @ A1.T
+                mus[l] = predinfo[l]['mean'][k, :]
+                A1 = np.squeeze(predinfo[l]['covdecomp'][k, :, :])
+                covmats[l] = A1.T @ A1
                 if 'corrf' in options.keys():
-                    covmats[l] += phi[(k, l)] * options['corrf'](emulator[l].x[xind, :], l)['C']
+                    covmats[l] += phi[(k, l)] * options['corrf'](emulator[l].x, l)['C']
                 else:
                     covmats[l] += phi[(k, l)] * np.eye(obsvar.shape[0])
-                covmats[l] += 0.0001 * np.diag(obsvar)
+                covmats[l] += np.mean(obsvar) * 0.0001 * np.eye(covmats[l].shape[0])
                 covmatsinv[l] = np.linalg.inv(covmats[l])
                 totInv += covmatsinv[l]
-                if l > 0.5:
-                    term2 += covmatsinv[l] @ (mus[0] - mus[l])
-
+                term2 += covmatsinv[l] @ mus[l]
             S0 = np.linalg.inv(totInv)
-            S0 += np.diag(obsvar)
             m0 = np.linalg.solve(totInv, term2)
-            mut = mus[0]
+            
+            m0 = m0[xind]
+            S0 = S0[xind, :][:, xind] + np.diag(obsvar)
+            S00altinv = np.diag(1/obsvar) -\
+                np.linalg.inv(np.diag(1/obsvar) + totInv[xind,:][:,xind])
+            S0 = np.linalg.inv(S00altinv)
         else:
-            m0 = np.squeeze(y) * 0
-            mut = np.squeeze(y) - predinfo['mean'][(k, xind)]
+            m0 = predinfo['mean'][(k, xind)]
             A1 = np.squeeze(predinfo['covdecomp'][k, :, xind])
             S0 = np.diag(obsvar)
             S0 += A1 @ A1.T
@@ -75,7 +76,7 @@ def loglik(emulator, theta, phi, y, xind, options):
                 S0 += phi[k] * np.eye(obsvar.shape[0])
             S0 += 0.0001 * np.diag(obsvar)
         W, V = np.linalg.eigh(S0)
-        muadj = V.T @ (mut - m0)
+        muadj = V.T @ (np.squeeze(y) - m0)
         loglikr1[k] = -0.5 * np.sum(muadj ** 2 / W)
         if loglikr1[k] > 0:
             print('lik is all messed up')
@@ -116,10 +117,8 @@ def predict(xindnew, emulator, theta, phi, y, xind, options):
         predinfo = [dict() for x in range(len(emulator))]
         for k in range(0, len(emulator)):
             predinfo[k] = emulator[k].predict(theta)
-            if k == 0:
-                preddict['meanfull'] = predinfo[0]['mean']
-                preddict['varfull'] = predinfo[0]['var']
-
+        preddict['meanfull'] = predinfo[1]['mean']
+        preddict['varfull'] = predinfo[1]['var']
     else:
         predinfo = emulator.predict(theta)
         preddict['meanfull'] = predinfo['mean']
@@ -135,28 +134,34 @@ def predict(xindnew, emulator, theta, phi, y, xind, options):
             term2 = np.zeros(emulator[0].x.shape[0])
             for l in range(0, len(emulator)):
                 mus[l] = predinfo[l]['mean'][k, :]
-                A1 = np.squeeze(predinfo[l]['covdecomp'][k, :, :])
-                covmats[l] = A1.T @ A1
+            for l in reversed(range(0, len(emulator))):
                 if 'corrf' in options.keys():
-                    covmats[l] += phi[(k, l)] * options['corrf'](emulator[l].x, l)['C']
+                    covmats[l] = phi[k, l] * options['corrf'](emulator[l].x, l)['C']
                 else:
-                    covmats[l] += phi[(k, l)] * np.eye(emulator[l].x.shape[0])
+                    covmats[l] = phi[k, l] * np.eye(emulator[l].x.shape[0])
                 covmats[l] += np.mean(obsvar) * 0.0001 * np.eye(covmats[l].shape[0])
-                covmatsinv[l] = np.linalg.inv(covmats[l])
+                Cinv = np.linalg.inv(covmats[l])
+                A1 = np.squeeze(predinfo[l]['covdecomp'][k, :, :])
+                covmatsinv[l] = Cinv - Cinv @ A1.T @ np.linalg.solve( A1 @ Cinv @ A1.T + np.eye(A1.shape[0]), A1 @ Cinv)
                 totInv += covmatsinv[l]
-                if l > 0.5:
-                    term2 += covmatsinv[l] @ (mus[0] - mus[l])
+                term2 += covmatsinv[l] @ mus[l]
 
             S0 = np.linalg.inv(totInv)
-            m0 = -np.linalg.solve(totInv, term2)
+            m0 = np.linalg.solve(totInv, term2)
             m00 = m0[xind]
             m10 = m0[xindnew]
-            S00 = S0[xind, :][:, xind] + np.diag(obsvar)
+           # print(m0[xind])
+            m00a = np.linalg.solve(totInv[xind,:] @ totInv[xind,:].T, totInv[xind,:] @term2)
+            #print(m00a)
+            #asdad
+            #S00 = S0[xind, :][:, xind] + np.diag(obsvar)
+            S00altinv = np.diag(1/obsvar) -\
+                np.linalg.inv(np.diag(1/obsvar) + totInv[xind,:][:,xind])
             S01 = S0[xind, :][:, xindnew]
             S11 = S0[xindnew, :][:, xindnew]
-            resid = np.squeeze(y) - mus[0][xind]
-            preddict['meanfull'][k, :] = mus[0][xindnew] + m10 + S01.T @ np.linalg.solve(S00, resid - m00)
-            preddict['varfull'][k, :] = np.diag(S11 - S01.T @ np.linalg.solve(S00, S01))
+            resid = np.squeeze(y)
+            preddict['meanfull'][k, :] =  m10 + S01.T @ S00altinv @ (resid - m00)
+            preddict['varfull'][k, :] = np.diag(S11 -S01.T @ S00altinv @ S01)
         else:
             m0 = np.squeeze(y) * 0
             mut = np.squeeze(y) - predinfo['mean'][(k, xind)]
@@ -171,10 +176,10 @@ def predict(xindnew, emulator, theta, phi, y, xind, options):
                 Cm = options['corrf'](emulator.x)['C']
                 S10 += phi[k] * Cm[xindnew, :][:, xind]
                 S11 += phi[k] * Cm[xindnew, :][:, xindnew]
-            elif 'corrf' in options.keys():
                 S0 += phi[k] * options['corrf'](emulator.x[xind, :])['C']
             else:
                 S0 += phi[k] * np.eye(obsvar.shape[0])
+            S0 += 0.0001 * np.diag(obsvar)
             preddict['meanfull'][k, :] = mus0 + S10 @ np.linalg.solve(S0, mut)
             preddict['varfull'][k, :] = np.diag(S11 - S10 @ np.linalg.solve(S0, S10.T))
 
