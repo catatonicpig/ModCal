@@ -91,9 +91,11 @@ class calibrator(object):
             L0 = self.logprior(theta, phi)
             inds = np.where(np.isfinite(L0))[0]
             if phi is None:
-                L0[inds] += self.calsoftware.loglik(self.emu, theta[inds, :], None, self.y, self.xind, passoptions)
+                L0[inds] += self.calsoftware.loglik(self.emu, theta[inds, :],
+                                                    None, self.y, self.xind, passoptions)
             else:
-                L0[inds] += self.calsoftware.loglik(self.emu, theta[inds, :], phi[inds, :], self.y, self.xind, passoptions)
+                L0[inds] += self.calsoftware.loglik(self.emu, theta[inds, :],
+                                                    phi[inds, :], self.y, self.xind, passoptions)
         return L0
 
     def logpostfull(self, thetaphi, passoptions=None):
