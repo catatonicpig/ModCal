@@ -5,7 +5,7 @@ from base.utilities import postsampler
 class calibrator(object):
     __doc__ = 'Calibrator.'
 
-    def __init__(self, emu=None, y=None, x=None, thetaprior=None, phiprior=None, passoptions={}, options=None, software='plumleecali'):
+    def __init__(self, emu=None, y=None, x=None, thetaprior=None, phiprior=None, passoptions={}, options=None, software='BDM'):
         if y is None:
             raise ValueError('You have not provided any y.')
         else:
