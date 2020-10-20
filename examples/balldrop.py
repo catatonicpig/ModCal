@@ -72,8 +72,7 @@ grav_results = balldropmodel_grav(thetacompexp, xtot)  # the value of the gravit
 emu_grav = emulator(thetacompexp, grav_results, xtot)  # this builds an
 # emulator for the gravity simulation. this is a specialized class specific to ModCal.
 
-x = np.array([[ 0.3, 20. ],
-              [ 0.4, 20. ],
+x = np.array([[ 0.4, 20. ],
               [ 0.5, 20. ],
         [ 0.6, 20. ],
         [ 0.8, 20. ],
@@ -92,11 +91,11 @@ x = np.array([[ 0.3, 20. ],
         [ 2.8, 60. ],
         [ 3.2, 60. ],
         [ 3.6, 60. ],
+        [ 3.8, 60. ],
         [ 4.0, 60. ],
         [ 4.2, 60. ],
-        [ 4.4, 60. ],
-        [ 4.6, 60. ]])
-obsvar = 4*np.ones(x.shape[0])  # variance for the observations in 'y' below
+        [ 4.4, 60. ]])
+obsvar = 1*np.ones(x.shape[0])  # variance for the observations in 'y' below
 y = balldroptrue(x) + sps.norm.rvs(0, np.sqrt(obsvar)) #observations at each row of 'x'
 
 
@@ -147,10 +146,10 @@ plotpreds(axes[3], pred_BMA)
 
 class priorstatdisc_1model:
     def logpdf(phi):
-        return np.squeeze(sps.norm.logpdf(phi[:,0], 1, 1) +
-                          sps.norm.logpdf(phi[:,0], 0, 1))
+        return np.squeeze(sps.norm.logpdf(phi[:,0], 0, 2) +
+                          sps.norm.logpdf(phi[:,0], 0, 0.5))
     def rvs(n):
-        return np.vstack((sps.norm.rvs(1,1, size = n),
+        return np.vstack((sps.norm.rvs(0, 2, size = n),
                          sps.norm.rvs(0,1, size = n))).T
 
 class priorstatdisc_2model:
@@ -162,9 +161,13 @@ class priorstatdisc_2model:
                           priorstatdisc_1model.rvs(n)))
 
 def cov_delta(x,phi):
-    C0 = np.exp(-1/3*np.abs(np.subtract.outer(x[:,0],x[:,0]))) #*\
-        #(1+np.abs(np.subtract.outer(x[:,0],x[:,0])))
-    adj = np.minimum(np.exp(phi[0] + phi[1]*x[:,0] - np.maximum(0,phi[1]*5)),
+    C0 = np.exp(-2*np.abs(np.subtract.outer(x[:,0],x[:,0]))) *\
+        (1 + 2*np.abs(np.subtract.outer(x[:,0],x[:,0])) )
+    if np.abs(phi[1]) < 0.00000001:
+        adj = 1
+    else:
+        adj = 5 * phi[1] / (np.exp((phi[1])*5)-1)
+    adj = np.minimum(np.exp(phi[0] + phi[1]*x[:,0]) * adj,
                      50)
     return (np.diag(adj) @ C0 @ np.diag(adj))
 
