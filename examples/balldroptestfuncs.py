@@ -35,7 +35,7 @@ def balldroptrue(x):
         return s + np.log1p(p) - np.log(2)
     t = x[:, 0]
     h0 = x[:, 1]
-    vter = 12
+    vter = 14
     g = 9.81
     y = h0 - (vter ** 2) / g * logcosh(g * t / vter)
     return y

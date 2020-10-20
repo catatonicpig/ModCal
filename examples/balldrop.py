@@ -16,7 +16,7 @@ from base.calibration import calibrator
 
 import matplotlib.pyplot as plt 
 def plotpreds(axis, preddict):
-    for k in (15,25,35):
+    for k in (20,40):
         inds = np.where(xtot[:,1] == k)[0]
         #uppercurve = preddict['mean'][inds] + 3*np.sqrt(preddict['var'][inds])
         #lowercurve = preddict['mean'][inds] - 3*np.sqrt(preddict['var'][inds])
@@ -30,12 +30,12 @@ def plotpreds(axis, preddict):
         axis.fill_between(xtot[inds,0], lowercurve, uppercurve, color='k', alpha=0.25)
     axis.plot(x,y, 'ro' ,markersize = 8)
     axis.set_xlim([0,3.8])
-    axis.set_ylim([-2,40])
+    axis.set_ylim([-2,42])
 from scipy.stats import kde
 def two2d(axis, theta):
     nbins = 50
     k = kde.gaussian_kde(theta.T)
-    xi, yi = np.mgrid[0:15:nbins*1j, 0:30:nbins*1j]
+    xi, yi = np.mgrid[0:18:nbins*1j, 0:40:nbins*1j]
     zi = k(np.vstack([xi.flatten(), yi.flatten()]))
     axis.pcolormesh(xi, yi, zi.reshape(xi.shape), shading='gouraud', cmap=plt.cm.BuGn_r)
     axis.contour(xi, yi, zi.reshape(xi.shape))
@@ -46,21 +46,19 @@ class priorphys:
     """ This defines the class instance of priors provided to the software. """
     def logpdf(theta):
         return np.squeeze(sps.norm.logpdf(theta[:, 0], 0, 5) +  # initial height deviation
-                          sps.gamma.logpdf(theta[:, 1], 3, 0, 5) +  # terminal velocity
+                          sps.gamma.logpdf(theta[:, 1], 2, 0, 10) +  # terminal velocity
                           sps.gamma.logpdf(theta[:, 2], 2, 0, 5))  # gravity
 
     def rvs(n):
         return np.vstack((sps.norm.rvs(0, 5, size=n),  # initial height deviation
-                          sps.gamma.rvs(3, 0, 5, size=n),  # terminal velocity
+                          sps.gamma.rvs(2, 0, 10, size=n),  # terminal velocity
                           sps.gamma.rvs(2, 0, 5, size=n))).T  # gravity
 
 
-tvec = np.concatenate((np.arange(0.1, 2.5, 0.1),
-                       np.arange(0.1, 4.1, 0.1),
+tvec = np.concatenate((np.arange(0.1, 2.9, 0.1),
                        np.arange(0.1, 4.1, 0.1)))  # the time vector of interest
-hvec = np.concatenate((15 * np.ones(24),
-                       25 * np.ones(40),
-                       35 * np.ones(40)))  # the drop heights vector of interest
+hvec = np.concatenate((20 * np.ones(28),
+                       40 * np.ones(40)))  # the drop heights vector of interest
 xtot = np.vstack((tvec, hvec)).T  # the input of interest
 # each row is an individual vector of interest
 # this should include those important to the study AND the data
@@ -76,19 +74,24 @@ grav_results = balldropmodel_grav(thetacompexp, xtot)  # the value of the gravit
 emu_grav = emulator(thetacompexp, grav_results, xtot)  # this builds an
 # emulator for the gravity simulation. this is a specialized class specific to ModCal.
 
-x = np.array([[ 0.1, 15. ],
-        [ 0.3, 15. ],
-        [ 0.6, 15. ],
-        [ 1.8, 15. ],
-        [ 2.0, 15. ],
-        [ 0.1, 25. ],
-        [ 0.3, 25. ],
-        [ 0.6, 25. ],
-        [ 2.0, 25. ],
-        [ 2.2, 25. ],
-        [ 2.4, 25. ],
-        [ 2.6, 25. ],
-        [ 2.8, 25. ],])
+x = np.array([[ 0.1, 20. ],
+              [ 0.2, 20. ],
+        [ 0.3, 20. ],
+        [ 0.4, 20. ],
+        [ 0.5, 20. ],
+        [ 0.7, 20. ],
+        [ 2.2, 20. ],
+        [ 0.1, 40. ],
+        [ 0.2, 40. ],
+        [ 0.3, 40. ],
+        [ 0.4, 40. ],
+        [ 0.6, 40. ],
+        [ 0.8, 40. ],
+        [ 2.3, 40. ],
+        [ 2.5, 40. ],
+        [ 2.7, 40. ],
+        [ 2.9, 40. ],
+        [3.1, 40. ],])
 obsvar = 0.25*np.ones(x.shape[0])  # variance for the observations in 'y' below
 y = balldroptrue(x) + sps.norm.rvs(0, np.sqrt(obsvar)) #observations at each row of 'x'
 
@@ -141,19 +144,19 @@ plotpreds(axes[3], pred_BMA)
     
 class priorstatdisc_modela:
     def logpdf(phi):
-        return np.squeeze(sps.gamma.logpdf(np.exp(phi[:,0]), 2, 0, 4) + phi[:,0] +
-                          sps.norm.logpdf(phi[:,1], -1, 0.5))
+        return np.squeeze(sps.gamma.logpdf(np.exp(phi[:,0]), 6, 0, 1) + phi[:,0] +
+                          sps.norm.logpdf(phi[:,1], -2, 0.1))
     def rvs(n):
-        return np.vstack((np.log(sps.gamma.rvs(2,0,4, size = n )),
-                         sps.norm.rvs(-1, 0.5, size = n))).T
+        return np.vstack((np.log(sps.gamma.rvs(6,0,1, size = n )),
+                         sps.norm.rvs(-2, 0.1, size = n))).T
 
 class priorstatdisc_modelb:
     def logpdf(phi):
-        return np.squeeze(sps.gamma.logpdf(np.exp(phi[:,0]), 2, 0, 4) + phi[:,0] +
-                          sps.norm.logpdf(phi[:,1], 0.75, 0.25))
+        return np.squeeze(sps.gamma.logpdf(np.exp(phi[:,0]), 6, 0, 1) + phi[:,0] +
+                          sps.norm.logpdf(phi[:,1], 2, 0.1))
     def rvs(n):
-        return np.vstack((np.log(sps.gamma.rvs(2, 0, 4, size = n )),
-                         sps.norm.rvs(0.75, 0.25, size = n))).T
+        return np.vstack((np.log(sps.gamma.rvs(6, 0, 1, size = n )),
+                         sps.norm.rvs(2, 0.1, size = n))).T
     
 class priorstatdisc_models:
     def logpdf(phi):
@@ -165,13 +168,13 @@ class priorstatdisc_models:
 
 
 def cov_delta(x,phi):
-    C0 = np.exp(-1/2*np.abs(np.subtract.outer(np.sqrt(x[:,0]),np.sqrt(x[:,0])))) #*\
-        #(1+2*np.abs(np.subtract.outer(np.sqrt(x[:,0]),np.sqrt(x[:,0]))))
+    C0 = np.exp(-4*np.abs(np.subtract.outer(np.sqrt(x[:,0]),np.sqrt(x[:,0]))) ** 1.5) #*\
+        #(1+5*np.abs(np.subtract.outer(np.sqrt(x[:,0]),np.sqrt(x[:,0]))))
     if np.abs(phi[1]) < 0.00000001:
         adj = 1
     else:
         adj = 3 * phi[1] / (np.exp((phi[1])*3)-1)
-    adj = np.minimum(np.exp(phi[0] + phi[1]*x[:,0]) * adj,
+    adj = np.minimum(np.exp(phi[0] + phi[1]*(x[:,0] ** 0.75)) * adj,
                      100)
     return (np.diag(adj) @ C0 @ np.diag(adj))
 
@@ -211,8 +214,8 @@ matchingvec = np.where(((x[:, None] > xtot - 1e-08) * (x[:, None] < xtot + 1e-08
 xind = matchingvec[1][matchingvec[0]]
 print(y - np.squeeze(emu_grav.predict(cal_grav.thetadraw[1],x)['mean'])[xind])
 phi = cal_grav.phidraw[1]
-adj = 4 * phi[1] / (np.exp((phi[1])*4)-1)
-adj = np.minimum(np.exp(phi[0] + phi[1]*x[:,0]) * adj,
+adj = 2 * phi[1] / (np.exp((phi[1])*2)-1)
+adj = np.minimum(np.exp(phi[0] + phi[1]*np.sqrt(x[:,0])) * adj,
              250)
 print(adj)
 
