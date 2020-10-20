@@ -1,5 +1,6 @@
 """Header here."""
 import numpy as np
+import scipy.stats as sps
 
 def loglik(emulator, theta, phi, y, xind, options):
     """
@@ -48,10 +49,10 @@ def loglik(emulator, theta, phi, y, xind, options):
             for l in range(0, len(emulator)):
                 mus[l] = predinfo[l]['mean'][k, xind]
                 A1 = np.squeeze(predinfo[l]['covdecomp'][k, :, xind])
-                covmats[l] = A1 @ A1.T
+                covmats[l] = (A1 @ A1.T)*0
                 if 'cov_disc' in options.keys():
                     covmats[l] += options['cov_disc'](emulator[l].x[xind,:], l, phi[k,:])
-                covmats[l] += np.diag(np.diag(covmats[l])) * 0.0001
+                covmats[l] += np.diag(np.diag(covmats[l])) * (10 ** (-6))
                 covmatsinv[l] = np.linalg.inv(covmats[l])
                 totInv += covmatsinv[l]
                 term2 += covmatsinv[l] @ mus[l]
@@ -63,10 +64,10 @@ def loglik(emulator, theta, phi, y, xind, options):
             S0 = A1 @ A1.T
             if 'cov_disc' in options.keys():
                 S0 += options['cov_disc'](emulator.x[xind,:], phi[k,:])
-            S0 += np.diag(np.diag(S0)) * 0.0001
+            #S0 += np.diag(np.diag(S0)) * 0.00000001
             W, V = np.linalg.eigh(np.diag(obsvar) + S0)
         muadj = V.T @ (np.squeeze(y) - m0)
-        loglikr1[k] = -0.5 * np.sum(muadj ** 2 / W)
+        loglikr1[k] = -0.5 * np.sum((muadj ** 2) / W)
         if np.min(W) < 10 ** (-9):
             print('lik is all messed up')
             print(W)
@@ -109,12 +110,15 @@ def predict(xindnew, emulator, theta, phi, y, xind, options):
         predinfo = [dict() for x in range(len(emulator))]
         for k in range(0, len(emulator)):
             predinfo[k] = emulator[k].predict(theta)
-        preddict['meanfull'] = predinfo[1]['mean']
-        preddict['varfull'] = predinfo[1]['var']
+        preddict['meanfull'] = predinfo[0]['mean']
+        preddict['varfull'] = predinfo[0]['var']
+        preddict['draws'] = predinfo[0]['mean']
     else:
         predinfo = emulator.predict(theta)
         preddict['meanfull'] = predinfo['mean']
+        preddict['draws'] = predinfo['mean']
         preddict['varfull'] = predinfo['var']
+        
     for k in range(0, theta.shape[0]):
         if type(emulator) is tuple:
             covmats = [np.array(0) for x in range(len(emulator))]
@@ -131,7 +135,7 @@ def predict(xindnew, emulator, theta, phi, y, xind, options):
                 covmats[l] = A1.T @ A1
                 if 'cov_disc' in options.keys():
                     covmats[l] += options['cov_disc'](emulator[l].x, l, phi[k,:])
-                covmats[l] += np.mean(obsvar) * 0.0001 * np.eye(covmats[l].shape[0])
+                covmats[l] += np.diag(np.diag(covmats[l])) * (10 ** (-6))
                 covmatsinv[l] = np.linalg.inv(covmats[l])
                 totInv += covmatsinv[l]
                 term2 += covmatsinv[l] @ mus[l]
@@ -146,6 +150,11 @@ def predict(xindnew, emulator, theta, phi, y, xind, options):
             preddict['meanfull'][k, :] =  m10 +  Mat1 @ (np.squeeze(y) - m00)
             preddict['varfull'][k, :] = (np.diag(S0)[xindnew] -\
                 np.sum(S0[xindnew, :][:, xind] * Mat1,1))
+            Wmat, Vmat = np.linalg.eigh(S0[xindnew,:][:,xindnew] - S0[xindnew, :][:, xind] @ Mat1.T)
+            
+            re = Vmat @ np.diag(np.sqrt(np.abs(Wmat))) @ Vmat.T @\
+                sps.norm.rvs(0,1,size=(Vmat.shape[1]))
+            preddict['draws'][k,:] = preddict['meanfull'][k, :]  + re
         else:
             m0 = np.squeeze(y) * 0
             mut = np.squeeze(y) - predinfo['mean'][(k, xind)]
@@ -159,13 +168,17 @@ def predict(xindnew, emulator, theta, phi, y, xind, options):
                 S0 += C[xind,:][:,xind]
                 S10 += C[xindnew,:][:,xind]
                 S11 += C[xindnew,:][:,xindnew]
-            S0 += np.diag(np.diag(S0)) * 0.0001
+            #S0 += np.diag(np.diag(S0)) * 0.00000001
             S0 += np.diag(obsvar)
             mus0 = predinfo['mean'][(k, xindnew)]
             preddict['meanfull'][k, :] = mus0 + S10 @ np.linalg.solve(S0, mut)
             preddict['varfull'][k, :] = np.diag(S11 - S10 @ np.linalg.solve(S0, S10.T))
+            Wmat, Vmat = np.linalg.eigh(S11 - S10 @ np.linalg.solve(S0, S10.T))
+            re = Vmat @ np.diag(np.sqrt(np.abs(Wmat))) @ Vmat.T @\
+                sps.norm.rvs(0,1,size=(Vmat.shape[1]))
+            preddict['draws'][k,:] = preddict['meanfull'][k, :]  + re
 
     preddict['mean'] = np.mean(preddict['meanfull'], 0)
-    varterm1 = np.var(preddict['meanfull'], 0)
+    varterm1 = 0*np.var(preddict['meanfull'], 0)
     preddict['var'] = np.mean(preddict['varfull'], 0) + varterm1
     return preddict

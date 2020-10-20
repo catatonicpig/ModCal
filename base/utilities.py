@@ -21,7 +21,7 @@ def postsampler(thetastart, logpostfunc, options=None):
     """
 
     if options is None:
-        numsamp = 5000
+        numsamp = 1000
         tarESS = np.max((100, 10 * thetastart.shape[1]))
 
         def postsamplefunc(thetastart, logpostfunc):

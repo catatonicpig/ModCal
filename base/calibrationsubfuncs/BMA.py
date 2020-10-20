@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """Header here."""
 import numpy as np
+import scipy.stats as sps
 
 def loglik(emulator, theta, phi, y, xind, options):
     """
@@ -105,11 +106,13 @@ def predict(xindnew, emulator, theta, phi, y, xind, options):
         predinfo = [dict() for x in range(len(emulator))]
         for k in range(0, len(emulator)):
             predinfo[k] = emulator[k].predict(theta)
-        preddict['meanfull'] = predinfo[1]['mean']
-        preddict['varfull'] = predinfo[1]['var']
+        preddict['meanfull'] = predinfo[0]['mean']
+        preddict['varfull'] = predinfo[0]['var']
+        preddict['draws'] = predinfo[0]['mean']
     else:
         predinfo = emulator.predict(theta)
         preddict['meanfull'] = predinfo['mean']
+        preddict['draws'] = predinfo['mean']
         preddict['varfull'] = predinfo['var']
     
     for k in range(0, theta.shape[0]):
@@ -136,13 +139,21 @@ def predict(xindnew, emulator, theta, phi, y, xind, options):
                     np.squeeze(predlocal[:, l] ** 2)
             lm = np.max(logliklocal)
             logpostcalc = np.log(np.sum(np.exp(logliklocal-lm))) + lm
-            logpost = np.exp(logliklocal - logpostcalc)
-            preddict['meanfull'][k,:] = np.sum(logpost * predlocal,1)
-            preddict['varfull'][k,:] = np.sum(logpost * sslocal,1) -\
-                np.sum(logpost * predlocal,1) ** 2
+            post = np.exp(logliklocal - logpostcalc)
+            preddict['meanfull'][k,:] = np.sum(post * predlocal,1)
+            preddict['varfull'][k,:] = np.sum(post * sslocal,1) -\
+                preddict['meanfull'][k,:] ** 2
+            rc = np.random.choice(len(emulator), p = post)
+            re = predinfo[rc]['covdecomp'][k,:,:].T @\
+                sps.norm.rvs(0,1,size=(predinfo[rc]['covdecomp'].shape[1]))
+            preddict['draws'][k,:] = predinfo[rc]['mean'][k,xindnew] + re[xindnew]
         else:
             preddict['meanfull'][k,:] = np.squeeze(predinfo['mean'][k,xindnew])
             preddict['varfull'][k,:] = np.sum((predinfo['covdecomp'][k,:,xindnew]) ** 2)
+            #rc = np.random.choice(len(emulator), p = post)
+            re = predinfo['covdecomp'][k,:,:].T @\
+                sps.norm.rvs(0,1,size=(predinfo['covdecomp'].shape[1]))
+            preddict['draws'][k,:] = preddict['meanfull'][k,:] + re[xindnew]
                 
     preddict['mean'] = np.mean(preddict['meanfull'], 0)
     varterm1 = np.var(preddict['meanfull'], 0)
