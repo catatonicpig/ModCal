@@ -49,10 +49,10 @@ def loglik(emulator, theta, phi, y, xind, options):
             for l in range(0, len(emulator)):
                 mus[l] = predinfo[l]['mean'][k, xind]
                 A1 = np.squeeze(predinfo[l]['covdecomp'][k, :, xind])
-                covmats[l] = (A1 @ A1.T)*0
+                covmats[l] = (A1 @ A1.T)
                 if 'cov_disc' in options.keys():
                     covmats[l] += options['cov_disc'](emulator[l].x[xind,:], l, phi[k,:])
-                covmats[l] += np.diag(np.diag(covmats[l])) * (10 ** (-6))
+                covmats[l] += np.diag(np.diag(covmats[l])) * (10 ** (-8))
                 covmatsinv[l] = np.linalg.inv(covmats[l])
                 totInv += covmatsinv[l]
                 term2 += covmatsinv[l] @ mus[l]
@@ -135,7 +135,7 @@ def predict(xindnew, emulator, theta, phi, y, xind, options):
                 covmats[l] = A1.T @ A1
                 if 'cov_disc' in options.keys():
                     covmats[l] += options['cov_disc'](emulator[l].x, l, phi[k,:])
-                covmats[l] += np.diag(np.diag(covmats[l])) * (10 ** (-6))
+                covmats[l] += np.diag(np.diag(covmats[l])) * (10 ** (-8))
                 covmatsinv[l] = np.linalg.inv(covmats[l])
                 totInv += covmatsinv[l]
                 term2 += covmatsinv[l] @ mus[l]

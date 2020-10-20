@@ -21,16 +21,16 @@ def plotpreds(axis, preddict):
         #uppercurve = preddict['mean'][inds] + 3*np.sqrt(preddict['var'][inds])
         #lowercurve = preddict['mean'][inds] - 3*np.sqrt(preddict['var'][inds])
         #axis.fill_between(xtot[inds,0], lowercurve, uppercurve, color='k', alpha=0.2)
-        #for l in range(0,preddict['draws'].shape[0]):
-        #    axis.plot(xtot[inds,0],preddict['draws'][l, inds],'k-', alpha=0.1,linewidth=0.1)
+        for l in range(0,preddict['draws'].shape[0]):
+            axis.plot(xtot[inds,0],preddict['draws'][l, inds],'k-', alpha=0.01,linewidth=0.1)
         uppercurve = np.quantile(preddict['draws'][:, inds],0.975,0)
         lowercurve = np.quantile(preddict['draws'][:, inds],0.025,0)
         #axis.plot(xtot[inds,0],uppercurve, 'k-', alpha=0.6,linewidth=0.5)
-        axis.plot(xtot[inds,0],preddict['mean'][inds], 'k-', alpha=0.5,linewidth=0.5)
+        #axis.plot(xtot[inds,0],preddict['mean'][inds], 'k-', alpha=0.5,linewidth=0.5)
         axis.fill_between(xtot[inds,0], lowercurve, uppercurve, color='k', alpha=0.25)
     axis.plot(x,y, 'ro' ,markersize = 8)
     axis.set_xlim([0,3.8])
-    axis.set_ylim([-2,42])
+    axis.set_ylim([-2,47])
 from scipy.stats import kde
 def two2d(axis, theta):
     nbins = 50
@@ -79,21 +79,30 @@ x = np.array([[ 0.1, 20. ],
         [ 0.3, 20. ],
         [ 0.4, 20. ],
         [ 0.5, 20. ],
+        [ 0.6, 20. ],
         [ 0.7, 20. ],
+        [ 0.9, 20. ],
+        [ 1.5, 20. ],
+        [ 2.0, 20. ],
         [ 2.2, 20. ],
+        [ 2.4, 20. ],
         [ 0.1, 40. ],
         [ 0.2, 40. ],
         [ 0.3, 40. ],
         [ 0.4, 40. ],
+        [ 0.5, 40. ],
         [ 0.6, 40. ],
+        [ 0.7, 20. ],
         [ 0.8, 40. ],
+        [ 2.1, 40. ],
         [ 2.3, 40. ],
         [ 2.5, 40. ],
         [ 2.7, 40. ],
         [ 2.9, 40. ],
         [3.1, 40. ],])
-obsvar = 0.25*np.ones(x.shape[0])  # variance for the observations in 'y' below
+obsvar = 4*np.ones(x.shape[0])  # variance for the observations in 'y' below
 y = balldroptrue(x) + sps.norm.rvs(0, np.sqrt(obsvar)) #observations at each row of 'x'
+balldropmodel_grav(np.array((0,0,9.81)).reshape((1,-1)), x)-balldroptrue(x)
 
 
 class priorstat_1model:
@@ -144,19 +153,19 @@ plotpreds(axes[3], pred_BMA)
     
 class priorstatdisc_modela:
     def logpdf(phi):
-        return np.squeeze(sps.gamma.logpdf(np.exp(phi[:,0]), 6, 0, 1) + phi[:,0] +
-                          sps.norm.logpdf(phi[:,1], -2, 0.1))
+        return np.squeeze(sps.norm.logpdf(phi[:,0], -2, 1) +
+                          sps.norm.logpdf(phi[:,1], -5, 0.25))
     def rvs(n):
-        return np.vstack((np.log(sps.gamma.rvs(6,0,1, size = n )),
-                         sps.norm.rvs(-2, 0.1, size = n))).T
+        return np.vstack((sps.norm.rvs(-2, 1, size = n ),
+                         sps.norm.rvs(-5, 0.25, size = n))).T
 
 class priorstatdisc_modelb:
     def logpdf(phi):
-        return np.squeeze(sps.gamma.logpdf(np.exp(phi[:,0]), 6, 0, 1) + phi[:,0] +
-                          sps.norm.logpdf(phi[:,1], 2, 0.1))
+        return np.squeeze(sps.norm.logpdf(phi[:,0], -2, 1) +
+                          sps.norm.logpdf(phi[:,1], 6, 0.25))
     def rvs(n):
-        return np.vstack((np.log(sps.gamma.rvs(6, 0, 1, size = n )),
-                         sps.norm.rvs(2, 0.1, size = n))).T
+        return np.vstack((sps.norm.rvs(-2, 1, size = n ),
+                         sps.norm.rvs(6, 0.25, size = n))).T
     
 class priorstatdisc_models:
     def logpdf(phi):
@@ -168,13 +177,10 @@ class priorstatdisc_models:
 
 
 def cov_delta(x,phi):
-    C0 = np.exp(-4*np.abs(np.subtract.outer(np.sqrt(x[:,0]),np.sqrt(x[:,0]))) ** 1.5) #*\
-        #(1+5*np.abs(np.subtract.outer(np.sqrt(x[:,0]),np.sqrt(x[:,0]))))
-    if np.abs(phi[1]) < 0.00000001:
-        adj = 1
-    else:
-        adj = 3 * phi[1] / (np.exp((phi[1])*3)-1)
-    adj = np.minimum(np.exp(phi[0] + phi[1]*(x[:,0] ** 0.75)) * adj,
+    C0 = np.exp(-1/2*np.abs(np.subtract.outer(np.sqrt(x[:,0]),np.sqrt(x[:,0])))) *\
+        (1+1/2*np.abs(np.subtract.outer(np.sqrt(x[:,0]),np.sqrt(x[:,0]))))
+    adj = 1/np.exp(np.minimum(0,phi[1]))
+    adj = np.minimum(np.exp(phi[0] + phi[1]*x[:,0]/np.max(xtot[:,0])) * adj,
                      100)
     return (np.diag(adj) @ C0 @ np.diag(adj))
 
@@ -210,15 +216,17 @@ plotpreds(axes[0], pred_lin)
 plotpreds(axes[1], pred_grav)
 plotpreds(axes[2], pred_BMM)
 
-matchingvec = np.where(((x[:, None] > xtot - 1e-08) * (x[:, None] < xtot + 1e-08)).all(2))
-xind = matchingvec[1][matchingvec[0]]
-print(y - np.squeeze(emu_grav.predict(cal_grav.thetadraw[1],x)['mean'])[xind])
 phi = cal_grav.phidraw[1]
-adj = 2 * phi[1] / (np.exp((phi[1])*2)-1)
-adj = np.minimum(np.exp(phi[0] + phi[1]*np.sqrt(x[:,0])) * adj,
-             250)
-print(adj)
-
 cov_delta(x,phi)
-phialt = cal_grav.phidraw
-phialt[:,0] = 2
+# matchingvec = np.where(((x[:, None] > xtot - 1e-08) * (x[:, None] < xtot + 1e-08)).all(2))
+# xind = matchingvec[1][matchingvec[0]]
+# print(y - np.squeeze(emu_grav.predict(cal_grav.thetadraw[1],x)['mean'])[xind])
+# phi = cal_grav.phidraw[1]
+# adj = 2 * phi[1] / (np.exp((phi[1])*2)-1)
+# adj = np.minimum(np.exp(phi[0] + phi[1]*np.sqrt(x[:,0])) * adj,
+#              250)
+# print(adj)
+
+# cov_delta(x,phi)
+# phialt = cal_grav.phidraw
+# phialt[:,0] = 2
