@@ -113,10 +113,13 @@ def predict(xindnew, emulator, theta, phi, y, xind, options):
         preddict['meanfull'] = predinfo[0]['mean']
         preddict['varfull'] = predinfo[0]['var']
         preddict['draws'] = predinfo[0]['mean']
+        preddict['modeldraws'] = predinfo[0]['mean']
     else:
         predinfo = emulator.predict(theta)
         preddict['meanfull'] = predinfo['mean']
+        preddict['full'] = predinfo['mean']
         preddict['draws'] = predinfo['mean']
+        preddict['modeldraws'] = predinfo['mean']
         preddict['varfull'] = predinfo['var']
         
     for k in range(0, theta.shape[0]):
@@ -158,6 +161,7 @@ def predict(xindnew, emulator, theta, phi, y, xind, options):
             re = Vmat @ np.diag(np.sqrt(np.abs(Wmat))) @ Vmat.T @\
                 sps.norm.rvs(0,1,size=(Vmat.shape[1]))
             preddict['draws'][k,:] = preddict['meanfull'][k, :]  + re
+            preddict['modeldraws'][k,:] = m10
         else:
             m0 = np.squeeze(y) * 0
             mut = np.squeeze(y) - predinfo['mean'][(k, xind)]
@@ -182,6 +186,7 @@ def predict(xindnew, emulator, theta, phi, y, xind, options):
             re = Vmat @ np.diag(np.sqrt(np.abs(Wmat))) @ Vmat.T @\
                 sps.norm.rvs(0,1,size=(Vmat.shape[1]))
             preddict['draws'][k,:] = preddict['meanfull'][k, :]  + re
+            preddict['modeldraws'][k,:] = mus0
 
     preddict['mean'] = np.mean(preddict['meanfull'], 0)
     varterm1 = np.var(preddict['meanfull'], 0)

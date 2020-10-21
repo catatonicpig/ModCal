@@ -22,9 +22,9 @@ def plotpreds(axis, preddict):
         #lowercurve = preddict['mean'][inds] - 3*np.sqrt(preddict['var'][inds])
         #axis.fill_between(xtot[inds,0], lowercurve, uppercurve, color='k', alpha=0.2)
         for l in range(0,preddict['draws'].shape[0]):
-            axis.plot(xtot[inds,0],preddict['draws'][l, inds],'k-', alpha=0.01,linewidth=0.1)
-        uppercurve = np.quantile(preddict['draws'][:, inds],0.99,0)
-        lowercurve = np.quantile(preddict['draws'][:, inds],0.01,0)
+            axis.plot(xtot[inds,0],preddict['modeldraws'][l, inds],'k-', alpha=0.01,linewidth=0.1)
+        uppercurve = np.quantile(preddict['modeldraws'][:, inds],0.99,0)
+        lowercurve = np.quantile(preddict['modeldraws'][:, inds],0.01,0)
         #axis.plot(xtot[inds,0],uppercurve, 'k-', alpha=0.6,linewidth=0.5)
         #axis.plot(xtot[inds,0],preddict['mean'][inds], 'k-', alpha=0.5,linewidth=0.5)
         axis.plot(xtot[inds,0], balldroptrue(xtot[inds,:]), 'k--',linewidth=2)
@@ -76,26 +76,34 @@ emu_grav = emulator(thetacompexp, grav_results, xtot)  # this builds an
 # emulator for the gravity simulation. this is a specialized class specific to ModCal.
 
 x = np.array([[ 0.1, 25. ],
+              [ 0.2, 25. ],
         [ 0.3, 25. ],
         [ 0.4, 25. ],
         [ 0.5, 25. ],
         [ 0.6, 25. ],
         [ 0.7, 25. ],
         [ 0.9, 25. ],
+        [ 1.1, 25. ],
         [ 2.0, 25. ],
         [ 2.4, 25. ],
+        [ 0.1, 50. ],
         [ 0.2, 50. ],
+        [ 0.3, 50. ],
         [ 0.4, 50. ],
         [ 0.5, 50. ],
         [ 0.6, 50. ],
-        [ 0.7, 25. ],
+        [ 0.7, 50. ],
         [ 0.8, 50. ],
         [ 0.9, 50. ],
+        [ 1.0, 50. ],
+        [ 1.2, 50. ],
         [ 3.5, 50. ],
+        [ 3.7, 50. ],
         [ 2.6, 50. ],
         [ 2.9, 50. ],
+        [3.1, 50. ],
         [3.3, 50. ],])
-obsvar = 1*np.ones(x.shape[0])  # variance for the observations in 'y' below
+obsvar = 4*np.ones(x.shape[0])  # variance for the observations in 'y' below
 y = balldroptrue(x) + sps.norm.rvs(0, np.sqrt(obsvar)) #observations at each row of 'x'
 balldropmodel_grav(np.array((0,0,9.81)).reshape((1,-1)), x)-balldroptrue(x)
 
@@ -157,10 +165,10 @@ class priorstatdisc_modela:
 class priorstatdisc_modelb:
     def logpdf(phi):
         return np.squeeze(sps.norm.logpdf(phi[:,0], 2, 0.5) +
-                          sps.norm.logpdf(phi[:,1], -2, 0.5))
+                          sps.norm.logpdf(phi[:,1], -4, 0.5))
     def rvs(n):
         return np.vstack((sps.norm.rvs(2, 0.5, size = n ),
-                         sps.norm.rvs(-2, 0.5, size = n))).T
+                         sps.norm.rvs(-4, 0.5, size = n))).T
     
 class priorstatdisc_models:
     def logpdf(phi):
@@ -172,9 +180,9 @@ class priorstatdisc_models:
 
 
 def cov_delta(x,phi):
-    C0 = np.exp(-np.abs(np.subtract.outer(np.sqrt(x[:,0]),np.sqrt(x[:,0])))) *\
-        (1+np.abs(np.subtract.outer(np.sqrt(x[:,0]),np.sqrt(x[:,0]))))
-    adj = 4 / (1+np.exp(phi[1]*(x[:,0] - phi[0])))
+    C0 = np.exp(-1/2*np.abs(np.subtract.outer(np.sqrt(x[:,0]),np.sqrt(x[:,0])))) *\
+        (1+1/2*np.abs(np.subtract.outer(np.sqrt(x[:,0]),np.sqrt(x[:,0]))))
+    adj = 20 / (1+np.exp(phi[1]*(x[:,0] - phi[0])))
     return (np.diag(adj) @ C0 @ np.diag(adj))
 
 def cov_disc(x,k,phi):
