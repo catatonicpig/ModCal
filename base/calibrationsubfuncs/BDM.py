@@ -145,12 +145,15 @@ def predict(xindnew, emulator, theta, phi, y, xind, options):
             m00 = m0[xind]
             m10 = m0[xindnew]
             S0inv = np.linalg.inv(np.diag(obsvar) + S0[xind,:][:,xind])
-            Mat1 = S0[xindnew, :][:, xind] @ S0inv
+            S10 = S0[xindnew, :][:, xind]
+            if 'pred_para' in options.keys():
+                S10 = options['pred_para'] * S10
+            Mat1 = S10 @ S0inv
             resid = np.squeeze(y)
             preddict['meanfull'][k, :] =  m10 +  Mat1 @ (np.squeeze(y) - m00)
             preddict['varfull'][k, :] = (np.diag(S0)[xindnew] -\
-                np.sum(S0[xindnew, :][:, xind] * Mat1,1))
-            Wmat, Vmat = np.linalg.eigh(S0[xindnew,:][:,xindnew] - S0[xindnew, :][:, xind] @ Mat1.T)
+                np.sum(S10 * Mat1,1))
+            Wmat, Vmat = np.linalg.eigh(S0[xindnew,:][:,xindnew] - S10 @ Mat1.T)
             
             re = Vmat @ np.diag(np.sqrt(np.abs(Wmat))) @ Vmat.T @\
                 sps.norm.rvs(0,1,size=(Vmat.shape[1]))
@@ -169,6 +172,8 @@ def predict(xindnew, emulator, theta, phi, y, xind, options):
                 S10 += C[xindnew,:][:,xind]
                 S11 += C[xindnew,:][:,xindnew]
             #S0 += np.diag(np.diag(S0)) * 0.00000001
+            if 'pred_para' in options.keys():
+                S10 = options['pred_para'] * S10
             S0 += np.diag(obsvar)
             mus0 = predinfo['mean'][(k, xindnew)]
             preddict['meanfull'][k, :] = mus0 + S10 @ np.linalg.solve(S0, mut)
@@ -179,6 +184,6 @@ def predict(xindnew, emulator, theta, phi, y, xind, options):
             preddict['draws'][k,:] = preddict['meanfull'][k, :]  + re
 
     preddict['mean'] = np.mean(preddict['meanfull'], 0)
-    varterm1 = 0*np.var(preddict['meanfull'], 0)
+    varterm1 = np.var(preddict['meanfull'], 0)
     preddict['var'] = np.mean(preddict['varfull'], 0) + varterm1
     return preddict
