@@ -8,7 +8,7 @@ Created on Fri Sep 11 14:40:38 2020
 import numpy as np
 import scipy.optimize as spo
 
-def fit(theta, f, x=None,  options=None):
+def fit(theta, f, x=None,  args=None):
     """Return a Gaussian Process emulator model."""
     emuinfo = {}
     emuinfo['offset'] = np.zeros(f.shape[1])
@@ -58,7 +58,7 @@ def fit(theta, f, x=None,  options=None):
     return emuinfo
 
 
-def predict(emumodel, theta,  options=None):
+def predict(emumodel, theta,  args=None):
     emumodels = emumodel['emulist']
     predvecs = np.zeros((theta.shape[0], len(emumodels)))
     predvars = np.zeros((theta.shape[0], len(emumodels)))

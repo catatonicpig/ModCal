@@ -22,8 +22,8 @@ def plotpreds(axis, preddict):
         #axis.fill_between(xtot[inds,0], lowercurve, uppercurve, color='k', alpha=0.2)
         for l in range(0,preddict['draws'].shape[0]):
             axis.plot(xtot[inds,0],preddict['modeldraws'][l, inds],'k-', alpha=0.01,linewidth=0.1)
-        uppercurve = np.quantile(preddict['modeldraws'][:, inds],0.99,0)
-        lowercurve = np.quantile(preddict['modeldraws'][:, inds],0.01,0)
+        uppercurve = np.quantile(preddict['modeldraws'][:, inds],0.975,0)
+        lowercurve = np.quantile(preddict['modeldraws'][:, inds],0.025,0)
         #axis.plot(xtot[inds,0],uppercurve, 'k-', alpha=0.6,linewidth=0.5)
         #axis.plot(xtot[inds,0],preddict['mean'][inds], 'k-', alpha=0.5,linewidth=0.5)
         axis.plot(xtot[inds,0], balldroptrue(xtot[inds,:]), 'k--',linewidth=2)
@@ -55,9 +55,9 @@ class priorphys:
                           sps.gamma.rvs(2, 0, 5, size=n))).T  # gravity
 
 
-tvec = np.concatenate((np.arange(0.1, 2.9, 0.1),
+tvec = np.concatenate((np.arange(0.1, 4.3, 0.1),
                        np.arange(0.1, 4.3, 0.1)))  # the time vector of interest
-hvec = np.concatenate((25 * np.ones(28),
+hvec = np.concatenate((25 * np.ones(42),
                        50 * np.ones(42)))  # the drop heights vector of interest
 xtot = np.vstack((tvec, hvec)).T  # the input of interest
 # each row is an individual vector of interest
@@ -83,6 +83,7 @@ x = np.array([[ 0.1, 25. ],
         [ 0.7, 25. ],
         [ 0.9, 25. ],
         [ 1.1, 25. ],
+        [ 1.3, 25. ],
         [ 2.0, 25. ],
         [ 2.4, 25. ],
         [ 0.1, 50. ],
@@ -105,52 +106,6 @@ x = np.array([[ 0.1, 25. ],
 obsvar = 4*np.ones(x.shape[0])  # variance for the observations in 'y' below
 y = balldroptrue(x) + sps.norm.rvs(0, np.sqrt(obsvar)) #observations at each row of 'x'
 balldropmodel_grav(np.array((0,0,9.81)).reshape((1,-1)), x)-balldroptrue(x)
-
-
-class priorstat_1model:
-    def logpdf(phi):
-        return np.squeeze(sps.norm.logpdf(phi, 2, 2))
-    def rvs(n):
-        return sps.norm.rvs(2,2, size = n).reshape((-1,1))
-
-class priorstat_2model:
-    def logpdf(phi):
-        return np.squeeze(priorstat_1model.logpdf(phi[:,0]) +
-                          priorstat_1model.logpdf(phi[:,1]))
-    def rvs(n):
-        return np.hstack((priorstat_1model.rvs(n),
-                          priorstat_1model.rvs(n)))
-    
-    
-cal_lin = calibrator(emu_lin, y, x,
-                    thetaprior = priorphys,
-                    phiprior = priorstat_1model,
-                    passoptions = {'obsvar': obsvar}, software = 'BMA')
-pred_lin = cal_lin.predict(xtot)
-
-cal_grav = calibrator(emu_grav, y, x,
-                       thetaprior = priorphys,
-                       phiprior = priorstat_1model,
-                       passoptions = {'obsvar': obsvar}, software = 'BMA')
-pred_grav = cal_grav.predict(xtot)
-
-cal_BMA = calibrator((emu_lin,emu_grav), y, x,
-                       thetaprior = priorphys,
-                       phiprior = priorstat_2model,
-                       passoptions = {'obsvar': obsvar}, software = 'BMA')
-pred_BMA = cal_BMA.predict(xtot)
-
-fig, axes = plt.subplots(ncols=4, nrows=1, figsize=(21, 5))
-two2d(axes[0], priorphys.rvs(1000)[:,(2,1)])
-two2d(axes[1], cal_lin.thetadraw[:,(2,1)])
-two2d(axes[2], cal_grav.thetadraw[:,(2,1)])
-two2d(axes[3], cal_BMA.thetadraw[:,(2,1)])
-
-fig, axes = plt.subplots(ncols=4, nrows=1, figsize=(21, 5))
-plotpreds(axes[1], pred_lin)
-plotpreds(axes[2], pred_grav)
-plotpreds(axes[3], pred_BMA)
-
 
     
 class priorstatdisc_modela:
@@ -189,44 +144,42 @@ def cov_disc(x,k,phi):
 
 cal_lin = calibrator(emu_lin, y, x,
                     thetaprior = priorphys,
-                    phiprior = priorstatdisc_modela,
-                    passoptions = {'obsvar': obsvar, 'cov_disc': cov_delta}, software = 'BDM')
+                    software = 'BMA',
+                    args = {'obsvar': obsvar, 'cov_disc': cov_delta,
+                               'phiprior': priorstatdisc_modela})
 pred_lin = cal_lin.predict(xtot)
 
 cal_grav = calibrator(emu_grav, y, x,
                        thetaprior = priorphys,
-                       phiprior = priorstatdisc_modelb,
-                       passoptions = {'obsvar': obsvar, 'cov_disc': cov_delta}, software = 'BDM')
+                       software = 'BMA',
+                    args = {'obsvar': obsvar, 'cov_disc': cov_delta,
+                               'phiprior': priorstatdisc_modelb})
 pred_grav = cal_grav.predict(xtot)
+
+cal_BMA = calibrator((emu_lin,emu_grav), y, x,
+                    thetaprior = priorphys,
+                    phiprior = priorstatdisc_models,
+                    software = 'BMA',
+                    args = {'obsvar': obsvar, 'cov_disc': cov_disc,
+                            'phiprior': priorstatdisc_models})
+pred_BMA = cal_BMA.predict(xtot)
 
 cal_BMM = calibrator((emu_lin,emu_grav), y, x,
                     thetaprior = priorphys,
                     phiprior = priorstatdisc_models,
-                    passoptions = {'obsvar': obsvar, 'cov_disc': cov_disc}, software = 'BDM')
-pred_BMM = cal_BMM.predict(xtot) #, theta = cal_lin.thetadraw, phi = cal_BMM.phidraw
+                    software = 'BDM',
+                    args = {'obsvar': obsvar, 'cov_disc': cov_disc,
+                            'phiprior': priorstatdisc_models})
+pred_BMM = cal_BMM.predict(xtot)
 
 fig, axes = plt.subplots(ncols=4, nrows=1, figsize=(21, 5))
-two2d(axes[0], priorphys.rvs(1000)[:,(2,1)])
-two2d(axes[1], cal_lin.thetadraw[:,(2,1)])
-two2d(axes[2], cal_grav.thetadraw[:,(2,1)])
-two2d(axes[3], cal_BMM.thetadraw[:,(2,1)])
+two2d(axes[0], cal_lin.thetas()[:,(2,1)])
+two2d(axes[1], cal_grav.thetas()[:,(2,1)])
+two2d(axes[2], cal_BMA.thetas()[:,(2,1)])
+two2d(axes[3], cal_BMM.thetas()[:,(2,1)])
 
-fig, axes = plt.subplots(ncols=3, nrows=1, figsize=(21, 5))
+fig, axes = plt.subplots(ncols=4, nrows=1, figsize=(21, 5))
 plotpreds(axes[0], pred_lin)
 plotpreds(axes[1], pred_grav)
-plotpreds(axes[2], pred_BMM)
-
-phi = cal_lin.phidraw[1]
-cov_delta(x,phi)
-# matchingvec = np.where(((x[:, None] > xtot - 1e-08) * (x[:, None] < xtot + 1e-08)).all(2))
-# xind = matchingvec[1][matchingvec[0]]
-# print(y - np.squeeze(emu_grav.predict(cal_grav.thetadraw[1],x)['mean'])[xind])
-# phi = cal_grav.phidraw[1]
-# adj = 2 * phi[1] / (np.exp((phi[1])*2)-1)
-# adj = np.minimum(np.exp(phi[0] + phi[1]*np.sqrt(x[:,0])) * adj,
-#              250)
-# print(adj)
-
-# cov_delta(x,phi)
-# phialt = cal_grav.phidraw
-# phialt[:,0] = 2
+plotpreds(axes[2], pred_BMA)
+plotpreds(axes[3], pred_BMM)

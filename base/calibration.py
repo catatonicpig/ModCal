@@ -31,11 +31,6 @@ class calibrator(object):
             matrix or list.  It must align with the defination in "emu.theta"
             thetaprior.logpdf(theta) :  produces the log pdf from the prior on theta, arranged in a
             vector.
-        thetaprior : distribution class instatance with two built in functions
-            phiprior.rvs(n) :  produces n draws from the prior on phi, arranged in either a
-            matrix or list.
-            phiprior.logpdf(phi) :  produces the log pdf from the prior on phi, arranged in a
-            vector.
         software : str
             A string that points to the file located in "calibrationsubfuncs" you would
             like to use.
@@ -104,25 +99,14 @@ class calibrator(object):
                 raise ValueError('Module not found!')
 
             self.args = args
-            self.thetaprior = thetaprior
             if thetaprior is None:
                 raise ValueError('You must give a prior for theta.')
-            if phiprior is None:
-                class phiprior:
-                    def logpdf(phi):
-                        return 0
-                    def rvs(n):
-                        return None
-                self.phiprior = phiprior
-            else:
-                self.phiprior = phiprior
+            self.thetaprior = thetaprior
             
-            self.thetadraw = None
-            self.phidraw = None
-            self.thetadraw, self.phidraw = self.fit()
+            self.fit()
 
 
-    def fit(self, theta = None, phi = None, args=None):
+    def fit(self, thetaprior = None, args=None):
         r"""
         Returns a draws from theta and phi given data.
 
@@ -131,16 +115,13 @@ class calibrator(object):
 
         Parameters
         ----------
-        theta : array of float
-            A list or matrix of intitial parameters. If not provided it will draw from prior.
-        phi : array of float
-            A list or matrix of statistical model parameters.  It must have the same number of rows
-            or elements as \"theta\".  If not provided it will draw from prior.
+        thetaprior : distribution class instatance with two built in functions
+            thetaprior.rvs(n) :  produces n draws from the prior on theta, arranged in either a
+            matrix or list.  It must align with the defination in "emu.theta"
+            thetaprior.logpdf(theta) :  produces the log pdf from the prior on theta, arranged in a
+            vector.
         args : dict
             A dictionary containing options you would like to pass to either
-            loglik(theta, phi, args)
-            or
-            logprior(theta, phi, args)
 
         Returns
         -------
@@ -148,25 +129,13 @@ class calibrator(object):
             cal.info['theta'] : array of float
                 A list or matrix of parameters drawn from the posterior. If not provided it will
                 draw from prior.
-            cal.info['phi'] :
-                A list or matrix of statistical model parameters drawn from the posterior.  It will
-                have the same number of rows or elements as \"theta\".
         """
-        if theta is None:
-            if self.thetadraw is not None:
-                theta = self.thetadraw
-            else:
-                self.thetadraw = self.thetaprior.rvs(1000)
-                theta = self.thetadraw
-        if phi is None:
-            if self.phidraw is not None:
-                phi = self.phidraw
-            else:
-                self.phidraw = self.phiprior.rvs(1000)
-                phi = self.phidraw
+        if thetaprior is None:
+            thetaprior = self.thetaprior
         if args is None:
             args = self.args
-        return self.calsoftware.fit(theta, phi, self.logpost)
+        self.info = self.calsoftware.fit(thetaprior, self.emu, self.y, self.x, args)
+        return None
 
 
     def predict(self, x, args=None):
@@ -196,99 +165,20 @@ class calibrator(object):
             preddict['modeldraws'] : Draws of the model's prediction at each x. The dependency will be 
                                 preserved
         """
-        matchingvec = np.where(((x[:, None] > self.emu0.x - 1e-08) * (x[:, None] < self.emu0.x + 1e-08)).all(2))
-        xind = matchingvec[1][matchingvec[0]]
         if args is None:
             args = self.args
             
-        return self.emusoftware.predict(x, self.emu, self.info,
-                              copy.deepcopy(theta),
-                              args)
+        return self.calsoftware.predict(x, self.emu, self.info, args)
 
 
-    def logprior(self, theta, phi, args=None):
+    def thetas(self):
         r"""
-        Returns a log prior at the new parameters.
-
-        Parameters
-        ----------
-        theta : array of float
-            A list or matrix of parameters.
-        phi : array of float
-            A list or matrix of statistical model parameters.  It must have the same number of rows
-            or elements as \"theta\".
-        args : dict
-            A dictionary containing options you would like to pass to either
-            thetaprior.logpdf(theta, args)
-            or
-            phiprior.logpdf(theta, args)
+        Returns posterior draws of the parameters.
 
         Returns
         -------
-        array of float
-            A vector of unnormlaized log prior.
+        thetas : array of floats
+            A matrix of posterior parameter values.
         """
-        return self.thetaprior.logpdf(theta) + self.phiprior.logpdf(phi)
-
-
-    def loglik(self, theta, phi, args=None):
-        r"""
-        Returns a log likelihood at the new parameters.  It directly calls 
-        \"calibrationsubfuncs.[software].loglik\" where \"[software]\" is the user option.
-
-        Parameters
-        ----------
-        theta : array of float
-            A list or matrix of parameters.
-        phi : array of float
-            A list or matrix of statistical model parameters.  It must have the same number of rows
-            or elements as \"theta\".
-        args : dict
-            A dictionary containing options you would like to pass to either
-            thetaprior.logpdf(theta, args)
-            or
-            phiprior.logpdf(theta, args)
-
-        Returns
-        -------
-        array of float
-            A vector of unnormlaized log likelihood.
-        """
-        if args is None:
-            args = self.args
-        return self.calsoftware.loglik(self.emu, theta, phi, self.y, self.xind, args)
-
-
-    def logpost(self, theta, phi, args=None):
-        r"""
-        Returns a log posterior at the new parameters.  It is merely the summation of loglik and
-        logprior
-
-        Parameters
-        ----------
-        theta : array of float
-            A list or matrix of parameters.
-        phi : array of float
-            A list or matrix of statistical model parameters.  It must have the same number of rows
-            or elements as \"theta\".
-        args : dict
-            A dictionary containing options you would like to pass to either
-            thetaprior.logpdf(theta, args)
-            or
-            phiprior.logpdf(theta, args)
-
-        Returns
-        -------
-        array of float
-            A vector of unnormlaized log posterior.
-        """
-        if args is None:
-            args = self.args
-
-        L0 = self.logprior(theta, phi)
-        inds = np.where(np.isfinite(L0))[0]
-        if phi is None:
-            L0[inds] += self.loglik(theta[inds], None)
-        else:
-            L0[inds] += self.loglik(theta[inds], phi[inds])
-        return L0
+        
+        return self.info['theta']

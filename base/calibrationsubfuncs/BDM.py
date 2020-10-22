@@ -3,13 +3,13 @@ import numpy as np
 import scipy.stats as sps
 from base.utilities import postsampler
 
-def fit(theta, phi, logpostfunc, options=None):
+def fit(thetaprior, emu, y, x, args=None):
     """
     Return draws from the posterior.
 
     Parameters
     ----------
-    thetastart : array of float
+    thetaprior : array of float
         Some matrix of parameters where function evaluations as starting points.
     logpriorfunc : function
         A function call describing the log of the prior distribution
@@ -20,6 +20,18 @@ def fit(theta, phi, logpostfunc, options=None):
     theta : matrix of sampled paramter values
     """
     
+    if 'obsvar' in args.keys():
+        obsvar = args['obsvar']
+    else:
+        raise ValueError('Must provide a prior on statistical parameters in this software.')
+    
+    if 'phiprior' in args.keys():
+        phiprior = args['phiprior']
+    else:
+        raise ValueError('Must provide a prior on statistical parameters in this software.')
+    
+    theta = thetaprior.rvs(1000)
+    phi = phiprior.rvs(1000)
     
     thetadim = theta[0].shape[0]
     if phi is None:
@@ -31,7 +43,16 @@ def fit(theta, phi, logpostfunc, options=None):
     else:
         phidim = phi[0].shape[0]
         thetaphi = np.hstack((theta,phi))
+        
+        
+    if type(emu) is tuple:
+        emux = emu[0].x
+    else:
+        emux = emu.x
     
+    matchingvec = np.where(((x[:, None] > emux - 1e-08) *\
+                            (x[:, None] < emux + 1e-08)).all(2))
+    xind = matchingvec[1][matchingvec[0]]
     def logpostfull(thetaphi):
         if phidim > 0.5:
             theta = thetaphi[:, :thetadim]
@@ -39,7 +60,14 @@ def fit(theta, phi, logpostfunc, options=None):
         else:
             theta = thetaphi
             phi = None
-        return logpostfunc(theta, phi)
+        logpost =thetaprior.logpdf(theta) + phiprior.logpdf(phi)
+        
+        inds = np.where(np.isfinite(logpost))[0]
+        if phi is None:
+            logpost[inds] += loglik(emu, theta[inds], None, y, xind, args)
+        else:
+            logpost[inds] += loglik(emu, theta[inds], phi[inds], y, xind, args)
+        return logpost
     
     numsamp = 1000
     tarESS = np.max((100, 10 * thetaphi.shape[1]))
@@ -52,113 +80,65 @@ def fit(theta, phi, logpostfunc, options=None):
         theta = thetaphi
         phi = None
     
-    return theta, phi
+    info = {}
+    info['theta'] = theta
+    info['phi'] = phi
+    info['xind'] = xind
+    info['y'] = y
+    info['x'] = x
+    info['emux'] = emux
+    return info
 
-def loglik(emulator, theta, phi, y, xind, options):
+
+def predict(x, emu, info, args = None):
     """
     Return posterior of function evaluation at the new parameters.
 
     Parameters
     ----------
-    emumodel : Pred
-        A fitted emulator model defined as an emulation class.
-    theta : array of float
+    emu : dict
+        A fitted emu model defined as an emulation class.
+    info : array of float
         Some matrix of parameters where function evaluations as starting points.
     y : Observations
         A vector of the same length as x with observations. 'None' is equivlent to a vector of
         zeros.
     Sinv : Observation Precision Matrix
-        A matrix of the same length as "emulator.x" with observations. 'None' is equivlent to the
+        A matrix of the same length as "emu.x" with observations. 'None' is equivlent to the
         identity matrix.
 
     Returns
     -------
     post: vector of unnormlaized log posterior
     """
+    xind = info['xind']
+    y = info['y']
+    theta = info['theta']
+    phi = info['phi']
+    
+    matchingvec = np.where(((x[:, None] > info['emux'] - 1e-08) *\
+                            (x[:, None] < info['emux'] + 1e-08)).all(2))
+    xindnew = matchingvec[1][matchingvec[0]]
+    
+    theta = info['theta']
+    phi = info['phi']
     if theta.ndim == 1:
         theta = theta.reshape((1, theta.shape[0]))
-    elif 'obsvar' in options.keys():
-        obsvar = options['obsvar']
-    else:
-        raise ValueError('Must provide obsvar at this moment.')
-    if type(emulator) is tuple:
-        predinfo = [dict() for x in range(len(emulator))]
-        for k in range(0, len(emulator)):
-            predinfo[k] = emulator[k].predict(theta)
-
-    else:
-        predinfo = emulator.predict(theta)
-    loglik = np.zeros(theta.shape[0])
-    for k in range(0, theta.shape[0]):
-        if type(emulator) is tuple:
-            covmats = [np.array(0) for x in range(len(emulator))]
-            covmatsinv = [np.array(0) for x in range(len(emulator))]
-            mus = [np.array(0) for x in range(len(emulator))]
-            resid = np.zeros(len(emulator) * xind.shape[0])
-            totInv = np.zeros((xind.shape[0], xind.shape[0]))
-            term2 = np.zeros(xind.shape[0])
-            for l in range(0, len(emulator)):
-                mus[l] = predinfo[l]['mean'][k, xind]
-                A1 = np.squeeze(predinfo[l]['covdecomp'][k, :, xind])
-                covmats[l] = (A1 @ A1.T)
-                if 'cov_disc' in options.keys():
-                    covmats[l] += options['cov_disc'](emulator[l].x[xind,:], l, phi[k,:])
-                covmats[l] += np.diag(np.diag(covmats[l])) * (10 ** (-8))
-                covmatsinv[l] = np.linalg.inv(covmats[l])
-                totInv += covmatsinv[l]
-                term2 += covmatsinv[l] @ mus[l]
-            m0 = np.linalg.solve(totInv, term2)
-            W, V = np.linalg.eigh(np.diag(obsvar) + np.linalg.inv(totInv))
-        else:
-            m0 = predinfo['mean'][(k, xind)]
-            A1 = np.squeeze(predinfo['covdecomp'][k, :, xind])
-            S0 = A1 @ A1.T
-            if 'cov_disc' in options.keys():
-                S0 += options['cov_disc'](emulator.x[xind,:], phi[k,:])
-            W, V = np.linalg.eigh(np.diag(obsvar) + S0)
-        muadj = V.T @ (np.squeeze(y) - m0)
-        loglik[k] = -0.5 * np.sum((muadj ** 2) / W)-0.5 * np.sum(np.log(W))
-    return loglik
-
-
-def predict(xindnew, emulator, theta, phi, y, xind, options):
-    """
-    Return posterior of function evaluation at the new parameters.
-
-    Parameters
-    ----------
-    emumodel : Pred
-        A fitted emulator model defined as an emulation class.
-    theta : array of float
-        Some matrix of parameters where function evaluations as starting points.
-    y : Observations
-        A vector of the same length as x with observations. 'None' is equivlent to a vector of
-        zeros.
-    Sinv : Observation Precision Matrix
-        A matrix of the same length as "emulator.x" with observations. 'None' is equivlent to the
-        identity matrix.
-
-    Returns
-    -------
-    post: vector of unnormlaized log posterior
-    """
-    if theta.ndim == 1:
-        theta = theta.reshape((1, theta.shape[0]))
-    elif 'obsvar' in options.keys():
-        obsvar = options['obsvar']
+    elif 'obsvar' in args.keys():
+        obsvar = args['obsvar']
     else:
         raise ValueError('Must provide obsvar at this moment.')
     preddict = {}
-    if type(emulator) is tuple:
-        predinfo = [dict() for x in range(len(emulator))]
-        for k in range(0, len(emulator)):
-            predinfo[k] = emulator[k].predict(theta)
+    if type(emu) is tuple:
+        predinfo = [dict() for x in range(len(emu))]
+        for k in range(0, len(emu)):
+            predinfo[k] = emu[k].predict(theta)
         preddict['meanfull'] = predinfo[0]['mean']
         preddict['varfull'] = predinfo[0]['var']
         preddict['draws'] = predinfo[0]['mean']
         preddict['modeldraws'] = predinfo[0]['mean']
     else:
-        predinfo = emulator.predict(theta)
+        predinfo = emu.predict(theta)
         preddict['meanfull'] = predinfo['mean']
         preddict['full'] = predinfo['mean']
         preddict['draws'] = predinfo['mean']
@@ -166,21 +146,21 @@ def predict(xindnew, emulator, theta, phi, y, xind, options):
         preddict['varfull'] = predinfo['var']
         
     for k in range(0, theta.shape[0]):
-        if type(emulator) is tuple:
-            covmats = [np.array(0) for x in range(len(emulator))]
-            covmatsB = [np.array(0) for x in range(len(emulator))]
-            covmatsC = [np.array(0) for x in range(len(emulator))]
-            covmatsinv = [np.array(0) for x in range(len(emulator))]
-            mus = [np.array(0) for x in range(len(emulator))]
-            totInv = np.zeros((emulator[0].x.shape[0], emulator[0].x.shape[0]))
-            term2 = np.zeros(emulator[0].x.shape[0])
-            for l in range(0, len(emulator)):
+        if type(emu) is tuple:
+            covmats = [np.array(0) for x in range(len(emu))]
+            covmatsB = [np.array(0) for x in range(len(emu))]
+            covmatsC = [np.array(0) for x in range(len(emu))]
+            covmatsinv = [np.array(0) for x in range(len(emu))]
+            mus = [np.array(0) for x in range(len(emu))]
+            totInv = np.zeros((emu[0].x.shape[0], emu[0].x.shape[0]))
+            term2 = np.zeros(emu[0].x.shape[0])
+            for l in range(0, len(emu)):
                 mus[l] = predinfo[l]['mean'][k, :]
-            for l in reversed(range(0, len(emulator))):
+            for l in reversed(range(0, len(emu))):
                 A1 = np.squeeze(predinfo[l]['covdecomp'][k, :, :])
                 covmats[l] = A1.T @ A1
-                if 'cov_disc' in options.keys():
-                    covmats[l] += options['cov_disc'](emulator[l].x, l, phi[k,:])
+                if 'cov_disc' in args.keys():
+                    covmats[l] += args['cov_disc'](info['emux'], l, phi[k,:])
                 covmats[l] += np.diag(np.diag(covmats[l])) * (10 ** (-8))
                 covmatsinv[l] = np.linalg.inv(covmats[l])
                 totInv += covmatsinv[l]
@@ -214,8 +194,8 @@ def predict(xindnew, emulator, theta, phi, y, xind, options):
             S0 = A1 @ A1.T
             S10 = A2 @ A1.T
             S11 = A2 @ A2.T
-            if 'cov_disc' in options.keys():
-                C = options['cov_disc'](emulator.x, phi[k,:])
+            if 'cov_disc' in args.keys():
+                C = args['cov_disc'](info['emux'], phi[k,:])
                 S0 += C[xind,:][:,xind]
                 S10 += C[xindnew,:][:,xind]
                 S11 += C[xindnew,:][:,xindnew]
@@ -233,3 +213,70 @@ def predict(xindnew, emulator, theta, phi, y, xind, options):
     varterm1 = np.var(preddict['meanfull'], 0)
     preddict['var'] = np.mean(preddict['varfull'], 0) + varterm1
     return preddict
+
+
+def loglik(emu, theta, phi, y, xind, args):
+    """
+    Return posterior of function evaluation at the new parameters.
+
+    Parameters
+    ----------
+    emumodel : Pred
+        A fitted emu model defined as an emulation class.
+    theta : array of float
+        Some matrix of parameters where function evaluations as starting points.
+    y : Observations
+        A vector of the same length as x with observations. 'None' is equivlent to a vector of
+        zeros.
+    Sinv : Observation Precision Matrix
+        A matrix of the same length as "emu.x" with observations. 'None' is equivlent to the
+        identity matrix.
+
+    Returns
+    -------
+    post: vector of unnormlaized log posterior
+    """
+    if theta.ndim == 1:
+        theta = theta.reshape((1, theta.shape[0]))
+    elif 'obsvar' in args.keys():
+        obsvar = args['obsvar']
+    else:
+        raise ValueError('Must provide obsvar at this moment.')
+    if type(emu) is tuple:
+        predinfo = [dict() for x in range(len(emu))]
+        for k in range(0, len(emu)):
+            predinfo[k] = emu[k].predict(theta)
+    else:
+        predinfo = emu.predict(theta)
+    
+    loglik = np.zeros(theta.shape[0])
+    for k in range(0, theta.shape[0]):
+        if type(emu) is tuple:
+            covmats = [np.array(0) for x in range(len(emu))]
+            covmatsinv = [np.array(0) for x in range(len(emu))]
+            mus = [np.array(0) for x in range(len(emu))]
+            resid = np.zeros(len(emu) * xind.shape[0])
+            totInv = np.zeros((xind.shape[0], xind.shape[0]))
+            term2 = np.zeros(xind.shape[0])
+            for l in range(0, len(emu)):
+                mus[l] = predinfo[l]['mean'][k, xind]
+                A1 = np.squeeze(predinfo[l]['covdecomp'][k, :, xind])
+                covmats[l] = (A1 @ A1.T)
+                if 'cov_disc' in args.keys():
+                    covmats[l] += args['cov_disc'](emu[l].x[xind,:], l, phi[k,:])
+                covmats[l] += np.diag(np.diag(covmats[l])) * (10 ** (-8))
+                covmatsinv[l] = np.linalg.inv(covmats[l])
+                totInv += covmatsinv[l]
+                term2 += covmatsinv[l] @ mus[l]
+            m0 = np.linalg.solve(totInv, term2)
+            W, V = np.linalg.eigh(np.diag(obsvar) + np.linalg.inv(totInv))
+        else:
+            m0 = predinfo['mean'][(k, xind)]
+            A1 = np.squeeze(predinfo['covdecomp'][k, :, xind])
+            S0 = A1 @ A1.T
+            if 'cov_disc' in args.keys():
+                S0 += args['cov_disc'](emu.x[xind,:], phi[k,:])
+            W, V = np.linalg.eigh(np.diag(obsvar) + S0)
+        muadj = V.T @ (np.squeeze(y) - m0)
+        loglik[k] = -0.5 * np.sum((muadj ** 2) / W)-0.5 * np.sum(np.log(W))
+    return loglik

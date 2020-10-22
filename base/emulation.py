@@ -34,7 +34,7 @@ class emulator(object):
             Optional dictionary containing options you would like to pass to
             [software].fit(theta, f, x, args)
             or
-            [software].pred(theta, args)
+            [software].predict(theta, args)
 
         Returns
         -------
@@ -69,7 +69,7 @@ class emulator(object):
         self.theta = theta
         self.f = f
         self.x = x
-        
+        self.args = args
         try:
             self.emusoftware = importlib.import_module('base.emulationsubfuncs.' + software)
         except:
@@ -84,9 +84,7 @@ class emulator(object):
         
         self.fit()
         
-        self.emusoftware.predict(self.info,
-                       copy.deepcopy(self.theta),
-                       options=None)
+        self.emusoftware.predict(self.info, copy.deepcopy(self.theta))
 
 
     def fit(self, args= None):
