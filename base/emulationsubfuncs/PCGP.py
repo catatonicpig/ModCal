@@ -8,7 +8,7 @@ Created on Fri Sep 11 14:40:38 2020
 import numpy as np
 import scipy.optimize as spo
 
-def build(theta, f, x=None,  options=None):
+def fit(theta, f, x=None,  options=None):
     """Return a Gaussian Process emulator model."""
     emuinfo = {}
     emuinfo['offset'] = np.zeros(f.shape[1])

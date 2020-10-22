@@ -4,11 +4,43 @@ import numpy as np
 import importlib
 import copy
 
-class emulator(object):
-    """Emulator."""
 
-    def __init__(self, theta=None, f=None, x=None, software='plumleeemu',
-                 buildfirst=True, testpred=True):
+class emulator(object):
+    """A class used to represent an emulator or surrogate model."""
+
+    def __init__(self, theta=None, f=None, x=None, software='PCGP', args={}):
+        r"""
+        Intitalizes an emulator or surrogate.
+
+        It directly calls "emulationsubfuncs.[software]" where [software] is
+        the user option with default listed above. If you would like to change this software, just
+        drop a new file in the "emulationsubfuncs" folder with the required formatting.
+
+        Parameters
+        ----------
+        theta : array of float
+            An n-by-d matrix of parameters. n should be at least 2 times m. Each row in theta should
+            correspond to a row in f.
+        f : array of float
+            An n-by-m matrix of responses with 'nan' representing responses not yet available. Each
+            row in f should correspond to a row in theta. Each column should correspond to a row in
+            x.
+        x : array of objects
+            An m-by-p matrix of inputs. Each column should correspond to a row in f.
+        software : str
+            A string that points to the file located in "emulationsubfuncs" you would
+            like to use.
+        args : dict
+            Optional dictionary containing options you would like to pass to
+            [software].fit(theta, f, x, args)
+            or
+            [software].pred(theta, args)
+
+        Returns
+        -------
+        emu : instance of emulation class
+            An instance of the emulation class that can be used with the functions listed below.
+        """
         if f is None or theta is None:
             raise ValueError('You have no provided any theta and/or f.')
         
@@ -39,42 +71,88 @@ class emulator(object):
         self.x = x
         
         try:
-            emusoftware = importlib.import_module('base.emulationsubfuncs.' + software)
+            self.emusoftware = importlib.import_module('base.emulationsubfuncs.' + software)
         except:
             raise ValueError('Module not found!')
             
             
-        if "build" not in dir(emusoftware):
-            raise ValueError('Function \"build\" not found in module!')
+        if "fit" not in dir(self.emusoftware):
+            raise ValueError('Function \"fit\" not found in module!')
         
-        self.builder = emusoftware.build
-            
-        if buildfirst:
-            self.build()
-            self.modelbuilt = True
-            
-        if "predict" not in dir(emusoftware):
+        if "predict" not in dir(self.emusoftware):
             raise ValueError('Function \"predict\" not found in module!')
-            
-        self.predictor = emusoftware.predict
         
-        if testpred:
-            if self.modelbuilt is False:
-                print('Cannot test prediction because \"buildfirst\" is False.')
-            else:
-                self.predictor(self.model,
-                               copy.deepcopy(self.theta),
-                               options=None)
+        self.fit()
         
-    def build(self, options=None):
-        self.model = self.builder(copy.deepcopy(self.theta),
+        self.emusoftware.predict(self.info,
+                       copy.deepcopy(self.theta),
+                       options=None)
+
+
+    def fit(self, args= None):
+        r"""
+        Fits an emulator or surrogate.
+        
+        Calls
+        emu.info = [software].fit(emu.theta, emu.f, emu.x, args = args)
+
+        Parameters
+        ----------
+        emu.theta : array of float
+            An n-by-d matrix of parameters. n should be at least 2 times m. Each row in theta should
+            correspond to a row in f.
+        emu.f : array of float
+            An n-by-m matrix of responses with 'nan' representing responses not yet available. Each
+            row in f should correspond to a row in theta. Each column should correspond to a row in
+            x.
+        emu.x : array of objects
+            An m-by-p matrix of inputs. Each column should correspond to a row in f.
+        args : dict
+            Optional dictionary containing options you would like to pass to
+            [software].fit(theta, phi, args)
+            Defaults to the one used to build emu.
+
+        Returns
+        -------
+        emu.info : dict
+            An arbitrary dictionary that can be used with [software].pred
+        """
+        if args is None:
+            args = self.args
+        self.info = self.emusoftware.fit(copy.deepcopy(self.theta),
                                   copy.deepcopy(self.f), 
                                   copy.deepcopy(self.x),
-                                  copy.deepcopy(options))
+                                  args = args)
+
+
+    def predict(self, theta, args=None):
+        r"""
+        Fits an emulator or surrogate.
         
-    def predict(self, theta, options=None):
+        Calls
+        preddict = [software].predict(emu.theta, args = args)
+
+        Parameters
+        ----------
+        emu.theta : array of float
+            An n-by-d matrix of parameters.
+        args : dict
+            A dictionary containing options you would like to pass to
+            [software].fit(theta, phi, args). 
+            Defaults to the one used to build emu.
+
+        Returns
+        -------
+        preddict : dict of prediction objects
+            preddict['mean'] : Mean of prediction at each point theta and emu.x
+            preddict['var'] : Variance of prediction at each point theta and emu.x
+            preddict['covdecomp'] : A matrix such that when A = preddict['covdecomp'][k,:,:]
+                then A.T @ A = covariance matrix of prediction errors at theta[k,:] and emu.x
+        """
+        if args is None:
+            args = self.args
         if theta.ndim < 1.5:
             theta = theta.reshape([-1, self.theta.shape[1]])
-        return self.predictor(self.model,
+        return self.emusoftware.predict(self.info,
                               copy.deepcopy(theta),
-                              copy.deepcopy(options))
+                              args)
