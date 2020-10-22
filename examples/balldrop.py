@@ -10,7 +10,6 @@ from balldroptestfuncs import balldropmodel_linear,\
 SCRIPT_DIR = os.path.dirname(os.path.realpath(
     os.path.join(os.getcwd(), os.path.expanduser(__file__))))
 sys.path.append(os.path.normpath(os.path.join(SCRIPT_DIR, '..')))
-from base.utilities import postsampler
 from base.emulation import emulator
 from base.calibration import calibrator
 
@@ -191,19 +190,19 @@ def cov_disc(x,k,phi):
 cal_lin = calibrator(emu_lin, y, x,
                     thetaprior = priorphys,
                     phiprior = priorstatdisc_modela,
-                    passoptions = {'obsvar': obsvar, 'cov_disc': cov_delta, 'pred_para': 0}, software = 'BDM')
+                    passoptions = {'obsvar': obsvar, 'cov_disc': cov_delta}, software = 'BDM')
 pred_lin = cal_lin.predict(xtot)
 
 cal_grav = calibrator(emu_grav, y, x,
                        thetaprior = priorphys,
                        phiprior = priorstatdisc_modelb,
-                       passoptions = {'obsvar': obsvar, 'cov_disc': cov_delta, 'pred_para': 0}, software = 'BDM')
+                       passoptions = {'obsvar': obsvar, 'cov_disc': cov_delta}, software = 'BDM')
 pred_grav = cal_grav.predict(xtot)
 
 cal_BMM = calibrator((emu_lin,emu_grav), y, x,
                     thetaprior = priorphys,
                     phiprior = priorstatdisc_models,
-                    passoptions = {'obsvar': obsvar, 'cov_disc': cov_disc, 'pred_para': 0}, software = 'BDM')
+                    passoptions = {'obsvar': obsvar, 'cov_disc': cov_disc}, software = 'BDM')
 pred_BMM = cal_BMM.predict(xtot) #, theta = cal_lin.thetadraw, phi = cal_BMM.phidraw
 
 fig, axes = plt.subplots(ncols=4, nrows=1, figsize=(21, 5))

@@ -21,6 +21,8 @@ def plumleepostsampler(thetastart, logpostfunc, numsamp, tarESS):
     -------
     theta : matrix of sampled paramter values
     """
+    
+    
     numchain = 100
     maxiters = 10
     keepgoing = True

@@ -1,6 +1,58 @@
 """Header here."""
 import numpy as np
 import scipy.stats as sps
+from base.utilities import postsampler
+
+def fit(theta, phi, logpostfunc, options=None):
+    """
+    Return draws from the posterior.
+
+    Parameters
+    ----------
+    thetastart : array of float
+        Some matrix of parameters where function evaluations as starting points.
+    logpriorfunc : function
+        A function call describing the log of the prior distribution
+    loglikfunc : function
+        A function call describing the log of the likelihood function
+    Returns
+    -------
+    theta : matrix of sampled paramter values
+    """
+    
+    
+    thetadim = theta[0].shape[0]
+    if phi is None:
+        phidim = 0
+        thetaphi = theta
+    elif phi[0] is None:
+        phidim = 0
+        thetaphi = theta
+    else:
+        phidim = phi[0].shape[0]
+        thetaphi = np.hstack((theta,phi))
+    
+    def logpostfull(thetaphi):
+        if phidim > 0.5:
+            theta = thetaphi[:, :thetadim]
+            phi = thetaphi[:, thetadim:]
+        else:
+            theta = thetaphi
+            phi = None
+        return logpostfunc(theta, phi)
+    
+    numsamp = 1000
+    tarESS = np.max((100, 10 * thetaphi.shape[1]))
+    thetaphi = postsampler(thetaphi, logpostfull)
+    
+    if phidim > 0.5:
+        theta = thetaphi[:, :thetadim]
+        phi = thetaphi[:, thetadim:]
+    else:
+        theta = thetaphi
+        phi = None
+    
+    return theta, phi
 
 def loglik(emulator, theta, phi, y, xind, options):
     """
@@ -36,8 +88,7 @@ def loglik(emulator, theta, phi, y, xind, options):
 
     else:
         predinfo = emulator.predict(theta)
-    loglikr1 = np.zeros(theta.shape[0])
-    loglikr2 = np.zeros(theta.shape[0])
+    loglik = np.zeros(theta.shape[0])
     for k in range(0, theta.shape[0]):
         if type(emulator) is tuple:
             covmats = [np.array(0) for x in range(len(emulator))]
@@ -64,18 +115,10 @@ def loglik(emulator, theta, phi, y, xind, options):
             S0 = A1 @ A1.T
             if 'cov_disc' in options.keys():
                 S0 += options['cov_disc'](emulator.x[xind,:], phi[k,:])
-            #S0 += np.diag(np.diag(S0)) * 0.00000001
             W, V = np.linalg.eigh(np.diag(obsvar) + S0)
         muadj = V.T @ (np.squeeze(y) - m0)
-        loglikr1[k] = -0.5 * np.sum((muadj ** 2) / W)
-        if np.min(W) < 10 ** (-9):
-            print('lik is all messed up')
-            print(W)
-            print(phi[k,:])
-            print(S0)
-            adsadas
-        loglikr2[k] = -0.5 * np.sum(np.log(W))
-    return loglikr1 + loglikr2
+        loglik[k] = -0.5 * np.sum((muadj ** 2) / W)-0.5 * np.sum(np.log(W))
+    return loglik
 
 
 def predict(xindnew, emulator, theta, phi, y, xind, options):
@@ -149,8 +192,6 @@ def predict(xindnew, emulator, theta, phi, y, xind, options):
             m10 = m0[xindnew]
             S0inv = np.linalg.inv(np.diag(obsvar) + S0[xind,:][:,xind])
             S10 = S0[xindnew, :][:, xind]
-            if 'pred_para' in options.keys():
-                S10 = options['pred_para'] * S10
             Mat1 = S10 @ S0inv
             resid = np.squeeze(y)
             preddict['meanfull'][k, :] =  m10 +  Mat1 @ (np.squeeze(y) - m00)
@@ -161,7 +202,10 @@ def predict(xindnew, emulator, theta, phi, y, xind, options):
             re = Vmat @ np.diag(np.sqrt(np.abs(Wmat))) @ Vmat.T @\
                 sps.norm.rvs(0,1,size=(Vmat.shape[1]))
             preddict['draws'][k,:] = preddict['meanfull'][k, :]  + re
-            preddict['modeldraws'][k,:] = m10
+            Wmat, Vmat = np.linalg.eigh(S0[xindnew,:][:,xindnew])
+            re = Vmat @ np.diag(np.sqrt(np.abs(Wmat))) @ Vmat.T @\
+                sps.norm.rvs(0,1,size=(Vmat.shape[1]))
+            preddict['modeldraws'][k,:] = m10 + re
         else:
             m0 = np.squeeze(y) * 0
             mut = np.squeeze(y) - predinfo['mean'][(k, xind)]
@@ -175,9 +219,6 @@ def predict(xindnew, emulator, theta, phi, y, xind, options):
                 S0 += C[xind,:][:,xind]
                 S10 += C[xindnew,:][:,xind]
                 S11 += C[xindnew,:][:,xindnew]
-            #S0 += np.diag(np.diag(S0)) * 0.00000001
-            if 'pred_para' in options.keys():
-                S10 = options['pred_para'] * S10
             S0 += np.diag(obsvar)
             mus0 = predinfo['mean'][(k, xindnew)]
             preddict['meanfull'][k, :] = mus0 + S10 @ np.linalg.solve(S0, mut)
