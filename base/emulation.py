@@ -82,6 +82,7 @@ class emulator(object):
         if "predict" not in dir(self.emusoftware):
             raise ValueError('Function \"predict\" not found in module!')
         
+        self.info = {}
         self.fit()
         
         self.emusoftware.predict(self.info, copy.deepcopy(self.theta))
@@ -117,10 +118,8 @@ class emulator(object):
         """
         if args is None:
             args = self.args
-        self.info = self.emusoftware.fit(copy.deepcopy(self.theta),
-                                  copy.deepcopy(self.f), 
-                                  copy.deepcopy(self.x),
-                                  args = args)
+        self.emusoftware.fit(self.info, copy.deepcopy(self.theta), copy.deepcopy(self.f), 
+                                      copy.deepcopy(self.x), args = args)
 
 
     def predict(self, theta, args=None):
