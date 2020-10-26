@@ -3,7 +3,7 @@ import numpy as np
 import scipy.stats as sps
 from base.utilities import postsampler
 
-def fit(thetaprior, emu, y, x, args=None):
+def fit(info, emu, y, x, args=None):
     """
     Return draws from the posterior.
 
@@ -20,6 +20,9 @@ def fit(thetaprior, emu, y, x, args=None):
     theta : matrix of sampled paramter values
     """
     
+    thetaprior = info['thetaprior']
+    theta = thetaprior.rvs(1000)
+    
     if 'obsvar' in args.keys():
         obsvar = args['obsvar']
     else:
@@ -30,18 +33,15 @@ def fit(thetaprior, emu, y, x, args=None):
     else:
         raise ValueError('Must provide a prior on statistical parameters in this software.')
     
-    theta = thetaprior.rvs(1000)
-    phi = phiprior.rvs(1000)
     
+    theta = thetaprior.rvs(1000)
     thetadim = theta[0].shape[0]
-    if phi is None:
-        phidim = 0
-        thetaphi = theta
-    elif phi[0] is None:
+    if phiprior.rvs(1) is None:
         phidim = 0
         thetaphi = theta
     else:
-        phidim = phi[0].shape[0]
+        phi = phiprior.rvs(1000)
+        phidim = (phiprior.rvs(1)).shape[1]
         thetaphi = np.hstack((theta,phi))
         
         
@@ -80,14 +80,13 @@ def fit(thetaprior, emu, y, x, args=None):
         theta = thetaphi
         phi = None
     
-    info = {}
     info['theta'] = theta
     info['phi'] = phi
     info['xind'] = xind
     info['y'] = y
     info['x'] = x
     info['emux'] = emux
-    return info
+    return
 
 
 def predict(x, emu, info, args = None):

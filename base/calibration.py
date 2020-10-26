@@ -2,14 +2,14 @@
 import numpy as np, importlib, base.emulation, copy
 from base.utilities import postsampler
 
+#need to make 'info' defined at the class level
 
 class calibrator(object):
     r"""
     A class used to represent a calibrator.
     """
 
-    def __init__(self, emu=None, y=None, x=None, thetaprior=None, phiprior=None,
-                 software='BDM', args={}):
+    def __init__(self, emu=None, y=None, x=None, thetaprior=None, software='BDM', args={}):
         r"""
         Intitalizes a calibration model.
 
@@ -97,16 +97,18 @@ class calibrator(object):
                 self.calsoftware = importlib.import_module('base.calibrationsubfuncs.' + software)
             except:
                 raise ValueError('Module not found!')
-
+            
+            self.info = {}
             self.args = args
             if thetaprior is None:
                 raise ValueError('You must give a prior for theta.')
-            self.thetaprior = thetaprior
+            else:
+                self.info['thetaprior'] = thetaprior
             
             self.fit()
 
 
-    def fit(self, thetaprior = None, args=None):
+    def fit(self, args=None):
         r"""
         Returns a draws from theta and phi given data.
 
@@ -115,26 +117,13 @@ class calibrator(object):
 
         Parameters
         ----------
-        thetaprior : distribution class instatance with two built in functions
-            thetaprior.rvs(n) :  produces n draws from the prior on theta, arranged in either a
-            matrix or list.  It must align with the defination in "emu.theta"
-            thetaprior.logpdf(theta) :  produces the log pdf from the prior on theta, arranged in a
-            vector.
         args : dict
             A dictionary containing options you would like to pass to either
-
-        Returns
-        -------
-        cal.info : dict
-            cal.info['theta'] : array of float
-                A list or matrix of parameters drawn from the posterior. If not provided it will
-                draw from prior.
         """
-        if thetaprior is None:
-            thetaprior = self.thetaprior
         if args is None:
             args = self.args
-        self.info = self.calsoftware.fit(thetaprior, self.emu, self.y, self.x, args)
+        
+        self.calsoftware.fit(self.info, self.emu, self.y, self.x, args)
         return None
 
 

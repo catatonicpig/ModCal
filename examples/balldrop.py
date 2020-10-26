@@ -54,6 +54,10 @@ class priorphys:
                           sps.gamma.rvs(2, 0, 10, size=n),  # terminal velocity
                           sps.gamma.rvs(2, 0, 5, size=n))).T  # gravity
 
+#emaphsize they should contain the dashed lines
+#show which model is being used
+#template for the group now (later outside)
+        
 
 tvec = np.concatenate((np.arange(0.1, 4.3, 0.1),
                        np.arange(0.1, 4.3, 0.1)))  # the time vector of interest
@@ -110,11 +114,11 @@ balldropmodel_grav(np.array((0,0,9.81)).reshape((1,-1)), x)-balldroptrue(x)
     
 class priorstatdisc_modela:
     def logpdf(phi):
-        return np.squeeze(sps.norm.logpdf(phi[:,0], 1, 0.5) +
-                          sps.norm.logpdf(phi[:,1], 2, 0.5))
+        return np.squeeze(sps.norm.logpdf(phi[:,0], 2, 0.5) +
+                          sps.norm.logpdf(phi[:,1], 3, 0.5))
     def rvs(n):
-        return np.vstack((sps.norm.rvs(1, 0.5, size = n ),
-                         sps.norm.rvs(2, 0.5, size = n))).T
+        return np.vstack((sps.norm.rvs(2, 0.5, size = n ),
+                         sps.norm.rvs(3, 0.5, size = n))).T
 
 class priorstatdisc_modelb:
     def logpdf(phi):
@@ -158,7 +162,6 @@ pred_grav = cal_grav.predict(xtot)
 
 cal_BMA = calibrator((emu_lin,emu_grav), y, x,
                     thetaprior = priorphys,
-                    phiprior = priorstatdisc_models,
                     software = 'BMA',
                     args = {'obsvar': obsvar, 'cov_disc': cov_disc,
                             'phiprior': priorstatdisc_models})
@@ -166,7 +169,6 @@ pred_BMA = cal_BMA.predict(xtot)
 
 cal_BMM = calibrator((emu_lin,emu_grav), y, x,
                     thetaprior = priorphys,
-                    phiprior = priorstatdisc_models,
                     software = 'BDM',
                     args = {'obsvar': obsvar, 'cov_disc': cov_disc,
                             'phiprior': priorstatdisc_models})
