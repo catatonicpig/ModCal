@@ -2,7 +2,7 @@
 import numpy as np
 import scipy.stats as sps
 from base.utilities import postsampler
-
+import copy
 def fit(info, emu, y, x, args=None):
     """
     Return draws from the posterior.
@@ -121,17 +121,16 @@ def predict(x, emu, info, args):
         predinfo = [dict() for x in range(len(emu))]
         for k in range(0, len(emu)):
             predinfo[k] = emu[k].predict(theta, xtot)
-        preddict['meanfull'] = predinfo[0]['mean'][:,mx:]
-        preddict['varfull'] = predinfo[0]['var'][:,mx:]
-        preddict['draws'] = predinfo[0]['mean'][:,mx:]
-        preddict['modeldraws'] = predinfo[0]['mean'][:,mx:]
+        preddict['meanfull'] = copy.deepcopy(predinfo[0]['mean'][:,mx:])
+        preddict['varfull'] = copy.deepcopy(predinfo[0]['var'][:,mx:])
+        preddict['draws'] = copy.deepcopy(predinfo[0]['mean'][:,mx:])
+        preddict['modeldraws'] = copy.deepcopy(predinfo[0]['mean'][:,mx:])
     else:
         predinfo = emu.predict(theta, xtot)
-        preddict['meanfull'] = predinfo['mean'][:,mx:]
-        preddict['full'] = predinfo['mean'][:,mx:]
-        preddict['draws'] = predinfo['mean'][:,mx:]
-        preddict['modeldraws'] = predinfo['mean'][:,mx:]
-        preddict['varfull'] = predinfo['var'][:,mx:]
+        preddict['meanfull'] = copy.deepcopy(predinfo['mean'][:,mx:])
+        preddict['varfull'] = copy.deepcopy(predinfo['var'][:,mx:])
+        preddict['draws'] = copy.deepcopy(predinfo['mean'][:,mx:])
+        preddict['modeldraws'] = copy.deepcopy(predinfo['mean'][:,mx:])
     
     for k in range(0, theta.shape[0]):
         if type(emu) is tuple:
@@ -206,7 +205,7 @@ def predict(x, emu, info, args):
             Wmat, Vmat = np.linalg.eigh(S11 - S10 @ np.linalg.solve(S0, S10.T))
             re = Vmat @ np.diag(np.sqrt(np.abs(Wmat))) @ Vmat.T @\
                 sps.norm.rvs(0,1,size=(Vmat.shape[1]))
-            #preddict['modeldraws'][k,:] = predinfo['mean'][k, mx:]
+            preddict['modeldraws'][k,:] = predinfo['mean'][k, mx:]
             re = predinfo['covdecomp'][k,:,:].T @\
                 sps.norm.rvs(0,1,size=(predinfo['covdecomp'].shape[1]))
             preddict['draws'][k,:] = predinfo['mean'][k,mx:] + re[mx:]

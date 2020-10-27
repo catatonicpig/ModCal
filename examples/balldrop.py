@@ -65,8 +65,8 @@ hvec = np.concatenate((25 * np.ones(42),
                        50 * np.ones(42)))  # the drop heights vector of interest
 xtot = (np.vstack((tvec, hvec)).T).astype('object')  # the input of interest
 xtotv= xtot.astype('float')
-xtot[xtot[:,1] == 25, 1] = 'A'
-xtot[xtot[:,1] == 50, 1] = 'B'
+xtot[xtot[:,1] == 25, 1] = 'lowdrop'
+xtot[xtot[:,1] == 50, 1] = 'highdrop'
 # each row is an individual vector of interest
 # this should include those important to the study AND the data
 
@@ -111,8 +111,8 @@ x = np.array([[ 0.1, 25. ],
         [3.1, 50. ],
         [3.3, 50. ],]).astype('object')
 xv = x.astype('float')
-x[x[:,1] == 25, 1] = 'A'
-x[x[:,1] == 50, 1] = 'B'
+x[x[:,1] == 25, 1] = 'lowdrop'
+x[x[:,1] == 50, 1] = 'highdrop'
 obsvar = 4*np.ones(x.shape[0])  # variance for the observations in 'y' below
 y = balldroptrue(xv) + sps.norm.rvs(0, np.sqrt(obsvar)) #observations at each row of 'x'
 
@@ -191,5 +191,3 @@ plotpreds(axes[0], pred_lin)
 plotpreds(axes[1], pred_grav)
 plotpreds(axes[2], pred_BMA)
 plotpreds(axes[3], pred_BMM)
-
-cal_BMM.theta.logpdf(cal_BMM.theta.rvs(1000))
