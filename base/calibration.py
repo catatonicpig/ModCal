@@ -67,7 +67,8 @@ class calibrator(object):
                     self.modelcount = len(emu)
                 else:
                     try:
-                        ftry = emu.predict(emu.theta[0, :])['mean']
+                        ftry = emu.predict(copy.deepcopy(emu.theta[0, :]), 
+                                           x=copy.deepcopy(emu.x[range(0,10,2), :]))['mean']
                     except:
                         raise ValueError('Your provided emulator failed to predict.')
                     emu.infonum = 0
@@ -84,14 +85,8 @@ class calibrator(object):
                     raise ValueError('If x is provided, predictions must align with y and emu.predict()')
                 else:
                     if x is not None:
-                        matchingvec = np.where(((x[:, None] > self.emu0.x - 1e-08) * (x[:, None] < self.emu0.x + 1e-08)).all(2))
-                        xind = matchingvec[1][matchingvec[0]]
-                        if xind.shape[0] < x.shape[0]:
-                            raise ValueError('If x is provided, it must be a subset of emu.x')
-                        self.xind = xind
                         self.x = x
                     else:
-                        self.xind = range(0, x.shape[0])
                         self.x = self.emu0.x
             try:
                 self.calsoftware = importlib.import_module('base.calibrationsubfuncs.' + software)
@@ -106,7 +101,7 @@ class calibrator(object):
                 self.info['thetaprior'] = thetaprior
             
             self.fit()
-
+            self.theta = thetapost(self)
 
     def fit(self, args=None):
         r"""
@@ -118,7 +113,7 @@ class calibrator(object):
         Parameters
         ----------
         args : dict
-            A dictionary containing options you would like to pass to either
+            A dictionary containing options you would like to pass
         """
         if args is None:
             args = self.args
@@ -156,18 +151,36 @@ class calibrator(object):
         """
         if args is None:
             args = self.args
-            
         return self.calsoftware.predict(x, self.emu, self.info, args)
 
 
-    def thetas(self):
+class thetapost(object):
         r"""
         Returns posterior draws of the parameters.
-
-        Returns
-        -------
-        thetas : array of floats
-            A matrix of posterior parameter values.
         """
         
-        return self.info['theta']
+        def __init__(self, cal):
+            self.cal = cal
+                
+        def rvs(self, args=None, n=100):
+            if args is None:
+                args = self.cal.args
+            if 'thetarvs' not in dir(self.cal.calsoftware):   
+                if 'theta' not in self.cal.info.keys():
+                    raise ValueError('thetarvs functionality not in software' 
+                                     ' and theta draws labeled \'theta\' not '
+                                     'provided in cal.info.')
+                else:
+                    return self.cal.info['theta'][
+                        np.random.choice(self.cal.info['theta'].shape[0],
+                                         size=n), :]
+            else:
+                return self.cal.calsoftware.thetarvs(self.cal.emu, 
+                                                     self.cal.info, 
+                                                     n, args)
+        
+        def logpdf(self, args=None, n=100):
+            if args is None:
+                args = self.cal.args
+            if 'thetalogpdf' not in dir(self.cal.calsoftware):   
+                    raise ValueError('thetalogpdf functionality not in software')

@@ -50,9 +50,6 @@ def fit(info, emu, y, x, args=None):
     else:
         emux = emu.x
     
-    matchingvec = np.where(((x[:, None] > emux - 1e-08) *\
-                            (x[:, None] < emux + 1e-08)).all(2))
-    xind = matchingvec[1][matchingvec[0]]
     def logpostfull(thetaphi):
         if phidim > 0.5:
             theta = thetaphi[:, :thetadim]
@@ -64,9 +61,9 @@ def fit(info, emu, y, x, args=None):
         
         inds = np.where(np.isfinite(logpost))[0]
         if phi is None:
-            logpost[inds] += loglik(emu, theta[inds], None, y, xind, args)
+            logpost[inds] += loglik(emu, theta[inds], None, y, x, args)
         else:
-            logpost[inds] += loglik(emu, theta[inds], phi[inds], y, xind, args)
+            logpost[inds] += loglik(emu, theta[inds], phi[inds], y, x, args)
         return logpost
     
     numsamp = 1000
@@ -82,7 +79,6 @@ def fit(info, emu, y, x, args=None):
     
     info['theta'] = theta
     info['phi'] = phi
-    info['xind'] = xind
     info['y'] = y
     info['x'] = x
     info['emux'] = emux
@@ -110,14 +106,10 @@ def predict(x, emu, info, args = None):
     -------
     post: vector of unnormlaized log posterior
     """
-    xind = info['xind']
     y = info['y']
     theta = info['theta']
     phi = info['phi']
     
-    matchingvec = np.where(((x[:, None] > info['emux'] - 1e-08) *\
-                            (x[:, None] < info['emux'] + 1e-08)).all(2))
-    xindnew = matchingvec[1][matchingvec[0]]
     
     theta = info['theta']
     phi = info['phi']
@@ -128,38 +120,42 @@ def predict(x, emu, info, args = None):
     else:
         raise ValueError('Must provide obsvar at this moment.')
     preddict = {}
+    xtot = np.vstack((info['x'],x))
+    mx =info['x'].shape[0]
+    print(xtot.shape)
+    print(x.shape)
     if type(emu) is tuple:
         predinfo = [dict() for x in range(len(emu))]
         for k in range(0, len(emu)):
-            predinfo[k] = emu[k].predict(theta)
-        preddict['meanfull'] = predinfo[0]['mean']
-        preddict['varfull'] = predinfo[0]['var']
-        preddict['draws'] = predinfo[0]['mean']
-        preddict['modeldraws'] = predinfo[0]['mean']
+            predinfo[k] = emu[k].predict(theta, xtot)
+        preddict['meanfull'] = predinfo[0]['mean'][:,mx:]
+        preddict['varfull'] = predinfo[0]['var'][:,mx:]
+        preddict['draws'] = predinfo[0]['mean'][:,mx:]
+        preddict['modeldraws'] = predinfo[0]['mean'][:,mx:]
     else:
-        predinfo = emu.predict(theta)
-        preddict['meanfull'] = predinfo['mean']
-        preddict['full'] = predinfo['mean']
-        preddict['draws'] = predinfo['mean']
-        preddict['modeldraws'] = predinfo['mean']
-        preddict['varfull'] = predinfo['var']
-        
+        predinfo = emu.predict(theta, xtot)
+        preddict['meanfull'] = predinfo['mean'][:,mx:]
+        preddict['full'] = predinfo['mean'][:,mx:]
+        preddict['draws'] = predinfo['mean'][:,mx:]
+        preddict['modeldraws'] = predinfo['mean'][:,mx:]
+        preddict['varfull'] = predinfo['var'][:,mx:]
+    
+    xind = range(0,mx)
+    xindnew = range(mx,xtot.shape[0])
     for k in range(0, theta.shape[0]):
         if type(emu) is tuple:
-            covmats = [np.array(0) for x in range(len(emu))]
-            covmatsB = [np.array(0) for x in range(len(emu))]
-            covmatsC = [np.array(0) for x in range(len(emu))]
-            covmatsinv = [np.array(0) for x in range(len(emu))]
-            mus = [np.array(0) for x in range(len(emu))]
-            totInv = np.zeros((emu[0].x.shape[0], emu[0].x.shape[0]))
-            term2 = np.zeros(emu[0].x.shape[0])
+            covmats = [np.array(0) for l in range(len(emu))]
+            covmatsinv = [np.array(0) for l in range(len(emu))]
+            mus = [np.array(0) for l in range(len(emu))]
+            totInv = np.zeros((xtot.shape[0], xtot.shape[0]))
+            term2 = np.zeros(xtot.shape[0])
             for l in range(0, len(emu)):
                 mus[l] = predinfo[l]['mean'][k, :]
             for l in reversed(range(0, len(emu))):
                 A1 = np.squeeze(predinfo[l]['covdecomp'][k, :, :])
                 covmats[l] = A1.T @ A1
                 if 'cov_disc' in args.keys():
-                    covmats[l] += args['cov_disc'](info['emux'], l, phi[k,:])
+                    covmats[l] += args['cov_disc'](xtot, l, phi[k,:])
                 covmats[l] += np.diag(np.diag(covmats[l])) * (10 ** (-8))
                 covmatsinv[l] = np.linalg.inv(covmats[l])
                 totInv += covmatsinv[l]
@@ -213,8 +209,17 @@ def predict(x, emu, info, args = None):
     preddict['var'] = np.mean(preddict['varfull'], 0) + varterm1
     return preddict
 
+def thetarvs(emu, info, args, n):
+    """
+    Return posterior of function evaluation at the new parameters.
 
-def loglik(emu, theta, phi, y, xind, args):
+    """
+    return info['theta'][
+        np.random.choice(info['theta'].shape[0],
+                         size=n), :]
+
+
+def loglik(emu, theta, phi, y, x, args):
     """
     Return posterior of function evaluation at the new parameters.
 
@@ -244,9 +249,9 @@ def loglik(emu, theta, phi, y, xind, args):
     if type(emu) is tuple:
         predinfo = [dict() for x in range(len(emu))]
         for k in range(0, len(emu)):
-            predinfo[k] = emu[k].predict(theta)
+            predinfo[k] = emu[k].predict(theta,x)
     else:
-        predinfo = emu.predict(theta)
+        predinfo = emu.predict(theta,x)
     
     loglik = np.zeros(theta.shape[0])
     for k in range(0, theta.shape[0]):
@@ -254,15 +259,15 @@ def loglik(emu, theta, phi, y, xind, args):
             covmats = [np.array(0) for x in range(len(emu))]
             covmatsinv = [np.array(0) for x in range(len(emu))]
             mus = [np.array(0) for x in range(len(emu))]
-            resid = np.zeros(len(emu) * xind.shape[0])
-            totInv = np.zeros((xind.shape[0], xind.shape[0]))
-            term2 = np.zeros(xind.shape[0])
+            resid = np.zeros(len(emu) * x.shape[0])
+            totInv = np.zeros((x.shape[0], x.shape[0]))
+            term2 = np.zeros(x.shape[0])
             for l in range(0, len(emu)):
-                mus[l] = predinfo[l]['mean'][k, xind]
-                A1 = np.squeeze(predinfo[l]['covdecomp'][k, :, xind])
-                covmats[l] = (A1 @ A1.T)
+                mus[l] = predinfo[l]['mean'][k, :]
+                A1 = np.squeeze(predinfo[l]['covdecomp'][k, :, :])
+                covmats[l] = A1.T @ A1
                 if 'cov_disc' in args.keys():
-                    covmats[l] += args['cov_disc'](emu[l].x[xind,:], l, phi[k,:])
+                    covmats[l] += args['cov_disc'](x, l, phi[k,:])
                 covmats[l] += np.diag(np.diag(covmats[l])) * (10 ** (-8))
                 covmatsinv[l] = np.linalg.inv(covmats[l])
                 totInv += covmatsinv[l]
@@ -270,11 +275,11 @@ def loglik(emu, theta, phi, y, xind, args):
             m0 = np.linalg.solve(totInv, term2)
             W, V = np.linalg.eigh(np.diag(obsvar) + np.linalg.inv(totInv))
         else:
-            m0 = predinfo['mean'][(k, xind)]
-            A1 = np.squeeze(predinfo['covdecomp'][k, :, xind])
+            m0 = predinfo['mean'][k, :]
+            A1 = np.squeeze(predinfo['covdecomp'][k, :, :])
             S0 = A1 @ A1.T
             if 'cov_disc' in args.keys():
-                S0 += args['cov_disc'](emu.x[xind,:], phi[k,:])
+                S0 += args['cov_disc'](x, phi[k,:])
             W, V = np.linalg.eigh(np.diag(obsvar) + S0)
         muadj = V.T @ (np.squeeze(y) - m0)
         loglik[k] = -0.5 * np.sum((muadj ** 2) / W)-0.5 * np.sum(np.log(W))

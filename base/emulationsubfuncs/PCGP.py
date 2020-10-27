@@ -13,6 +13,7 @@ def fit(info, theta, f, x=None,  args=None):
     info['offset'] = np.zeros(f.shape[1])
     info['scale'] = np.ones(f.shape[1])
     info['theta'] = theta
+    info['x'] = x
     
     fstand = 1*f
     for k in range(0, f.shape[1]):
@@ -57,10 +58,22 @@ def fit(info, theta, f, x=None,  args=None):
     return
 
 
-def predict(info, theta,  args=None):
+def predict(info, theta, x=None, args=None):
     infos = info['emulist']
     predvecs = np.zeros((theta.shape[0], len(infos)))
     predvars = np.zeros((theta.shape[0], len(infos)))
+    
+    if x is not None:
+        matchingmatrix = np.ones((x.shape[0], info['x'].shape[0]))
+        for k in range(0,x[0].shape[0]):
+            try:
+                matchingmatrix *= np.isclose(x[:,k][:,None].astype('float'),
+                         info['x'][:,k].astype('float'))
+            except:
+                matchingmatrix *= np.equal(x[:,k][:,None],info['x'][:,k])
+        xind = np.argwhere(matchingmatrix > 0.5)[:,1]
+    else:
+        xind = range(0,info['x'].shape[0])
     rsave = np.array(np.ones(len(infos)), dtype=object)
     for k in range(0, len(infos)):
         if infos[k]['hypind'] == k:
@@ -72,15 +85,16 @@ def predict(info, theta,  args=None):
         predvecs[:, k] = r @ infos[k]['pw']
         predvars[:, k] = info['var0'][k] - np.sum(r.T * (Rinv @ r.T), 0)
 
-    predmean = (predvecs @ info['PCs'].T)*info['scale'] + info['offset']
-    predvar = info['extravar'] + (predvars @ (info['PCs'] ** 2).T) *\
-        (info['scale'] ** 2)
+    predmean = (predvecs @ info['PCs'][xind,:].T)*info['scale'][xind] +\
+        info['offset'][xind]
+    predvar = info['extravar'][xind] + (predvars @ (info['PCs'][xind,:] ** 2).T) *\
+        (info['scale'][xind] ** 2)
     
     preddict = {}
-    preddict['mean'] = predmean
-    preddict['var'] = predvar
+    preddict['mean'] = 1*predmean
+    preddict['var'] = 1*predvar
     preddict['covdecomp'] = (np.sqrt(np.abs(predvars))[:,:,np.newaxis] *
-                             (info['PCs'].T)[np.newaxis,:,:])
+                             (info['PCs'][xind,:].T)[np.newaxis,:,:])
     return preddict
 
 
@@ -219,4 +233,3 @@ def emulation_smart_negloglikgrad(hyp, info):
         dnegloglik[k] = 0.5*np.sum(Rinv * dR[:, :, k])
     dnegloglik += (hyp-info['hypregmean'])/(info['hypregstd'] ** 2)
     return dnegloglik
-

@@ -122,7 +122,7 @@ class emulator(object):
                                       copy.deepcopy(self.x), args = args)
 
 
-    def predict(self, theta, args=None):
+    def predict(self, theta, x=None, args=None):
         r"""
         Fits an emulator or surrogate.
         
@@ -131,8 +131,10 @@ class emulator(object):
 
         Parameters
         ----------
-        emu.theta : array of float
-            An n-by-d matrix of parameters.
+        theta : array of float
+            An n'-by-d array of parameters.
+        x : array or list of inputs of interest
+            An m'-by-p array of objects (optional). Defaults to emu.x
         args : dict
             A dictionary containing options you would like to pass to
             [software].fit(theta, phi, args). 
@@ -149,7 +151,17 @@ class emulator(object):
         if args is None:
             args = self.args
         if theta.ndim < 1.5:
-            theta = theta.reshape([-1, self.theta.shape[1]])
+            theta = theta.reshape([-1, theta.shape[0]])
+        if theta[0].shape[0] is not self.theta[0].shape[0]:
+            raise ValueError('The new parameters do not match old parameters.')
+            
+        if x is None:
+            x = copy.deepcopy(self.x)
+        else:
+            if x[0].shape[0] is not self.x[0].shape[0]:
+                raise ValueError('The new inputs do not match old inputs.')
+                
         return self.emusoftware.predict(self.info,
                               copy.deepcopy(theta),
+                              copy.deepcopy(x),
                               args)

@@ -47,9 +47,6 @@ def fit(info, emu, y, x, args=None):
     else:
         emux = emu.x
     
-    matchingvec = np.where(((x[:, None] > emux - 1e-08) *\
-                            (x[:, None] < emux + 1e-08)).all(2))
-    xind = matchingvec[1][matchingvec[0]]
     def logpostfull(thetaphi):
         if phidim > 0.5:
             theta = thetaphi[:, :thetadim]
@@ -61,9 +58,9 @@ def fit(info, emu, y, x, args=None):
         
         inds = np.where(np.isfinite(logpost))[0]
         if phi is None:
-            logpost[inds] += loglik(emu, theta[inds], None, y, xind, args)
+            logpost[inds] += loglik(emu, theta[inds], None, y, x, args)
         else:
-            logpost[inds] += loglik(emu, theta[inds], phi[inds], y, xind, args)
+            logpost[inds] += loglik(emu, theta[inds], phi[inds], y, x, args)
         return logpost
     
     numsamp = 1000
@@ -79,7 +76,6 @@ def fit(info, emu, y, x, args=None):
     
     info['theta'] = theta
     info['phi'] = phi
-    info['xind'] = xind
     info['y'] = y
     info['x'] = x
     info['emux'] = emux
@@ -106,14 +102,10 @@ def predict(x, emu, info, args):
     -------
     post: vector of unnormlaized log posterior
     """
-    xind = info['xind']
     y = info['y']
     theta = info['theta']
     phi = info['phi']
     
-    matchingvec = np.where(((x[:, None] > info['emux'] - 1e-08) *\
-                            (x[:, None] < info['emux'] + 1e-08)).all(2))
-    xindnew = matchingvec[1][matchingvec[0]]
     
     if theta.ndim == 1:
         theta = theta.reshape((1, theta.shape[0]))
@@ -122,46 +114,49 @@ def predict(x, emu, info, args):
     else:
         raise ValueError('Must provide obsvar at this moment.')
     preddict = {}
+    
+    xtot = np.vstack((info['x'],x))
+    mx =info['x'].shape[0]
     if type(emu) is tuple:
         predinfo = [dict() for x in range(len(emu))]
         for k in range(0, len(emu)):
-            predinfo[k] = emu[k].predict(theta)
-        preddict['meanfull'] = predinfo[0]['mean']
-        preddict['varfull'] = predinfo[0]['var']
-        preddict['draws'] = predinfo[0]['mean']
-        preddict['modeldraws'] = predinfo[0]['mean']
+            predinfo[k] = emu[k].predict(theta, xtot)
+        preddict['meanfull'] = predinfo[0]['mean'][:,mx:]
+        preddict['varfull'] = predinfo[0]['var'][:,mx:]
+        preddict['draws'] = predinfo[0]['mean'][:,mx:]
+        preddict['modeldraws'] = predinfo[0]['mean'][:,mx:]
     else:
-        predinfo = emu.predict(theta)
-        preddict['meanfull'] = predinfo['mean']
-        preddict['full'] = predinfo['mean']
-        preddict['draws'] = predinfo['mean']
-        preddict['modeldraws'] = predinfo['mean']
-        preddict['varfull'] = predinfo['var']
+        predinfo = emu.predict(theta, xtot)
+        preddict['meanfull'] = predinfo['mean'][:,mx:]
+        preddict['full'] = predinfo['mean'][:,mx:]
+        preddict['draws'] = predinfo['mean'][:,mx:]
+        preddict['modeldraws'] = predinfo['mean'][:,mx:]
+        preddict['varfull'] = predinfo['var'][:,mx:]
     
     for k in range(0, theta.shape[0]):
         if type(emu) is tuple:
             logliklocal = np.zeros(len(emu))
-            predlocal = np.zeros((xindnew.shape[0], len(emu)))
-            sslocal = np.zeros((xindnew.shape[0], len(emu)))
+            predlocal = np.zeros((x.shape[0], len(emu)))
+            sslocal = np.zeros((x.shape[0], len(emu)))
             for l in range(0, len(emu)):
-                mu = predinfo[l]['mean'][(k, xind)]
-                A1 = np.squeeze(predinfo[l]['covdecomp'][k, :, xind])
-                S0 = A1 @ A1.T
+                mu = predinfo[l]['mean'][k, :mx]
+                A1 = np.squeeze(predinfo[l]['covdecomp'][k, :, :mx])
+                S0 = A1.T @ A1
                 if 'cov_disc' in args.keys():
-                    S0 += args['cov_disc'](emu[l].x[xind,:], l, phi[k,:])
+                    S0 += args['cov_disc'](xtot[:mx,:], l, phi[k,:])
                 W, V = np.linalg.eigh(np.diag(obsvar) + S0)
                 Sinvu = V @ np.diag(1/W) @ V.T
                 ldetS = np.sum(np.log(W))
                 logliklocal[l] = -0.5*(np.squeeze(y)-mu).T @ (Sinvu @ (np.squeeze(y)-mu))
                 logliklocal[l] += -0.5*ldetS
-                A2 = np.squeeze(predinfo[l]['covdecomp'][k, :, xindnew])
-                S10 = A2 @ A1.T
-                S11 = A2 @ A2.T
+                A2 = np.squeeze(predinfo[l]['covdecomp'][k, :, mx:])
+                S10 = A2.T @ A1
+                S11 = A2.T @ A2
                 if 'cov_disc' in args.keys():
-                    C = args['cov_disc'](info['emux'], l, phi[k,:])
-                    S10 += C[xindnew,:][:,xind]
-                    S11 += C[xindnew,:][:,xindnew]
-                mus0 = predinfo[l]['mean'][(k, xindnew)]
+                    C = args['cov_disc'](xtot, l, phi[k,:])
+                    S10 += C[mx:,:][:,:mx]
+                    S11 += C[mx:,:][:,mx:]
+                mus0 = predinfo[l]['mean'][k, mx:]
                 predlocal[:,l] = mus0 + S10 @ np.linalg.solve(np.diag(obsvar) + S0, y-mu)
                 sslocal[:,l] = np.diag(S11 - S10 @ np.linalg.solve(np.diag(obsvar) + S0, S10.T)) + predlocal[:,l] ** 2
             lm = np.max(logliklocal)
@@ -172,55 +167,56 @@ def predict(x, emu, info, args):
             preddict['varfull'][k,:] = np.sum(post * sslocal,1) -\
                 preddict['meanfull'][k,:] ** 2
             rc = np.random.choice(len(emu), p = post)
-            A1 = np.squeeze(predinfo[rc]['covdecomp'][k, :, xind])
-            A2 = np.squeeze(predinfo[rc]['covdecomp'][k, :, xindnew])
-            S0 = A1 @ A1.T
+            A1 = np.squeeze(predinfo[rc]['covdecomp'][k, :, :mx])
+            A2 = np.squeeze(predinfo[rc]['covdecomp'][k, :, mx:])
+            
+            S0 = A1.T @ A1
             S0 += np.diag(obsvar)
             if 'cov_disc' in args.keys():
-                C = args['cov_disc'](info['emux'], rc, phi[k,:])
-                S0 += C[xind,:][:,xind]
-                S10 += C[xindnew,:][:,xind]
-                S11 += C[xindnew,:][:,xindnew]
+                C = args['cov_disc'](xtot, rc, phi[k,:])
+                S0 += C[:mx,:][:,:mx]
+                S10 += C[mx:,:][:,:mx]
+                S11 += C[mx:,:][:,mx:]
             Wmat, Vmat = np.linalg.eigh(S11 - S10 @ np.linalg.solve(S0, S10.T))
             re = Vmat @ np.diag(np.sqrt(np.abs(Wmat))) @ Vmat.T @\
                 sps.norm.rvs(0,1,size=(Vmat.shape[1]))
             preddict['draws'][k,:] = preddict['meanfull'][k, :]  + re
-            preddict['modeldraws'][k,:] = mus0
+            preddict['modeldraws'][k,:] = 1*mus0
             re = predinfo[rc]['covdecomp'][k,:,:].T @\
                 sps.norm.rvs(0,1,size=(predinfo[rc]['covdecomp'].shape[1]))
-            preddict['draws'][k,:] = predinfo[rc]['mean'][k,xindnew] + re[xindnew]
-            preddict['modeldraws'][k,:] = predinfo[rc]['mean'][k,xindnew] + re[xindnew]
+            preddict['draws'][k,:] = predinfo[rc]['mean'][k,mx:] + re[mx:]
+            preddict['modeldraws'][k,:] = predinfo[rc]['mean'][k,mx:] + re[mx:]
 
         else:
-            mu = predinfo['mean'][(k, xind)]
-            A1 = np.squeeze(predinfo['covdecomp'][k, :, xind])
-            A2 = np.squeeze(predinfo['covdecomp'][k, :, xindnew])
-            S0 = A1 @ A1.T
-            S10 = A2 @ A1.T
-            S11 = A2 @ A2.T
+            mu = predinfo['mean'][k, :mx]
+            A1 = np.squeeze(predinfo['covdecomp'][k, :, :mx])
+            A2 = np.squeeze(predinfo['covdecomp'][k, :, mx:])
+            S0 = A1.T @ A1
+            S10 = A2.T @ A1
+            S11 = A2.T @ A2
             if 'cov_disc' in args.keys():
-                C = args['cov_disc'](info['emux'], phi[k,:])
-                S0 += C[xind,:][:,xind]
-                S10 += C[xindnew,:][:,xind]
-                S11 += C[xindnew,:][:,xindnew]
+                C = args['cov_disc'](xtot, phi[k,:])
+                S0 += C[:mx,:][:,:mx]
+                S10 += C[mx:,:][:,:mx]
+                S11 += C[mx:,:][:,mx:]
             S0 += np.diag(obsvar)
-            mus0 = predinfo['mean'][(k, xindnew)]
+            mus0 = 1*predinfo['mean'][k, mx:]
             preddict['meanfull'][k,:] = mus0 + S10 @ np.linalg.solve(S0, y-mu)
             preddict['varfull'][k,:] = np.diag(S11 - S10 @ np.linalg.solve(S0, S10.T))
             Wmat, Vmat = np.linalg.eigh(S11 - S10 @ np.linalg.solve(S0, S10.T))
             re = Vmat @ np.diag(np.sqrt(np.abs(Wmat))) @ Vmat.T @\
                 sps.norm.rvs(0,1,size=(Vmat.shape[1]))
-            preddict['modeldraws'][k,:] = mus0
+            #preddict['modeldraws'][k,:] = predinfo['mean'][k, mx:]
             re = predinfo['covdecomp'][k,:,:].T @\
                 sps.norm.rvs(0,1,size=(predinfo['covdecomp'].shape[1]))
-            preddict['draws'][k,:] = predinfo['mean'][k,xindnew] + re[xindnew]
+            preddict['draws'][k,:] = predinfo['mean'][k,mx:] + re[mx:]
                 
     preddict['mean'] = np.mean(preddict['meanfull'], 0)
     varterm1 = np.var(preddict['meanfull'], 0)
     preddict['var'] = np.mean(preddict['varfull'], 0) + varterm1
     return preddict
 
-def loglik(emu, theta, phi, y, xind, args):
+def loglik(emu, theta, phi, y, x, args):
     r"""
     Return posterior of function evaluation at the new parameters.
 
@@ -250,21 +246,21 @@ def loglik(emu, theta, phi, y, xind, args):
     if type(emu) is tuple:
         predinfo = [dict() for x in range(len(emu))]
         for k in range(0, len(emu)):
-            predinfo[k] = emu[k].predict(theta)
+            predinfo[k] = emu[k].predict(theta, x)
         loglik = np.zeros(predinfo[0]['mean'].shape[0])
     else:
-        predinfo = emu.predict(theta)
+        predinfo = emu.predict(theta, x)
         loglik = np.zeros(predinfo['mean'].shape[0])
         
     for k in range(0, theta.shape[0]):
         if type(emu) is tuple:
             logliklocal = np.zeros(len(emu))
             for l in range(0, len(emu)):
-                mu = predinfo[l]['mean'][(k, xind)]
-                A1 = np.squeeze(predinfo[l]['covdecomp'][k, :, xind])
-                S0 = A1 @ A1.T
+                mu = predinfo[l]['mean'][k, :]
+                A1 = np.squeeze(predinfo[l]['covdecomp'][k, :, :])
+                S0 = A1.T @ A1
                 if 'cov_disc' in args.keys():
-                    S0 += args['cov_disc'](emu[l].x[xind,:], l, phi[k,:])
+                    S0 += args['cov_disc'](x, l, phi[k,:])
                 W, V = np.linalg.eigh(np.diag(obsvar) + S0)
                 Sinvu = V @ np.diag(1/W) @ V.T
                 ldetS = np.sum(np.log(W))
@@ -273,11 +269,11 @@ def loglik(emu, theta, phi, y, xind, args):
             lm = np.max(logliklocal)
             loglik[k] = np.log(np.sum(np.exp(logliklocal-lm))) + lm
         else:
-            mu = predinfo['mean'][(k, xind)]
-            A1 = np.squeeze(predinfo['covdecomp'][k, :, xind])
-            S0 = A1 @ A1.T
+            mu = predinfo['mean'][k, :]
+            A1 = np.squeeze(predinfo['covdecomp'][k, :, :])
+            S0 = A1.T @ A1
             if 'cov_disc' in args.keys():
-                S0 += args['cov_disc'](emu.x[xind,:], phi[k,:])
+                S0 += args['cov_disc'](x, phi[k,:])
             W, V = np.linalg.eigh(np.diag(obsvar) + S0)
             Sinvu = V @ np.diag(1/W) @ V.T
             ldetS = np.sum(np.log(W))
