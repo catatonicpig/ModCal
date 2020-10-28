@@ -213,7 +213,8 @@ class prediction(object):
         elif opstr in self.info.keys():
             return copy.deepcopy(self.info[opstr])
         elif 'rnd' in self.info.keys():
-            return np.mean(self.info['rnd'], 0)
+            self.info[opstr] = np.mean(self.info['rnd'], 0)
+            return copy.deepcopy(self.info[opstr])
         else:
             raise ValueError(self.__softwarenotfoundstr(pfstr, opstr))
 
@@ -230,7 +231,8 @@ class prediction(object):
         elif opstr in self.info.keys():
             return copy.deepcopy(self.info[opstr])
         elif 'rnd' in self.info.keys():
-            return np.mean(self.info['rnd'], 0)
+            self.info[opstr] = np.var(self.info['rnd'], 0)
+            return copy.deepcopy(self.info[opstr])
         else:
             raise ValueError(self.__softwarenotfoundstr(pfstr, opstr))
     
@@ -303,7 +305,8 @@ class thetadist(object):
         elif (pfstr+opstr) in self.cal.info.keys():
             return copy.deepcopy(self.cal.info[(pfstr+opstr)])
         elif (pfstr+'rnd') in self.cal.info.keys():
-            return np.mean(self.cal.info[(pfstr+'rnd')], 0)
+            self.cal.info[(pfstr+opstr)] = np.mean(self.cal.info[(pfstr+'rnd')], 0)
+            return copy.deepcopy(self.cal.info[(pfstr+opstr)])
         else:
             raise ValueError(self.__softwarenotfoundstr(pfstr, opstr))
 
@@ -320,7 +323,8 @@ class thetadist(object):
         elif (pfstr+opstr) in self.cal.info.keys():
             return copy.deepcopy(self.cal.info[(pfstr+opstr)])
         elif (pfstr+'rnd') in self.cal.info.keys():
-            return np.var(self.cal.info[(pfstr+'rnd')], 0)
+            self.cal.info[(pfstr+opstr)] = np.var(self.cal.info[(pfstr+'rnd')], 0)
+            return copy.deepcopy(self.cal.info[(pfstr+opstr)])
         else:
             raise ValueError(self.__softwarenotfoundstr(pfstr, opstr))
     
