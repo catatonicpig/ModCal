@@ -56,7 +56,7 @@ class calibrator(object):
                 elif type(emu) is tuple:
                     for k in range(0, len(emu)):
                         try:
-                            ftry = emu[k].predict(emu[k].theta[0, :])['mean']
+                            ftry = emu[k].predict(emu[k].theta[0, :]).mean()
                         except:
                             raise ValueError('Your provided emulator failed to predict.')
 
@@ -67,7 +67,7 @@ class calibrator(object):
                 else:
                     try:
                         ftry = emu.predict(copy.deepcopy(emu.theta[0, :]), 
-                                           x=copy.deepcopy(emu.x[range(0,10,2), :]))['mean']
+                                           x=copy.deepcopy(emu.x[range(0,10,2), :]))
                     except:
                         raise ValueError('Your provided emulator failed to predict.')
                     emu.infonum = 0
@@ -88,7 +88,7 @@ class calibrator(object):
                     else:
                         self.x = self.emu0.x
             try:
-                self.calsoftware = importlib.import_module('base.calibrationsubfuncs.' + software)
+                self.software = importlib.import_module('base.calibrationsubfuncs.' + software)
             except:
                 raise ValueError('Module not found!')
             
@@ -133,7 +133,7 @@ class calibrator(object):
         if args is None:
             args = self.args
         
-        self.calsoftware.fit(self.info, self.emu, self.y, self.x, args)
+        self.software.fit(self.info, self.emu, self.y, self.x, args)
         return None
 
 
@@ -158,13 +158,14 @@ class calibrator(object):
         """
         if args is None:
             args = self.args
-        info = self.calsoftware.predict(x, self.emu, self.info, args)
+        info = self.software.predict(x, self.emu, self.info, args)
         return prediction(info, self)
 
 
 class prediction(object):
     r"""
-    A class to represent a prediction.  pred.info will give the dictionary from the software.
+    A class to represent a calibration prediction.  
+    predict.info will give the dictionary from the software.
     """
 
     def __init__(self, info, cal):
@@ -176,8 +177,7 @@ class prediction(object):
                   if callable(getattr(self, method_name))]
         object_methods = [x for x in object_methods if not x.startswith('_')]
         object_methods = [x for x in object_methods if not x.startswith('cal')]
-        print(object_methods)
-        strrepr = ('A prediction object where the code in located in the file '
+        strrepr = ('A calibration prediction object predict where the code in located in the file '
                    + ' calibration.  The main methods are predict.' +
                    ', predict.'.join(object_methods) + '.  Default of predict() is' +
                    ' predict.mean() and ' +
@@ -206,10 +206,10 @@ class prediction(object):
         """
         pfstr = 'predict' #prefix string
         opstr = 'mean' #operation string
-        if (pfstr + opstr) in dir(self.cal.calsoftware):
+        if (pfstr + opstr) in dir(self.cal.software):
             if args is None:
                 args = self.cal.args
-            return self.cal.calsoftware.predictmean(self.info, args)
+            return self.cal.software.predictmean(self.info, args)
         elif opstr in self.info.keys():
             return self.info[opstr]
         elif 'rnd' in self.info.keys():
@@ -223,10 +223,10 @@ class prediction(object):
         """
         pfstr = 'predict' #prefix string
         opstr = 'var' #operation string
-        if (pfstr + opstr) in dir(self.cal.calsoftware):
+        if (pfstr + opstr) in dir(self.cal.software):
             if args is None:
                 args = self.cal.args
-            return self.cal.calsoftware.predictvar(self.info, args)
+            return self.cal.software.predictvar(self.info, args)
         elif opstr in self.info.keys():
             return self.info[opstr]
         elif 'rnd' in self.info.keys():
@@ -240,10 +240,10 @@ class prediction(object):
         """
         pfstr = 'predict' #prefix string
         opstr = 'rnd' #operation string
-        if (pfstr + opstr) in dir(self.cal.calsoftware):
+        if (pfstr + opstr) in dir(self.cal.software):
             if args is None:
                 args = self.cal.args
-            return self.cal.calsoftware.predictrnd(self.info, args)
+            return self.cal.software.predictrnd(self.info, args)
         elif 'rnd' in self.info.keys():
             return self.info['rnd'][np.random.choice(self.info['rnd'].shape[0], size=s), :]
         else:
@@ -296,10 +296,10 @@ class thetadist(object):
         """
         pfstr = 'theta' #prefix string
         opstr = 'mean' #operation string
-        if (pfstr + opstr) in dir(self.cal.calsoftware):
+        if (pfstr + opstr) in dir(self.cal.software):
             if args is None:
                 args = self.cal.args
-            return self.cal.calsoftware.thetamean(self.cal.info, args)
+            return self.cal.software.thetamean(self.cal.info, args)
         elif (pfstr+opstr) in self.cal.info.keys():
             return self.cal.info[(pfstr+opstr)]
         elif (pfstr+'rnd') in self.cal.info.keys():
@@ -313,10 +313,10 @@ class thetadist(object):
         """
         pfstr = 'theta'  # prefix string
         opstr = 'var'  # operation string
-        if (pfstr + opstr) in dir(self.cal.calsoftware):
+        if (pfstr + opstr) in dir(self.cal.software):
             if args is None:
                 args = self.cal.args
-            return self.cal.calsoftware.thetavar(self.cal.info, args)
+            return self.cal.software.thetavar(self.cal.info, args)
         elif (pfstr+opstr) in self.cal.info.keys():
             return self.cal.info[(pfstr+opstr)]
         elif (pfstr+'rnd') in self.cal.info.keys():
@@ -330,10 +330,10 @@ class thetadist(object):
         """
         pfstr = 'theta' #prefix string
         opstr = 'rnd' #operation string
-        if (pfstr + opstr) in dir(self.cal.calsoftware):
+        if (pfstr + opstr) in dir(self.cal.software):
             if args is None:
                 args = self.cal.args
-            return self.cal.calsoftware.thetarnd(self.cal.info, s, args)
+            return self.cal.software.thetarnd(self.cal.info, s, args)
         elif (pfstr+opstr) in self.cal.info.keys():
             return self.cal.info['thetarnd'][
                         np.random.choice(self.cal.info['thetarnd'].shape[0], size=s), :]

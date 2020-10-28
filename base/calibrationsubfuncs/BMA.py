@@ -81,7 +81,7 @@ def fit(info, emu, y, x, args=None):
     info['emux'] = emux
     return
 
-def predict(x, emu, info, args):
+def predict(x, emu, calinfo, args):
     """
     Return posterior of function evaluation at the new parameters.
 
@@ -102,9 +102,9 @@ def predict(x, emu, info, args):
     -------
     post: vector of unnormlaized log posterior
     """
-    y = info['y']
-    theta = info['thetarnd']
-    phi = info['phirnd']
+    y = calinfo['y']
+    theta = calinfo['thetarnd']
+    phi = calinfo['phirnd']
     
     
     if theta.ndim == 1:
@@ -113,24 +113,24 @@ def predict(x, emu, info, args):
         obsvar = args['obsvar']
     else:
         raise ValueError('Must provide obsvar at this moment.')
-    preddict = {}
+    info = {}
     
-    xtot = np.vstack((info['x'],x))
-    mx =info['x'].shape[0]
+    xtot = np.vstack((calinfo['x'],x))
+    mx = calinfo['x'].shape[0]
     if type(emu) is tuple:
-        predinfo = [dict() for x in range(len(emu))]
+        emupredict = [dict() for x in range(len(emu))]
         for k in range(0, len(emu)):
-            predinfo[k] = emu[k].predict(theta, xtot)
-        preddict['meanfull'] = copy.deepcopy(predinfo[0]['mean'][:,mx:])
-        preddict['varfull'] = copy.deepcopy(predinfo[0]['var'][:,mx:])
-        preddict['rnd'] = copy.deepcopy(predinfo[0]['mean'][:,mx:])
-        preddict['modelrnd'] = copy.deepcopy(predinfo[0]['mean'][:,mx:])
+            emupredict[k] = emu[k].predict(theta, xtot)
+        info['meanfull'] = copy.deepcopy(emupredict[0]()[:,mx:])
+        info['varfull'] = copy.deepcopy(emupredict[0]()[:,mx:])
+        info['rnd'] = copy.deepcopy(emupredict[0]()[:,mx:])
+        info['modelrnd'] = copy.deepcopy(emupredict[0]()[:,mx:])
     else:
-        predinfo = emu.predict(theta, xtot)
-        preddict['meanfull'] = copy.deepcopy(predinfo['mean'][:,mx:])
-        preddict['varfull'] = copy.deepcopy(predinfo['var'][:,mx:])
-        preddict['rnd'] = copy.deepcopy(predinfo['mean'][:,mx:])
-        preddict['modelrnd'] = copy.deepcopy(predinfo['mean'][:,mx:])
+        emupredict = emu.predict(theta, xtot)
+        info['meanfull'] = copy.deepcopy(emupredict()[:,mx:])
+        info['varfull'] = copy.deepcopy(emupredict()[:,mx:])
+        info['rnd'] = copy.deepcopy(emupredict()[:,mx:])
+        info['modelrnd'] = copy.deepcopy(emupredict()[:,mx:])
     
     for k in range(0, theta.shape[0]):
         if type(emu) is tuple:
@@ -138,8 +138,8 @@ def predict(x, emu, info, args):
             predlocal = np.zeros((x.shape[0], len(emu)))
             sslocal = np.zeros((x.shape[0], len(emu)))
             for l in range(0, len(emu)):
-                mu = predinfo[l]['mean'][k, :mx]
-                A1 = np.squeeze(predinfo[l]['covdecomp'][k, :, :mx])
+                mu = emupredict[l]()[k, :mx]
+                A1 = np.squeeze(emupredict[l].info['covdecomp'][k, :, :mx])
                 S0 = A1.T @ A1
                 if 'cov_disc' in args.keys():
                     S0 += args['cov_disc'](xtot[:mx,:], l, phi[k,:])
@@ -148,26 +148,26 @@ def predict(x, emu, info, args):
                 ldetS = np.sum(np.log(W))
                 logliklocal[l] = -0.5*(np.squeeze(y)-mu).T @ (Sinvu @ (np.squeeze(y)-mu))
                 logliklocal[l] += -0.5*ldetS
-                A2 = np.squeeze(predinfo[l]['covdecomp'][k, :, mx:])
+                A2 = np.squeeze(emupredict[l].info['covdecomp'][k, :, mx:])
                 S10 = A2.T @ A1
                 S11 = A2.T @ A2
                 if 'cov_disc' in args.keys():
                     C = args['cov_disc'](xtot, l, phi[k,:])
                     S10 += C[mx:,:][:,:mx]
                     S11 += C[mx:,:][:,mx:]
-                mus0 = predinfo[l]['mean'][k, mx:]
+                mus0 = emupredict[l]()[k, mx:]
                 predlocal[:,l] = mus0 + S10 @ np.linalg.solve(np.diag(obsvar) + S0, y-mu)
                 sslocal[:,l] = np.diag(S11 - S10 @ np.linalg.solve(np.diag(obsvar) + S0, S10.T)) + predlocal[:,l] ** 2
             lm = np.max(logliklocal)
             logpostcalc = np.log(np.sum(np.exp(logliklocal-lm))) + lm
             post = np.exp(logliklocal - logpostcalc)
             
-            preddict['meanfull'][k,:] = np.sum(post * predlocal,1)
-            preddict['varfull'][k,:] = np.sum(post * sslocal,1) -\
-                preddict['meanfull'][k,:] ** 2
+            info['meanfull'][k,:] = np.sum(post * predlocal,1)
+            info['varfull'][k,:] = np.sum(post * sslocal,1) -\
+                info['meanfull'][k,:] ** 2
             rc = np.random.choice(len(emu), p = post)
-            A1 = np.squeeze(predinfo[rc]['covdecomp'][k, :, :mx])
-            A2 = np.squeeze(predinfo[rc]['covdecomp'][k, :, mx:])
+            A1 = np.squeeze(emupredict[rc].info['covdecomp'][k, :, :mx])
+            A2 = np.squeeze(emupredict[rc].info['covdecomp'][k, :, mx:])
             
             S0 = A1.T @ A1
             S0 += np.diag(obsvar)
@@ -179,17 +179,17 @@ def predict(x, emu, info, args):
             Wmat, Vmat = np.linalg.eigh(S11 - S10 @ np.linalg.solve(S0, S10.T))
             re = Vmat @ np.diag(np.sqrt(np.abs(Wmat))) @ Vmat.T @\
                 sps.norm.rvs(0,1,size=(Vmat.shape[1]))
-            preddict['rnd'][k,:] = preddict['meanfull'][k, :]  + re
-            preddict['modelrnd'][k,:] = 1*mus0
-            re = predinfo[rc]['covdecomp'][k,:,:].T @\
-                sps.norm.rvs(0,1,size=(predinfo[rc]['covdecomp'].shape[1]))
-            preddict['rnd'][k,:] = predinfo[rc]['mean'][k,mx:] + re[mx:]
-            preddict['modelrnd'][k,:] = predinfo[rc]['mean'][k,mx:] + re[mx:]
+            info['rnd'][k,:] = info['meanfull'][k, :]  + re
+            info['modelrnd'][k,:] = 1*mus0
+            re = emupredict[rc].info['covdecomp'][k,:,:].T @\
+                sps.norm.rvs(0,1,size=(emupredict[rc].info['covdecomp'].shape[1]))
+            info['rnd'][k,:] = emupredict[rc]()[k,mx:] + re[mx:]
+            info['modelrnd'][k,:] = emupredict[rc]()[k,mx:] + re[mx:]
 
         else:
-            mu = predinfo['mean'][k, :mx]
-            A1 = np.squeeze(predinfo['covdecomp'][k, :, :mx])
-            A2 = np.squeeze(predinfo['covdecomp'][k, :, mx:])
+            mu = emupredict()[k, :mx]
+            A1 = np.squeeze(emupredict.info['covdecomp'][k, :, :mx])
+            A2 = np.squeeze(emupredict.info['covdecomp'][k, :, mx:])
             S0 = A1.T @ A1
             S10 = A2.T @ A1
             S11 = A2.T @ A2
@@ -199,21 +199,21 @@ def predict(x, emu, info, args):
                 S10 += C[mx:,:][:,:mx]
                 S11 += C[mx:,:][:,mx:]
             S0 += np.diag(obsvar)
-            mus0 = 1*predinfo['mean'][k, mx:]
-            preddict['meanfull'][k,:] = mus0 + S10 @ np.linalg.solve(S0, y-mu)
-            preddict['varfull'][k,:] = np.diag(S11 - S10 @ np.linalg.solve(S0, S10.T))
+            mus0 = 1*emupredict()[k, mx:]
+            info['meanfull'][k,:] = mus0 + S10 @ np.linalg.solve(S0, y-mu)
+            info['varfull'][k,:] = np.diag(S11 - S10 @ np.linalg.solve(S0, S10.T))
             Wmat, Vmat = np.linalg.eigh(S11 - S10 @ np.linalg.solve(S0, S10.T))
             re = Vmat @ np.diag(np.sqrt(np.abs(Wmat))) @ Vmat.T @\
                 sps.norm.rvs(0,1,size=(Vmat.shape[1]))
-            preddict['modelrnd'][k,:] = predinfo['mean'][k, mx:]
-            re = predinfo['covdecomp'][k,:,:].T @\
-                sps.norm.rvs(0,1,size=(predinfo['covdecomp'].shape[1]))
-            preddict['rnd'][k,:] = predinfo['mean'][k,mx:] + re[mx:]
+            info['modelrnd'][k,:] = emupredict()[k, mx:]
+            re = emupredict.info['covdecomp'][k,:,:].T @\
+                sps.norm.rvs(0,1,size=(emupredict.info['covdecomp'].shape[1]))
+            info['rnd'][k,:] = emupredict()[k,mx:] + re[mx:]
                 
-    preddict['mean'] = np.mean(preddict['meanfull'], 0)
-    varterm1 = np.var(preddict['meanfull'], 0)
-    preddict['var'] = np.mean(preddict['varfull'], 0) + varterm1
-    return preddict
+    info['mean'] = np.mean(info['meanfull'], 0)
+    varterm1 = np.var(info['meanfull'], 0)
+    info['var'] = np.mean(info['varfull'], 0) + varterm1
+    return info
 
 def loglik(emu, theta, phi, y, x, args):
     r"""
@@ -243,20 +243,20 @@ def loglik(emu, theta, phi, y, x, args):
     else:
         raise ValueError('Must provide obsvar at this moment.')
     if type(emu) is tuple:
-        predinfo = [dict() for x in range(len(emu))]
+        emupredict = [dict() for x in range(len(emu))]
         for k in range(0, len(emu)):
-            predinfo[k] = emu[k].predict(theta, x)
-        loglik = np.zeros(predinfo[0]['mean'].shape[0])
+            emupredict[k] = emu[k].predict(theta, x)
+        loglik = np.zeros(emupredict[0]().shape[0])
     else:
-        predinfo = emu.predict(theta, x)
-        loglik = np.zeros(predinfo['mean'].shape[0])
+        emupredict = emu.predict(theta, x)
+        loglik = np.zeros(emupredict().shape[0])
         
     for k in range(0, theta.shape[0]):
         if type(emu) is tuple:
             logliklocal = np.zeros(len(emu))
             for l in range(0, len(emu)):
-                mu = predinfo[l]['mean'][k, :]
-                A1 = np.squeeze(predinfo[l]['covdecomp'][k, :, :])
+                mu = emupredict[l]()[k, :]
+                A1 = np.squeeze(emupredict[l].info['covdecomp'][k, :, :])
                 S0 = A1.T @ A1
                 if 'cov_disc' in args.keys():
                     S0 += args['cov_disc'](x, l, phi[k,:])
@@ -268,8 +268,8 @@ def loglik(emu, theta, phi, y, x, args):
             lm = np.max(logliklocal)
             loglik[k] = np.log(np.sum(np.exp(logliklocal-lm))) + lm
         else:
-            mu = predinfo['mean'][k, :]
-            A1 = np.squeeze(predinfo['covdecomp'][k, :, :])
+            mu = emupredict()[k, :]
+            A1 = np.squeeze(emupredict.info['covdecomp'][k, :, :])
             S0 = A1.T @ A1
             if 'cov_disc' in args.keys():
                 S0 += args['cov_disc'](x, phi[k,:])
