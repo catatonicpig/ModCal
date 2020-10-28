@@ -103,6 +103,12 @@ class calibrator(object):
             self.fit()
             self.theta = thetapost(self)
 
+    def __repr__(self):
+        return 'hello world'
+    
+    def __call__(self, x=None):
+        return self.predict(self.x)
+    
     def fit(self, args=None):
         r"""
         Returns a draws from theta and phi given data.
@@ -154,6 +160,41 @@ class calibrator(object):
         return self.calsoftware.predict(x, self.emu, self.info, args)
 
 
+class prediction(object):
+        r"""
+        Returns posterior draws of the parameters.
+        """
+        
+        def __init__(self, info):
+            self.info = info
+        
+        
+        def __call__(self, x=None):
+            return self.info['mean']
+                
+        def draws(self, args=None, n=100):
+            if args is None:
+                args = self.cal.args
+            if 'thetarvs' not in dir(self.cal.calsoftware):   
+                if 'theta' not in self.cal.info.keys():
+                    raise ValueError('thetarvs functionality not in software' 
+                                     ' and theta draws labeled \'theta\' not '
+                                     'provided in cal.info.')
+                else:
+                    return self.cal.info['theta'][
+                        np.random.choice(self.cal.info['theta'].shape[0],
+                                         size=n), :]
+            else:
+                return self.cal.calsoftware.thetarvs(self.cal.emu, 
+                                                     self.cal.info, 
+                                                     n, args)
+        
+        def logpdf(self, args=None, n=100):
+            if args is None:
+                args = self.cal.args
+            if 'thetalogpdf' not in dir(self.cal.calsoftware):   
+                    raise ValueError('thetalogpdf functionality not in software')
+                    
 class thetapost(object):
         r"""
         Returns posterior draws of the parameters.
