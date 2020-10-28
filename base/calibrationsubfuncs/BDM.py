@@ -21,7 +21,7 @@ def fit(info, emu, y, x, args=None):
     """
     
     thetaprior = info['thetaprior']
-    theta = thetaprior.rvs(1000)
+    theta = thetaprior.rnd(1000)
     
     if 'obsvar' in args.keys():
         obsvar = args['obsvar']
@@ -34,14 +34,14 @@ def fit(info, emu, y, x, args=None):
         raise ValueError('Must provide a prior on statistical parameters in this software.')
     
     
-    theta = thetaprior.rvs(1000)
+    theta = thetaprior.rnd(1000)
     thetadim = theta[0].shape[0]
-    if phiprior.rvs(1) is None:
+    if phiprior.rnd(1) is None:
         phidim = 0
         thetaphi = theta
     else:
-        phi = phiprior.rvs(1000)
-        phidim = (phiprior.rvs(1)).shape[1]
+        phi = phiprior.rnd(1000)
+        phidim = (phiprior.rnd(1)).shape[1]
         thetaphi = np.hstack((theta,phi))
         
         
@@ -57,7 +57,7 @@ def fit(info, emu, y, x, args=None):
         else:
             theta = thetaphi
             phi = None
-        logpost =thetaprior.logpdf(theta) + phiprior.logpdf(phi)
+        logpost =thetaprior.lpdf(theta) + phiprior.lpdf(phi)
         
         inds = np.where(np.isfinite(logpost))[0]
         if phi is None:
@@ -77,8 +77,8 @@ def fit(info, emu, y, x, args=None):
         theta = thetaphi
         phi = None
     
-    info['theta'] = theta
-    info['phi'] = phi
+    info['thetarnd'] = theta
+    info['phirnd'] = phi
     info['y'] = y
     info['x'] = x
     info['emux'] = emux
@@ -107,12 +107,8 @@ def predict(x, emu, info, args = None):
     post: vector of unnormlaized log posterior
     """
     y = info['y']
-    theta = info['theta']
-    phi = info['phi']
-    
-    
-    theta = info['theta']
-    phi = info['phi']
+    theta = info['thetarnd']
+    phi = info['phirnd']
     if theta.ndim == 1:
         theta = theta.reshape((1, theta.shape[0]))
     elif 'obsvar' in args.keys():
@@ -128,14 +124,14 @@ def predict(x, emu, info, args = None):
             predinfo[k] = emu[k].predict(theta, xtot)
         preddict['meanfull'] = copy.deepcopy(predinfo[0]['mean'][:,mx:])
         preddict['varfull'] = copy.deepcopy(predinfo[0]['var'][:,mx:])
-        preddict['draws'] = copy.deepcopy(predinfo[0]['mean'][:,mx:])
-        preddict['modeldraws'] = copy.deepcopy(predinfo[0]['mean'][:,mx:])
+        preddict['rnd'] = copy.deepcopy(predinfo[0]['mean'][:,mx:])
+        preddict['modelrnd'] = copy.deepcopy(predinfo[0]['mean'][:,mx:])
     else:
         predinfo = emu.predict(theta, xtot)
         preddict['meanfull'] = copy.deepcopy(predinfo['mean'][:,mx:])
         preddict['varfull'] = copy.deepcopy(predinfo['var'][:,mx:])
-        preddict['draws'] = copy.deepcopy(predinfo['mean'][:,mx:])
-        preddict['modeldraws'] = copy.deepcopy(predinfo['mean'][:,mx:])
+        preddict['rnd'] = copy.deepcopy(predinfo['mean'][:,mx:])
+        preddict['modelrnd'] = copy.deepcopy(predinfo['mean'][:,mx:])
     
     
     xind = range(0,mx)
@@ -174,11 +170,11 @@ def predict(x, emu, info, args = None):
             
             re = Vmat @ np.diag(np.sqrt(np.abs(Wmat))) @ Vmat.T @\
                 sps.norm.rvs(0,1,size=(Vmat.shape[1]))
-            preddict['draws'][k,:] = preddict['meanfull'][k, :]  + re
+            preddict['rnd'][k,:] = preddict['meanfull'][k, :]  + re
             Wmat, Vmat = np.linalg.eigh(S0[xindnew,:][:,xindnew])
             re = Vmat @ np.diag(np.sqrt(np.abs(Wmat))) @ Vmat.T @\
                 sps.norm.rvs(0,1,size=(Vmat.shape[1]))
-            preddict['modeldraws'][k,:] = m10 + re
+            preddict['modelrnd'][k,:] = m10 + re
         else:
             m0 = np.squeeze(y) * 0
             mut = np.squeeze(y) - predinfo['mean'][(k, xind)]
@@ -199,22 +195,23 @@ def predict(x, emu, info, args = None):
             Wmat, Vmat = np.linalg.eigh(S11 - S10 @ np.linalg.solve(S0, S10.T))
             re = Vmat @ np.diag(np.sqrt(np.abs(Wmat))) @ Vmat.T @\
                 sps.norm.rvs(0,1,size=(Vmat.shape[1]))
-            preddict['draws'][k,:] = preddict['meanfull'][k, :]  + re
-            preddict['modeldraws'][k,:] = mus0
+            preddict['rnd'][k,:] = preddict['meanfull'][k, :]  + re
+            preddict['modelrnd'][k,:] = mus0
 
     preddict['mean'] = np.mean(preddict['meanfull'], 0)
     varterm1 = np.var(preddict['meanfull'], 0)
     preddict['var'] = np.mean(preddict['varfull'], 0) + varterm1
     return preddict
 
-def thetarvs(emu, info, args, n):
+def thetarnd(info, s=100, args=None):
     """
     Return posterior of function evaluation at the new parameters.
 
     """
-    return info['theta'][
-        np.random.choice(info['theta'].shape[0],
-                         size=n), :]
+    return info['thetarnd'][
+        np.random.choice(info['thetarnd'].shape[0],
+                         size=s), :]
+
 
 
 def loglik(emu, theta, phi, y, x, args):

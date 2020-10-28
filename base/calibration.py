@@ -6,7 +6,7 @@ from base.utilities import postsampler
 
 class calibrator(object):
     r"""
-    A class used to represent a calibrator.
+    A class to represent a calibrator.  cal.info will give the dictionary from the software.
     """
 
     def __init__(self, emu=None, y=None, x=None, thetaprior=None, software='BDM', args={}):
@@ -52,9 +52,8 @@ class calibrator(object):
                 raise ValueError('You have not provided any emulator.')
             else:
                 if thetaprior is None:
-                    print('You have not provided any prior function, stopping...')
+                    raise ValueError('You have not provided any prior function, stopping...')
                 elif type(emu) is tuple:
-                    print('You have provided a tuple of emulators')
                     for k in range(0, len(emu)):
                         try:
                             ftry = emu[k].predict(emu[k].theta[0, :])['mean']
@@ -101,14 +100,24 @@ class calibrator(object):
                 self.info['thetaprior'] = thetaprior
             
             self.fit()
-            self.theta = thetapost(self)
+            self.theta = thetadist(self)
 
     def __repr__(self):
-        return 'hello world'
+        object_methods = [method_name for method_name in dir(self)
+                  if callable(getattr(self, method_name))]
+        object_methods = [x for x in object_methods if not x.startswith('__')]
+        object_methods = [x for x in object_methods if not x.startswith('emu')]
+        strrepr = ('A calibration object where the code in located in the file '
+                   + ' calibration.  The main methods are cal.' +
+                   ', cal.'. join(object_methods) + '.  Default of cal(x) is cal.pred(x).' +
+                   '  Run help(cal) for the document string.')
+        return strrepr
+    
     
     def __call__(self, x=None):
-        return self.predict(self.x)
-    
+        return self.predict(x)
+
+
     def fit(self, args=None):
         r"""
         Returns a draws from theta and phi given data.
@@ -137,91 +146,202 @@ class calibrator(object):
 
         Parameters
         ----------
-        x : array of float
+        x : array of objects
             An array of inputs to the model where you would like to predict.
         args : dict
-            A dictionary containing options you would like to pass to either
-            loglik(theta, phi, args)
-            or
-            logprior(theta, phi, args)
+            A dictionary containing options you would like to pass.
 
         Returns
         -------
-        preddict : dict of prediction objects
-            preddict['mean'] : Mean of prediction at each point x
-            preddict['var'] : Pointwise variance of prediction at each point x
-            preddict['draws'] : Draws of the prediction at each point x. The dependency will be 
-                                preserved
-            preddict['modeldraws'] : Draws of the model's prediction at each x. The dependency will be 
-                                preserved
+        prediction : an instance of class prediction
+            prediction.info : Gives the dictionary of what was produced by the software.
         """
         if args is None:
             args = self.args
-        return self.calsoftware.predict(x, self.emu, self.info, args)
+        info = self.calsoftware.predict(x, self.emu, self.info, args)
+        return prediction(info, self)
 
 
 class prediction(object):
+    r"""
+    A class to represent a prediction.  pred.info will give the dictionary from the software.
+    """
+
+    def __init__(self, info, cal):
+        self.info = info
+        self.cal = cal
+
+    def __repr__(self):
+        object_methods = [method_name for method_name in dir(self)
+                  if callable(getattr(self, method_name))]
+        object_methods = [x for x in object_methods if not x.startswith('_')]
+        object_methods = [x for x in object_methods if not x.startswith('cal')]
+        print(object_methods)
+        strrepr = ('A prediction object where the code in located in the file '
+                   + ' calibration.  The main methods are predict.' +
+                   ', predict.'.join(object_methods) + '.  Default of predict() is' +
+                   ' predict.mean() and ' +
+                   'predict(s) will run predict.rnd(s).  Run help(predict) for the document' +
+                   ' string.')
+        return strrepr
+
+    def __call__(self, s=None, args=None):
+        if s is None:
+            return self.mean(args)
+        else:
+            return self.rnd(s, args)
+        
+
+    def __softwarenotfoundstr(self, pfstr, opstr):
+        print(pfstr + opstr + ' functionality not in software... \n' +
+              ' Key labeled ' + opstr + ' not ' +
+              'provided in ' + pfstr + '.info... \n' +
+              ' Key labeled rnd not ' +
+              'provided in ' + pfstr + '.info...')
+        return 'Could not reconsile a good way to compute this value in current software.'
+
+    def mean(self, args = None):
         r"""
-        Returns posterior draws of the parameters.
+        Returns the mean at all x in when building the prediction.
         """
-        
-        def __init__(self, info):
-            self.info = info
-        
-        
-        def __call__(self, x=None):
-            return self.info['mean']
-                
-        def draws(self, args=None, n=100):
+        pfstr = 'predict' #prefix string
+        opstr = 'mean' #operation string
+        if (pfstr + opstr) in dir(self.cal.calsoftware):
             if args is None:
                 args = self.cal.args
-            if 'thetarvs' not in dir(self.cal.calsoftware):   
-                if 'theta' not in self.cal.info.keys():
-                    raise ValueError('thetarvs functionality not in software' 
-                                     ' and theta draws labeled \'theta\' not '
-                                     'provided in cal.info.')
-                else:
-                    return self.cal.info['theta'][
-                        np.random.choice(self.cal.info['theta'].shape[0],
-                                         size=n), :]
-            else:
-                return self.cal.calsoftware.thetarvs(self.cal.emu, 
-                                                     self.cal.info, 
-                                                     n, args)
-        
-        def logpdf(self, args=None, n=100):
-            if args is None:
-                args = self.cal.args
-            if 'thetalogpdf' not in dir(self.cal.calsoftware):   
-                    raise ValueError('thetalogpdf functionality not in software')
-                    
-class thetapost(object):
+            return self.cal.calsoftware.predictmean(self.info, args)
+        elif opstr in self.info.keys():
+            return self.info[opstr]
+        elif 'rnd' in self.info.keys():
+            return np.mean(self.info['rnd'], 0)
+        else:
+            raise ValueError(self.__softwarenotfoundstr(pfstr, opstr))
+
+    def var(self, args = None):
         r"""
-        Returns posterior draws of the parameters.
+        Returns the variance at all x in when building the prediction.
         """
-        
-        def __init__(self, cal):
-            self.cal = cal
-                
-        def rvs(self, args=None, n=100):
+        pfstr = 'predict' #prefix string
+        opstr = 'var' #operation string
+        if (pfstr + opstr) in dir(self.cal.calsoftware):
             if args is None:
                 args = self.cal.args
-            if 'thetarvs' not in dir(self.cal.calsoftware):   
-                if 'theta' not in self.cal.info.keys():
-                    raise ValueError('thetarvs functionality not in software' 
-                                     ' and theta draws labeled \'theta\' not '
-                                     'provided in cal.info.')
-                else:
-                    return self.cal.info['theta'][
-                        np.random.choice(self.cal.info['theta'].shape[0],
-                                         size=n), :]
-            else:
-                return self.cal.calsoftware.thetarvs(self.cal.emu, 
-                                                     self.cal.info, 
-                                                     n, args)
-        
-        def logpdf(self, args=None, n=100):
+            return self.cal.calsoftware.predictvar(self.info, args)
+        elif opstr in self.info.keys():
+            return self.info[opstr]
+        elif 'rnd' in self.info.keys():
+            return np.mean(self.info['rnd'], 0)
+        else:
+            raise ValueError(self.__softwarenotfoundstr(pfstr, opstr))
+    
+    def rnd(self, s=100, args=None):
+        r"""
+        Returns s random draws at all x in when building the prediction.
+        """
+        pfstr = 'predict' #prefix string
+        opstr = 'rnd' #operation string
+        if (pfstr + opstr) in dir(self.cal.calsoftware):
             if args is None:
                 args = self.cal.args
-            if 'thetalogpdf' not in dir(self.cal.calsoftware):   
-                    raise ValueError('thetalogpdf functionality not in software')
+            return self.cal.calsoftware.predictrnd(self.info, args)
+        elif 'rnd' in self.info.keys():
+            return self.info['rnd'][np.random.choice(self.info['rnd'].shape[0], size=s), :]
+        else:
+            raise ValueError(self.__softwarenotfoundstr(pfstr, opstr))
+
+    def lpdf(self, y=None, args=None):
+        r"""
+        Returns a log pdf given theta.
+        """
+        raise ValueError('lpdf functionality not in software')
+
+class thetadist(object):
+    r"""
+    A class to represent a calibrator.  pred.info will give the dictionary from the software.
+    """
+    
+    def __init__(self, cal):
+        self.cal = cal
+
+    def __repr__(self):
+        object_methods = [method_name for method_name in dir(self)
+                  if callable(getattr(self, method_name))]
+        object_methods = [x for x in object_methods if not x.startswith('_')]
+        object_methods = [x for x in object_methods if not x.startswith('cal')]
+        strrepr = ('A theta distribution object where the code in located in the file '
+                   + ' calibration.  The main methods are cal.theta' +
+                   ', cal.theta.'.join(object_methods) + '.  Default of predict() is' +
+                   ' cal.theta.mean() and ' +
+                   'cal.theta(s) will cal.theta.rnd(s).  Run help(cal.theta) for the document' +
+                   ' string.')
+        return strrepr
+
+    def __call__(self, s=None, args=None):
+        if s is None:
+            return self.mean(args)
+        else:
+            return self.rnd(s, args)
+    
+    def __softwarenotfoundstr(self, pfstr, opstr):
+        print(pfstr + opstr + 'functionality not in software... \n' +
+              ' Key labeled ' + (pfstr+opstr) + ' not ' +
+              'provided in cal.info... \n' +
+              ' Key labeled ' + pfstr + 'rnd not ' +
+              'provided in cal.info...')
+        return 'Could not reconsile a good way to compute this value in current software.'
+    
+    def mean(self, args = None):
+        r"""
+        Returns mean of each element of theta found during calibration.
+        """
+        pfstr = 'theta' #prefix string
+        opstr = 'mean' #operation string
+        if (pfstr + opstr) in dir(self.cal.calsoftware):
+            if args is None:
+                args = self.cal.args
+            return self.cal.calsoftware.thetamean(self.cal.info, args)
+        elif (pfstr+opstr) in self.cal.info.keys():
+            return self.cal.info[(pfstr+opstr)]
+        elif (pfstr+'rnd') in self.cal.info.keys():
+            return np.mean(self.cal.info[(pfstr+'rnd')], 0)
+        else:
+            raise ValueError(self.__softwarenotfoundstr(pfstr, opstr))
+
+    def var(self, args = None):
+        r"""
+        Returns predictive variance of each element of theta found during calibration.
+        """
+        pfstr = 'theta'  # prefix string
+        opstr = 'var'  # operation string
+        if (pfstr + opstr) in dir(self.cal.calsoftware):
+            if args is None:
+                args = self.cal.args
+            return self.cal.calsoftware.thetavar(self.cal.info, args)
+        elif (pfstr+opstr) in self.cal.info.keys():
+            return self.cal.info[(pfstr+opstr)]
+        elif (pfstr+'rnd') in self.cal.info.keys():
+            return np.var(self.cal.info[(pfstr+'rnd')], 0)
+        else:
+            raise ValueError(self.__softwarenotfoundstr(pfstr, opstr))
+    
+    def rnd(self, s=100, args=None):
+        r"""
+        Returns s predictive draws for theta found during calibration.
+        """
+        pfstr = 'theta' #prefix string
+        opstr = 'rnd' #operation string
+        if (pfstr + opstr) in dir(self.cal.calsoftware):
+            if args is None:
+                args = self.cal.args
+            return self.cal.calsoftware.thetarnd(self.cal.info, s, args)
+        elif (pfstr+opstr) in self.cal.info.keys():
+            return self.cal.info['thetarnd'][
+                        np.random.choice(self.cal.info['thetarnd'].shape[0], size=s), :]
+        else:
+            raise ValueError(self.__softwarenotfoundstr(pfstr, opstr))
+    
+    def lpdf(self, theta=None, args=None):
+        r"""
+        Returns a log pdf given theta.
+        """
+        raise ValueError('lpdf functionality not in software')
