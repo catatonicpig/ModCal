@@ -109,7 +109,7 @@ class calibrator(object):
         object_methods = [x for x in object_methods if not x.startswith('emu')]
         strrepr = ('A calibration object where the code in located in the file '
                    + ' calibration.  The main methods are cal.' +
-                   ', cal.'. join(object_methods) + '.  Default of cal(x) is cal.pred(x).' +
+                   ', cal.'. join(object_methods) + '.  Default of cal(x) is cal.predict(x).' +
                    '  Run help(cal) for the document string.')
         return strrepr
     
@@ -153,7 +153,7 @@ class calibrator(object):
 
         Returns
         -------
-        prediction : an instance of class prediction
+        prediction : an instance of calibration class prediction
             prediction.info : Gives the dictionary of what was produced by the software.
         """
         if args is None:

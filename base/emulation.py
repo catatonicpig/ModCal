@@ -87,6 +87,19 @@ class emulator(object):
         
         self.software.predict(self.info, copy.deepcopy(self.theta))
 
+    def __repr__(self):
+        object_methods = [method_name for method_name in dir(self)
+                  if callable(getattr(self, method_name))]
+        object_methods = [x for x in object_methods if not x.startswith('__')]
+        strrepr = ('An emulation object where the code in located in the file '
+                   + ' emulation.  The main methods are emu.' +
+                   ', emu.'. join(object_methods) + '.  Default of emu(theta) is' +
+                   ' emu.predict(theta).  Run help(emu) for the document string.')
+        return strrepr
+    
+    
+    def __call__(self, x=None):
+        return self.predict(x)
 
     def fit(self, args= None):
         r"""
@@ -142,11 +155,8 @@ class emulator(object):
 
         Returns
         -------
-        preddict : dict of prediction objects
-            preddict['mean'] : Mean of prediction at each point theta and emu.x
-            preddict['var'] : Variance of prediction at each point theta and emu.x
-            preddict['covdecomp'] : A matrix such that when A = preddict['covdecomp'][k,:,:]
-                then A.T @ A = covariance matrix of prediction errors at theta[k,:] and emu.x
+        prediction : an instance of emulation class prediction
+            prediction.info : Gives the dictionary of what was produced by the software.
         """
         if args is None:
             args = self.args
@@ -223,7 +233,7 @@ class prediction(object):
 
     def var(self, args = None):
         r"""
-        Returns the variance at theta and x in when building the prediction.
+        Returns the pointwise variance at theta and x in when building the prediction.
         """
         pfstr = 'predict' #prefix string
         opstr = 'var' #operation string
