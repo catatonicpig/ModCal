@@ -209,9 +209,9 @@ class prediction(object):
         if (pfstr + opstr) in dir(self.cal.software):
             if args is None:
                 args = self.cal.args
-            return self.cal.software.predictmean(self.info, args)
+            return copy.deepcopy(self.cal.software.predictmean(self.info, args))
         elif opstr in self.info.keys():
-            return self.info[opstr]
+            return copy.deepcopy(self.info[opstr])
         elif 'rnd' in self.info.keys():
             return np.mean(self.info['rnd'], 0)
         else:
@@ -226,9 +226,9 @@ class prediction(object):
         if (pfstr + opstr) in dir(self.cal.software):
             if args is None:
                 args = self.cal.args
-            return self.cal.software.predictvar(self.info, args)
+            return copy.deepcopy(self.cal.software.predictvar(self.info, args))
         elif opstr in self.info.keys():
-            return self.info[opstr]
+            return copy.deepcopy(self.info[opstr])
         elif 'rnd' in self.info.keys():
             return np.mean(self.info['rnd'], 0)
         else:
@@ -243,7 +243,7 @@ class prediction(object):
         if (pfstr + opstr) in dir(self.cal.software):
             if args is None:
                 args = self.cal.args
-            return self.cal.software.predictrnd(self.info, args)
+            return copy.deepcopy(self.cal.software.predictrnd(self.info, args))
         elif 'rnd' in self.info.keys():
             return self.info['rnd'][np.random.choice(self.info['rnd'].shape[0], size=s), :]
         else:
@@ -299,9 +299,9 @@ class thetadist(object):
         if (pfstr + opstr) in dir(self.cal.software):
             if args is None:
                 args = self.cal.args
-            return self.cal.software.thetamean(self.cal.info, args)
+            return copy.deepcopy(self.cal.software.thetamean(self.cal.info, args))
         elif (pfstr+opstr) in self.cal.info.keys():
-            return self.cal.info[(pfstr+opstr)]
+            return copy.deepcopy(self.cal.info[(pfstr+opstr)])
         elif (pfstr+'rnd') in self.cal.info.keys():
             return np.mean(self.cal.info[(pfstr+'rnd')], 0)
         else:
@@ -316,9 +316,9 @@ class thetadist(object):
         if (pfstr + opstr) in dir(self.cal.software):
             if args is None:
                 args = self.cal.args
-            return self.cal.software.thetavar(self.cal.info, args)
+            return copy.deepcopy(self.cal.software.thetavar(self.cal.info, args))
         elif (pfstr+opstr) in self.cal.info.keys():
-            return self.cal.info[(pfstr+opstr)]
+            return copy.deepcopy(self.cal.info[(pfstr+opstr)])
         elif (pfstr+'rnd') in self.cal.info.keys():
             return np.var(self.cal.info[(pfstr+'rnd')], 0)
         else:
@@ -333,7 +333,7 @@ class thetadist(object):
         if (pfstr + opstr) in dir(self.cal.software):
             if args is None:
                 args = self.cal.args
-            return self.cal.software.thetarnd(self.cal.info, s, args)
+            return copy.deepcopy(self.cal.software.thetarnd(self.cal.info, s, args))
         elif (pfstr+opstr) in self.cal.info.keys():
             return self.cal.info['thetarnd'][
                         np.random.choice(self.cal.info['thetarnd'].shape[0], size=s), :]

@@ -71,15 +71,14 @@ xtot[xtot[:,1] == 50, 1] = 'highdrop'
 # this should include those important to the study AND the data
 
 # we now create a computer experiment to build an emulator
-thetacompexp_lin = priorphys.rnd(50)  # drawing 50 rndom parameters from the prior
-linear_results = balldropmodel_linear(thetacompexp_lin, xtotv)  # the value of the linear simulation
-# This is for all vectors in the input of interest
-emu_lin = emulator(thetacompexp_lin, linear_results, xtot)  # this builds an emulator 
-# for the linear simulation. this is a specialized class specific to ModCal.
+thetacompexp = priorphys.rnd(50)  # drawing 50 rndom parameters from the prior
 
-thetacompexp_grav = priorphys.rnd(20)  # drawing 50 rndom parameters from the prior
-grav_results = balldropmodel_grav(thetacompexp_grav, xtotv)  # the value of the gravity simulation
-emu_grav = emulator(thetacompexp_grav, grav_results, xtot)  # this builds an
+linear_results = balldropmodel_linear(thetacompexp, xtotv)  # the value of the linear simulation
+# This is for all vectors in the input of interest
+emu_lin = emulator(thetacompexp, linear_results, xtot)  # this builds an emulator 
+# for the linear simulation. this is a specialized class specific to ModCal.
+grav_results = balldropmodel_grav(thetacompexp, xtotv)  # the value of the gravity simulation
+emu_grav = emulator(thetacompexp, grav_results, xtot)  # this builds an
 # emulator for the gravity simulation. this is a specialized class specific to ModCal.
 
 x = np.array([[ 0.1, 25. ],
@@ -133,12 +132,25 @@ class priorstatdisc_modelb:
     def rnd(n):
         return np.vstack((sps.norm.rvs(2, 0.5, size = n ),
                          sps.norm.rvs(-4, 0.5, size = n))).T
+    
+class priorstatdisc_models:
+    def lpdf(phi):
+        return np.squeeze(priorstatdisc_modela.lpdf(phi[:,:2]) +
+                          priorstatdisc_modelb.lpdf(phi[:,2:]))
+    def rnd(n):
+        return np.hstack((priorstatdisc_modela.rnd(n),
+                          priorstatdisc_modelb.rnd(n)))
+
+
 def cov_delta(x,phi):
     xv = x[:,0].astype(float)
     C0 = np.exp(-1/2*np.abs(np.subtract.outer(np.sqrt(xv),np.sqrt(xv)))) *\
         (1+1/2*np.abs(np.subtract.outer(np.sqrt(xv),np.sqrt(xv))))
     adj = 20 / (1+np.exp(phi[1]*(xv - phi[0])))
     return (np.diag(adj) @ C0 @ np.diag(adj))
+
+def cov_disc(x,k,phi):
+    return cov_delta(x, phi[2*k:(2*k+2)])
 
 cal_lin = calibrator(emu_lin, y, x,
                     thetaprior = priorphys,
@@ -154,11 +166,28 @@ cal_grav = calibrator(emu_grav, y, x,
                                'phiprior': priorstatdisc_modelb})
 pred_grav = cal_grav.predict(xtot)
 
+cal_BMA = calibrator((emu_lin,emu_grav), y, x,
+                    thetaprior = priorphys,
+                    software = 'BDM_BMA',
+                    args = {'obsvar': obsvar, 'cov_disc': cov_disc,
+                            'phiprior': priorstatdisc_models})
+pred_BMA = cal_BMA.predict(xtot)
 
-fig, axes = plt.subplots(ncols=2, nrows=1, figsize=(21, 5))
+cal_BMM = calibrator((emu_lin,emu_grav), y, x,
+                    thetaprior = priorphys,
+                    software = 'BDM_BMM',
+                    args = {'obsvar': obsvar, 'cov_disc': cov_disc,
+                            'phiprior': priorstatdisc_models})
+pred_BMM = cal_BMM.predict(xtot)
+
+fig, axes = plt.subplots(ncols=4, nrows=1, figsize=(21, 5))
 two2d(axes[0], cal_lin.theta(1000)[:,(2,1)])
 two2d(axes[1], cal_grav.theta.rnd(1000)[:,(2,1)])
+two2d(axes[2], cal_BMA.theta(1000)[:,(2,1)])
+two2d(axes[3], cal_BMM.theta.rnd(1000)[:,(2,1)])
 
-fig, axes = plt.subplots(ncols=2, nrows=1, figsize=(21, 5))
+fig, axes = plt.subplots(ncols=4, nrows=1, figsize=(21, 5))
 plotpreds(axes[0], pred_lin)
 plotpreds(axes[1], pred_grav)
+plotpreds(axes[2], pred_BMA)
+plotpreds(axes[3], pred_BMM)

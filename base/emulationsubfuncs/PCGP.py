@@ -8,6 +8,13 @@ Created on Fri Sep 11 14:40:38 2020
 import numpy as np
 import scipy.optimize as spo
 
+##############################################################################
+##############################################################################
+###################### THIS BEGINS THE REQUIRED PORTION ######################
+########## THE NEXT FUNCTIONS REQUIRED TO BE CALLED BY EMULATION #############
+##############################################################################
+##############################################################################
+
 def fit(info, theta, f, x=None,  args=None):
     """Return a Gaussian Process emulator model."""
     info['offset'] = np.zeros(f.shape[1])
@@ -57,6 +64,19 @@ def fit(info, theta, f, x=None,  args=None):
     info['emulist'] = emulist
     return
 
+##############################################################################
+##############################################################################
+####################### THIS ENDS THE REQUIRED PORTION #######################
+###### THE NEXT FUNCTIONS ARE OPTIONAL TO BE CALLED BY CALIBRATION ###########
+##############################################################################
+##############################################################################
+
+##############################################################################
+##############################################################################
+####################### THIS ENDS THE OPTIONAL PORTION #######################
+######### USE SPACE BELOW FOR ANY SUPPORTING FUNCTIONS YOU DESIRE ############
+##############################################################################
+##############################################################################
 
 def predict(info, theta, x=None, args=None):
     infos = info['emulist']
@@ -93,8 +113,14 @@ def predict(info, theta, x=None, args=None):
     preddict = {}
     preddict['mean'] = 1*predmean
     preddict['var'] = 1*predvar
-    preddict['covdecomp'] = (np.sqrt(np.abs(predvars))[:,:,np.newaxis] *
+    CH = (np.sqrt(np.abs(predvars))[:,:,np.newaxis] *
                              (info['PCs'][xind,:].T)[np.newaxis,:,:])
+    preddict['covhalf'] = CH
+    # CH = preddict['covhalf']
+    # C = np.ones((CH.shape[0],CH.shape[2],CH.shape[2]))
+    # for k in range(0,CH.shape[0]):
+    #     C[k,:,:] = CH[k].T @ CH[k]
+    # preddict['cov'] = C
     return preddict
 
 

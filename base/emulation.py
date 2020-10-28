@@ -223,11 +223,11 @@ class prediction(object):
         if (pfstr + opstr) in dir(self.emu.software):
             if args is None:
                 args = self.emu.args
-            return self.emu.software.predictmean(self.info, args)
+            return copy.deepcopy(self.emu.software.predictmean(self.info, args))
         elif opstr in self.info.keys():
             return self.info[opstr]
         elif 'rnd' in self.info.keys():
-            return np.mean(self.info['rnd'], 0)
+            return copy.deepcopy(np.mean(self.info['rnd'], 0))
         else:
             raise ValueError(self.__softwarenotfoundstr(pfstr, opstr))
 
@@ -240,28 +240,72 @@ class prediction(object):
         if (pfstr + opstr) in dir(self.emu.software):
             if args is None:
                 args = self.emu.args
-            return self.emu.software.predictvar(self.info, args)
+            return copy.deepcopy(self.emu.software.predictvar(self.info, args))
         elif opstr in self.info.keys():
-            return self.info[opstr]
+            return copy.deepcopy(self.info[opstr])
         elif 'rnd' in self.info.keys():
-            return np.mean(self.info['rnd'], 0)
+            return copy.deepcopy(np.var(self.info['rnd'], 0))
         else:
             raise ValueError(self.__softwarenotfoundstr(pfstr, opstr))
-    
-    def rnd(self, s=100, args=None):
+
+    def cov(self, args = None):
         r"""
-        Returns s random draws at theta and x in when building the prediction.
+        Returns the covariance matrix at theta and x in when building the prediction.
         """
         pfstr = 'predict' #prefix string
-        opstr = 'rnd' #operation string
+        opstr = 'cov' #operation string
         if (pfstr + opstr) in dir(self.emu.software):
             if args is None:
                 args = self.emu.args
-            return self.emu.software.predictrnd(self.info, args)
-        elif 'rnd' in self.info.keys():
-            return self.info['rnd'][np.random.choice(self.info['rnd'].shape[0], size=s), :]
+            return copy.deepcopy(self.emu.software.predictcov(self.info, args))
+        elif opstr in self.info.keys():
+            return copy.deepcopy(self.info[opstr])
+        elif 'covhalf' in self.info.keys():
+            if self.info['covhalf'].ndim == 2:
+                return self.info['covhalf'].T @ self.info['covhalf']
+            else:
+                am = self.info['covhalf'].shape
+                cov = np.ones((am[0],am[2],am[2]))
+                for k in range(0, self.info['covhalf'].shape[0]):
+                    A = self.info['covhalf'][k]
+                    cov[k,:,:] = A.T @ A
+            self.info['cov'] = cov
+            return copy.deepcopy(self.info[opstr])
         else:
             raise ValueError(self.__softwarenotfoundstr(pfstr, opstr))
+
+    def covhalf(self, args = None):
+        r"""
+        Returns the sqrt of the covariance matrix at theta and x in when building the prediction.
+        That is, if this returns A = predict.covhalf(.)[k], than A.T @ A = predict.cov(.)[k]
+        """
+        pfstr = 'predict' #prefix string
+        opstr = 'covhalf' #operation string
+        if (pfstr + opstr) in dir(self.emu.software):
+            if args is None:
+                args = self.emu.args
+            return copy.deepcopy(self.emu.software.predictcov(self.info, args))
+        elif opstr in self.info.keys():
+            return copy.deepcopy(self.info[opstr])
+        elif 'cov' in self.info.keys():
+            covhalf = np.ones(self.info['cov'].shape)
+            if self.info['cov'].ndim == 2:
+                W, V = np.linalg.eigh(self.info['cov'])
+                covhalf = (V @ (np.sqrt(np.abs(W)) * V.T))
+            else:
+                for k in range(0, self.info['cov'].shape[0]):
+                    W, V = np.linalg.eigh(self.info['cov'][k])
+                    covhalf[k,:,:] = (V @ (np.sqrt(np.abs(W)) * V.T))
+            self.info['covhalf'] = covhalf
+            return copy.deepcopy(self.info[opstr])
+        else:
+            raise ValueError(self.__softwarenotfoundstr(pfstr, opstr))
+
+    def rnd(self, s=100, args=None):
+        r"""
+        Returns a rnd draws of size s at theta and x 
+        """
+        raise ValueError('rnd functionality not in software')
 
     def lpdf(self, f=None, args=None):
         r"""
