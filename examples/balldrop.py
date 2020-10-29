@@ -4,6 +4,7 @@ import numpy as np
 import scipy.stats as sps
 import sys
 import os
+import copy
 
 #the following imports are sloppy until a module is actually built...
 from balldroptestfuncs import balldropmodel_linear,\
@@ -94,10 +95,10 @@ y = balldroptrue(xv) + sps.norm.rvs(0, np.sqrt(obsvar)) #observations at each ro
     
 class priorstatdisc_model:
     def lpdf(phi):
-        return np.squeeze(sps.norm.logpdf(phi[:,0], 3, 1) +
+        return np.squeeze(sps.norm.logpdf(phi[:,0], 2, 2) +
                           sps.norm.logpdf(phi[:,1], 0, 2))
     def rnd(n):
-        return np.vstack((sps.norm.rvs(3, 1, size = n ),
+        return np.vstack((sps.norm.rvs(2, 2, size = n ),
                          sps.norm.rvs(0, 2, size = n))).T
 def cov_delta(x,phi):
     xv = x[:,0].astype(float)
@@ -132,16 +133,17 @@ def two2d(axis, theta):
     axis.pcolormesh(xi, yi, zi.reshape(xi.shape), shading='gouraud', cmap=plt.cm.BuGn_r)
     axis.contour(xi, yi, zi.reshape(xi.shape))
 
-ax1 = plt
+fig1, ax1 = plt.subplots()
 two2d(ax1, cal_lin.theta(2000))
-ax1.xlabel('drop offset')
-ax1.ylabel('terminal velocity')
-ax1.title('density plot for the parameter of the linear model')
+ax1.set_xlabel('drop offset')
+ax1.set_ylabel('terminal velocity')
+ax1.set_title('density plot for the parameter of the linear model')
 
-hist = plt.hist(cal_grav.theta(2000), bins=30)
-ax1.xlabel('gravity')
-ax1.ylabel('frequency')
-ax1.title('histogram for gravity')
+fig2, ax2 = plt.subplots()
+ax2.hist(cal_grav.theta(2000), bins=30)
+ax2.set_xlabel('gravity')
+ax2.set_ylabel('frequency')
+ax2.set_title('histogram for gravity')
 
 
 def plotpreds(axis, pred):
