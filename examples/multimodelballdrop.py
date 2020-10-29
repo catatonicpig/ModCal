@@ -5,6 +5,10 @@ import scipy.stats as sps
 import sys
 import os
 
+##############################################################################
+######## THIS FILE IS A WIP, NOT REALLY FOR OUTSIDE CONSUMPTION ##############
+##############################################################################
+
 from balldroptestfuncs import balldropmodel_linear,\
     balldropmodel_grav, balldroptrue
 SCRIPT_DIR = os.path.dirname(os.path.realpath(
@@ -54,6 +58,7 @@ class priorphys:
                           sps.gamma.rvs(2, 0, 10, size=n),  # terminal velocity
                           sps.gamma.rvs(2, 0, 5, size=n))).T  # gravity
 
+#These are notes to myself.
 #emaphsize they should contain the dashed lines
 #show which model is being used
 #template for the group now (later outside)
@@ -77,7 +82,7 @@ linear_results = balldropmodel_linear(thetacompexp, xtotv)  # the value of the l
 # This is for all vectors in the input of interest
 emu_lin = emulator(thetacompexp, linear_results, xtot)  # this builds an emulator 
 # for the linear simulation. this is a specialized class specific to ModCal.
-grav_results = balldropmodel_grav(thetacompexp, xtotv)  # the value of the gravity simulation
+grav_results = balldropmodel_grav(thetacompexp[:,2], xtotv)  # the value of the gravity simulation
 emu_grav = emulator(thetacompexp, grav_results, xtot)  # this builds an
 # emulator for the gravity simulation. this is a specialized class specific to ModCal.
 

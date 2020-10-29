@@ -8,7 +8,7 @@ import copy
 class emulator(object):
     """A class used to represent an emulator or surrogate model."""
 
-    def __init__(self, theta=None, f=None, x=None, software='PCGP', args={}):
+    def __init__(self, theta, f, x=None, software='PCGP', args={}):
         r"""
         Intitalizes an emulator or surrogate.
 
@@ -84,8 +84,6 @@ class emulator(object):
         
         self.info = {}
         self.fit()
-        
-        self.software.predict(self.info, copy.deepcopy(self.theta))
 
     def __repr__(self):
         object_methods = [method_name for method_name in dir(self)
@@ -170,8 +168,8 @@ class emulator(object):
         else:
             if x[0].shape[0] is not self.x[0].shape[0]:
                 raise ValueError('The new inputs do not match old inputs.')
-        
-        info = self.software.predict(self.info, copy.deepcopy(theta),
+        info = {}
+        self.software.predict(info, self.info, copy.deepcopy(theta),
                               copy.deepcopy(x), args)
         return prediction(info, self)
 

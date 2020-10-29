@@ -22,7 +22,7 @@ def balldropmodel_grav(theta, x):
         t = x[:, 0]
         h0 = x[:, 1]
         # vter = theta[k, 1]
-        g = theta[k, 2]
+        g = theta[k]
         f[k, :] = h0 - (g / 2) * (t ** 2)
     return f
 

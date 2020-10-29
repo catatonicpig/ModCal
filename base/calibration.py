@@ -35,10 +35,7 @@ class calibrator(object):
             A string that points to the file located in "calibrationsubfuncs" you would
             like to use.
         args : dict
-            A dictionary containing options you would like to pass to either
-            calibrationsubfuncs.[software].loglik(theta, phi, args)
-            or
-            logprior(theta, phi, args)
+            A dictionary containing options you would like to pass to fit and/or predict
 
         Returns
         -------
@@ -59,20 +56,12 @@ class calibrator(object):
                             ftry = emu[k].predict(emu[k].theta[0, :]).mean()
                         except:
                             raise ValueError('Your provided emulator failed to predict.')
-
-                        emu[k].infonum = k
-
-                    self.emu0 = emu[0]
-                    self.modelcount = len(emu)
                 else:
                     try:
                         ftry = emu.predict(copy.deepcopy(emu.theta[0, :]), 
                                            x=copy.deepcopy(emu.x[range(0,10,2), :]))
                     except:
                         raise ValueError('Your provided emulator failed to predict.')
-                    emu.infonum = 0
-                    self.emu0 = emu
-                    self.modelcount = 1
             self.emu = emu
             self.y = y
             
@@ -133,11 +122,11 @@ class calibrator(object):
         if args is None:
             args = self.args
         
-        self.software.fit(self.info, self.emu, self.y, self.x, args)
+        self.software.fit(self.info, self.emu, self.x, self.y, args)
         return None
 
 
-    def predict(self, x, args=None):
+    def predict(self, x=None, args=None):
         r"""
         Returns a predictions at x.
 
@@ -154,11 +143,14 @@ class calibrator(object):
         Returns
         -------
         prediction : an instance of calibration class prediction
-            prediction.info : Gives the dictionary of what was produced by the software.
+            prediction.predinfo : Gives the dictionary of what was produced by the software.
         """
         if args is None:
             args = self.args
-        info = self.software.predict(x, self.emu, self.info, args)
+        if args is x:
+            x = self.x
+        info = {}
+        self.software.predict(info, self.info, self.emu, x, args)
         return prediction(info, self)
 
 
@@ -259,7 +251,7 @@ class prediction(object):
 
 class thetadist(object):
     r"""
-    A class to represent a calibrator.  pred.info will give the dictionary from the software.
+    A class to represent a theta predictive distribution.
     """
     
     def __init__(self, cal):

@@ -1,47 +1,72 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Fri Sep 11 14:40:38 2020
-
-@author: Plumlee
-"""
+"""Header here."""
 
 import numpy as np
 import scipy.optimize as spo
 
+"""
 ##############################################################################
 ##############################################################################
 ###################### THIS BEGINS THE REQUIRED PORTION ######################
-########## THE NEXT FUNCTIONS REQUIRED TO BE CALLED BY EMULATION #############
+######### THE NEXT FUNCTIONS REQUIRED TO BE CALLED BY CALIBRATION ############
 ##############################################################################
 ##############################################################################
+"""
 
-def fit(info, theta, f, x=None,  args=None):
-    """Return a Gaussian Process emulator model."""
-    info['offset'] = np.zeros(f.shape[1])
-    info['scale'] = np.ones(f.shape[1])
-    info['theta'] = theta
-    info['x'] = x
+"""
+##############################################################################
+################################### fit ######################################
+### The purpose of this is to take information and plug all of our fit
+### information into fitinfo, which is a python dictionary. 
+##############################################################################
+##############################################################################
+"""
+def fit(fitinfo, theta, f, x, args=None):
+    r"""
+    Fits a calibration model.
+
+    Parameters
+    ----------
+    fitinfo : dict
+        An arbitary dictionary where you should place all of your fitting information once complete.
+        This dictionary is pass by reference, so there is no reason to return anything. Keep
+        only stuff that will be used by predict below. 
+        theta : array of float
+    theta :  An n-by-d matrix of parameters. n should be at least 2 times m. Each row in theta should
+        correspond to a row in f.
+    f : array of float
+        An n-by-m matrix of responses with 'nan' representing responses not yet available. Each
+        row in f should correspond to a row in theta. Each column should correspond to a row in
+        x.
+    x : array of objects
+        An m-by-p matrix of inputs. Each column should correspond to a row in f.
+    args : dict
+        A dictionary containing options passed to you.
+    """
+    fitinfo['offset'] = np.zeros(f.shape[1])
+    fitinfo['scale'] = np.ones(f.shape[1])
+    fitinfo['theta'] = theta
+    fitinfo['x'] = x
     
     fstand = 1*f
     for k in range(0, f.shape[1]):
-        info['offset'][k] = np.mean(f[:, k])
-        info['scale'][k] = 0.9*np.std(f[:, k]) + 0.1*np.std(f)
-    fstand = (fstand - info['offset']) / info['scale']
+        fitinfo['offset'][k] = np.mean(f[:, k])
+        fitinfo['scale'][k] = 0.9*np.std(f[:, k]) + 0.1*np.std(f)
+    fstand = (fstand - fitinfo['offset']) / fitinfo['scale']
     Vecs, Vals, _ = np.linalg.svd((fstand / np.sqrt(fstand.shape[0])).T)
     Vals = np.append(Vals, np.zeros(Vecs.shape[1] - Vals.shape[0]))
-    Valssq = (fstand.shape[0]*(Vals ** 2) + 0.01) /\
-        (fstand.shape[0] + 0.01)
+    Valssq = (fstand.shape[0]*(Vals ** 2) + 0.001) /\
+        (fstand.shape[0] + 0.001)
     numVals = 1 + np.sum(np.cumsum(Valssq) < 0.9995*np.sum(Valssq))
     numVals = np.maximum(np.minimum(2,fstand.shape[1]),numVals)
-    info['Cs'] = Vecs * np.sqrt(Valssq)
-    info['PCs'] = info['Cs'][:, :numVals]
-    info['PCsi'] = Vecs[:,:numVals] * np.sqrt(1 / Valssq[:numVals])
-    pcaval = fstand @ info['PCsi']
-    fhat= pcaval @ info['PCs'].T
-    info['extravar'] = np.mean((fstand-fhat) ** 2,0) *\
-        (info['scale'] ** 2)
+    fitinfo['Cs'] = Vecs * np.sqrt(Valssq)
+    fitinfo['PCs'] = fitinfo['Cs'][:, :numVals]
+    fitinfo['PCsi'] = Vecs[:,:numVals] * np.sqrt(1 / Valssq[:numVals])
+    pcaval = fstand @ fitinfo['PCsi']
+    fhat= pcaval @ fitinfo['PCs'].T
+    fitinfo['extravar'] = np.mean((fstand-fhat) ** 2,0) *\
+        (fitinfo['scale'] ** 2)
         
-    info['var0'] = np.ones(numVals)
+    fitinfo['var0'] = np.ones(numVals)
     hypinds = np.zeros(numVals)
     emulist = [dict() for x in range(0, numVals)]
     
@@ -61,67 +86,83 @@ def fit(info, theta, f, x=None,  args=None):
         if emulist[pcanum]['hypind'] < -0.5:
             emulist[pcanum]['hypind'] = pcanum
         hypinds[pcanum] = emulist[pcanum]['hypind']
-    info['emulist'] = emulist
+    fitinfo['emulist'] = emulist
     return
 
-##############################################################################
-##############################################################################
-####################### THIS ENDS THE REQUIRED PORTION #######################
-###### THE NEXT FUNCTIONS ARE OPTIONAL TO BE CALLED BY CALIBRATION ###########
-##############################################################################
-##############################################################################
 
+"""
+##############################################################################
+################################### predict ##################################
+### The purpose of this is to take an emulator emu alongside fitinfo, and 
+### predict at x. You shove all your information into the dictionary predinfo.
 ##############################################################################
 ##############################################################################
-####################### THIS ENDS THE OPTIONAL PORTION #######################
-######### USE SPACE BELOW FOR ANY SUPPORTING FUNCTIONS YOU DESIRE ############
-##############################################################################
-##############################################################################
+"""
+def predict(predinfo, fitinfo, theta, x, args=None):
+    r"""
+    Finds prediction at theta and x given the dictionary fitinfo.
 
-def predict(info, theta, x=None, args=None):
-    infos = info['emulist']
+    Parameters
+    ----------
+    predinfo : dict
+        An arbitary dictionary where you should place all of your prediction information once complete. 
+        This dictionary is pass by reference, so there is no reason to return anything. Keep
+        only stuff that will be used by predict.  Key elements
+        predinfo['mean'] : predinfo['mean'][k] is mean of the prediction at all x at theta[k].
+        predinfo['var'] : predinfo['var'][k] is variance of the prediction at all x at theta[k].
+        predinfo['cov'] : predinfo['cov'][k] is mean of the prediction at all x at theta[k].
+        predinfo['covhalf'] : if A = predinfo['covhalf'][k] then A.T @ A = predinfo['cov'][k]
+        predinfo['rand'] : predinfo['rand'][l][k] lth draw of of x at theta[k].
+    fitinfo : dict
+        An arbitary dictionary where you placed all your important fitting information from the 
+        fit function above.
+    emu : instance of emulator class
+        An emulator class instatance as defined in emulation.
+    x : array of float
+        An array of x values where you want to predict.
+    args : dict
+        A dictionary containing options passed to you.
+    """
+    infos = fitinfo['emulist']
     predvecs = np.zeros((theta.shape[0], len(infos)))
     predvars = np.zeros((theta.shape[0], len(infos)))
-    
     if x is not None:
-        matchingmatrix = np.ones((x.shape[0], info['x'].shape[0]))
+        matchingmatrix = np.ones((x.shape[0], fitinfo['x'].shape[0]))
         for k in range(0,x[0].shape[0]):
             try:
                 matchingmatrix *= np.isclose(x[:,k][:,None].astype('float'),
-                         info['x'][:,k].astype('float'))
+                         fitinfo['x'][:,k].astype('float'))
             except:
-                matchingmatrix *= np.equal(x[:,k][:,None],info['x'][:,k])
+                matchingmatrix *= np.equal(x[:,k][:,None],fitinfo['x'][:,k])
         xind = np.argwhere(matchingmatrix > 0.5)[:,1]
     else:
-        xind = range(0,info['x'].shape[0])
+        xind = range(0,fitinfo['x'].shape[0])
     rsave = np.array(np.ones(len(infos)), dtype=object)
     for k in range(0, len(infos)):
         if infos[k]['hypind'] == k:
             rsave[k] = (1-infos[k]['nug']) *\
-                emulation_smart_covmat(theta, info['theta'], 
+                emulation_smart_covmat(theta, fitinfo['theta'], 
                                        infos[k]['hypcov'])
         r = np.squeeze(rsave[infos[k]['hypind']])
         Rinv = 1*infos[(infos[k]['hypind'])]['Rinv']
         predvecs[:, k] = r @ infos[k]['pw']
-        predvars[:, k] = info['var0'][k] - np.sum(r.T * (Rinv @ r.T), 0)
-
-    predmean = (predvecs @ info['PCs'][xind,:].T)*info['scale'][xind] +\
-        info['offset'][xind]
-    predvar = info['extravar'][xind] + (predvars @ (info['PCs'][xind,:] ** 2).T) *\
-        (info['scale'][xind] ** 2)
+        predvars[:, k] = fitinfo['var0'][k] - np.sum(r.T * (Rinv @ r.T), 0)
+    predmean = (predvecs @ fitinfo['PCs'][xind,:].T)*fitinfo['scale'][xind] +\
+        fitinfo['offset'][xind]
+    predvar = fitinfo['extravar'][xind] + (predvars @ (fitinfo['PCs'][xind,:] ** 2).T) *\
+        (fitinfo['scale'][xind] ** 2)
     
-    preddict = {}
-    preddict['mean'] = 1*predmean
-    preddict['var'] = 1*predvar
+    predinfo['mean'] = 1*predmean
+    predinfo['var'] = 1*predvar
     CH = (np.sqrt(np.abs(predvars))[:,:,np.newaxis] *
-                             (info['PCs'][xind,:].T)[np.newaxis,:,:])
-    preddict['covhalf'] = CH
+                             (fitinfo['PCs'][xind,:].T)[np.newaxis,:,:])
+    predinfo['covhalf'] = CH
     # CH = preddict['covhalf']
     # C = np.ones((CH.shape[0],CH.shape[2],CH.shape[2]))
     # for k in range(0,CH.shape[0]):
     #     C[k,:,:] = CH[k].T @ CH[k]
     # preddict['cov'] = C
-    return preddict
+    return 
 
 
 def emulation_covmat(x1, x2, gammav, returndir = False):

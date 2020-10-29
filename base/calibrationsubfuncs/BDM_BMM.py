@@ -5,23 +5,64 @@ from base.utilities import postsampler
 import copy
 
 
+"""
 ##############################################################################
 ##############################################################################
 ###################### THIS BEGINS THE REQUIRED PORTION ######################
 ######### THE NEXT FUNCTIONS REQUIRED TO BE CALLED BY CALIBRATION ############
 ##############################################################################
 ##############################################################################
+"""
 
-def fit(info, emu, y, x, args=None):
+"""
+##############################################################################
+################################### fit ######################################
+### The purpose of this is to take an emulator _emu_ and plug all of our fit
+### information into _info_, which is a python dictionary. Example emu functions
+### emupredict = emu(theta, x).predict()
+### emupredict.mean(): an array of size (theta.shape[0], x.shape[0]) containing the mean
+###             of the target function at theta and x
+### emupredict.var(): an array of size (theta.shape[0], x.shape[0]) containing the variance
+###             of the target function at theta and x
+### emupredict.cov(): an array of size (theta.shape[0], x.shape[0], x.shape[0]) containing the
+###             covariance matrix in x at each theta.
+### emupredict.rand(s): an array of size (s, theta.shape[0], x.shape[0]) containing s
+###             random draws from the emulator at theta and x.
+### Not all of these will work, it depends on your emulation software.
+##############################################################################
+##############################################################################
+"""
+def fit(fitinfo, emu, x, y, args=None):
     r"""
-    This is a optional docstring for an internal function.
+    Fits a calibration model.
+
+    Parameters
+    ----------
+    fitinfo : dict
+        An arbitary dictionary where you should place all of your fitting information once complete.
+        This dictionary is pass by reference, so there is no reason to return anything. Keep
+        only stuff that will be used by predict below. Note that the following are preloaded
+        fitinfo['thetaprior'].rnd(s) : Get s random draws from the prior predictive distribution on
+            theta.
+        fitinfo['thetaprior'].lpdf(theta) : Get the logpdf at theta(s).
+        In addition, calibration can directly use:
+        fitinfo['thetamean'] : the mean of the prediction of theta
+        fitinfo['thetavar'] : the var of the predictive variance on theta
+        fitinfo['thetarand'] : some number draws from the predictive distribution on theta
+    emu : tuple of instances of emulator class
+        An emulator class instatance as defined in emulation
+    x : array of objects
+        An array of x  that represent the inputs.
+    y : array of float
+        A one demensional array of observed values at x
+    args : dict
+        A dictionary containing options passed to you.
     """
-    
     
     if type(emu) is not tuple:
         raise ValueError('Must provide a tuple of emulators to BDM_BMM.')
         
-    thetaprior = info['thetaprior']
+    thetaprior = fitinfo['thetaprior']
     theta = thetaprior.rnd(1000)
     
     if 'obsvar' in args.keys():
@@ -74,29 +115,55 @@ def fit(info, emu, y, x, args=None):
         theta = thetaphi
         phi = None
     
-    info['thetarnd'] = theta
-    info['phirnd'] = phi
-    info['y'] = y
-    info['x'] = x
+    fitinfo['thetarnd'] = theta
+    fitinfo['phirnd'] = phi
+    fitinfo['y'] = y
+    fitinfo['x'] = x
     return
 
 
-def predict(x, emu, calinfo, args = None):
+"""
+##############################################################################
+################################### predict ##################################
+### The purpose of this is to take an emulator emu alongside fitinfo, and 
+### predict at x. You shove all your information into the dictionary predinfo.
+##############################################################################
+##############################################################################
+"""
+def predict(predinfo, fitinfo, emu, x, args=None):
     r"""
-    This is a optional docstring for an internal function.
+    Finds prediction at x given the emulator emu and dictionary fitinfo.
+
+    Parameters
+    ----------
+    predinfo : dict
+        An arbitary dictionary where you should place all of your prediction information once complete. 
+        This dictionary is pass by reference, so there is no reason to return anything. Keep
+        only stuff that will be used by predict.  Key elements
+        predinfo['mean'] : the mean of the prediction
+        predinfo['var'] : the variance of the prediction
+        predinfo['rand'] : some number draws from the predictive distribution on theta.
+    fitinfo : dict
+        An arbitary dictionary where you placed all your important fitting information from the 
+        fit function above.
+    emu : tuple of instances of emulator class
+        An emulator class instatance as defined in emulation
+    x : array of float
+        An array of x values where you want to predict.
+    args : dict
+        A dictionary containing options passed to you.
     """
     
-    theta = calinfo['thetarnd']
-    phi = calinfo['phirnd']
+    theta = fitinfo['thetarnd']
+    phi = fitinfo['phirnd']
     if theta.ndim == 1:
         theta = theta.reshape((1, theta.shape[0]))
     elif 'obsvar' in args.keys():
         obsvar = args['obsvar']
     else:
         raise ValueError('Must provide obsvar at this moment.')
-    info = {}
-    xtot = np.vstack((calinfo['x'],x))
-    mx =calinfo['x'].shape[0]
+    xtot = np.vstack((fitinfo['x'],x))
+    mx =fitinfo['x'].shape[0]
 
     emumean = [np.ones(1) for x in range(len(emu))]
     emucov = [np.ones(1) for x in range(len(emu))]
@@ -108,8 +175,8 @@ def predict(x, emu, calinfo, args = None):
     
     meanfull = np.ones((emumean[k].shape[0],x.shape[0]))
     varfull = np.ones((emumean[k].shape[0],x.shape[0]))
-    info['rnd'] = np.ones((emumean[k].shape[0],x.shape[0]))
-    info['modelrnd'] = np.ones((emumean[k].shape[0],x.shape[0]))
+    predinfo['rnd'] = np.ones((emumean[k].shape[0],x.shape[0]))
+    predinfo['modelrnd'] = np.ones((emumean[k].shape[0],x.shape[0]))
     xind = range(0,mx)
     xindnew = range(mx,xtot.shape[0])
     covmats = [np.array(0) for l in range(len(emu))]
@@ -137,7 +204,7 @@ def predict(x, emu, calinfo, args = None):
         S0inv = np.linalg.inv(np.diag(obsvar) + S0[xind,:][:,xind])
         S10 = S0[xindnew, :][:, xind]
         Mat1 = S10 @ S0inv
-        resid = np.squeeze(calinfo['y'])
+        resid = np.squeeze(fitinfo['y'])
         meanfull[k, :] =  m10 +  Mat1 @ (resid - m00)
         varfull[k, :] = (np.diag(S0)[xindnew] -\
             np.sum(S10 * Mat1,1))
@@ -145,31 +212,38 @@ def predict(x, emu, calinfo, args = None):
         
         re = Vmat @ np.diag(np.sqrt(np.abs(Wmat))) @ Vmat.T @\
             sps.norm.rvs(0,1,size=(Vmat.shape[1]))
-        info['rnd'][k,:] = meanfull[k, :]  + re
+        predinfo['rnd'][k,:] = meanfull[k, :]  + re
         Wmat, Vmat = np.linalg.eigh(S0[xindnew,:][:,xindnew])
         re = Vmat @ np.diag(np.sqrt(np.abs(Wmat))) @ Vmat.T @\
             sps.norm.rvs(0,1,size=(Vmat.shape[1]))
-        info['modelrnd'][k,:] = m10 + re
+        predinfo['modelrnd'][k,:] = m10 + re
 
-    info['mean'] = np.mean(meanfull, 0)
+    predinfo['mean'] = np.mean(meanfull, 0)
     varterm1 = np.var(meanfull, 0)
-    info['var'] = np.mean(varfull, 0) + varterm1
-    return info
+    predinfo['var'] = np.mean(varfull, 0) + varterm1
+    return
 
 
+
+
+"""
 ##############################################################################
 ##############################################################################
 ####################### THIS ENDS THE REQUIRED PORTION #######################
 ###### THE NEXT FUNCTIONS ARE OPTIONAL TO BE CALLED BY CALIBRATION ###########
+## If this project works, there will be a list of useful calibration functions
+## to provide as you want.
 ##############################################################################
 ##############################################################################
-
+"""
+"""
 ##############################################################################
 ##############################################################################
 ####################### THIS ENDS THE OPTIONAL PORTION #######################
 ######### USE SPACE BELOW FOR ANY SUPPORTING FUNCTIONS YOU DESIRE ############
 ##############################################################################
 ##############################################################################
+"""
 
 def loglik(emu, theta, phi, y, x, args):
     r"""
