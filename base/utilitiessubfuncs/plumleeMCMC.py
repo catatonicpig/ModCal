@@ -23,7 +23,7 @@ def plumleepostsampler(thetastart, logpostfunc, numsamp, tarESS):
     """
     
     
-    numchain = 100
+    numchain = 50
     maxiters = 10
     keepgoing = True
     while keepgoing:
