@@ -43,7 +43,7 @@ def plumleepostsampler(thetastart, logpostfunc, numsamp, tarESS):
             keepgoing = False
     rho = 0.5
     jitter = 0.01
-    numsamppc = np.ceil(np.minimum(200,np.maximum(25,numsamp/numchain)).astype('int')
+    numsamppc = np.minimum(200,np.maximum(25,np.ceil(numsamp/numchain))).astype('int')
     for iters in range(0,maxiters):
         covmat0 = np.cov(thetasave.T)
         Wc,Vc = np.linalg.eigh(covmat0)
