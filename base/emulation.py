@@ -8,7 +8,7 @@ import copy
 class emulator(object):
     """A class used to represent an emulator or surrogate model."""
 
-    def __init__(self, theta, f, x=None, software='PCGP', args={}):
+    def __init__(self, theta, f, x, software='PCGP', args={}):
         r"""
         Intitalizes an emulator or surrogate.
 
@@ -46,14 +46,37 @@ class emulator(object):
         
         if f.ndim < 0.5 or f.ndim > 2.5:
             raise ValueError('f must have either 1 or 2 demensions.')
-            
+        
+        isinff = np.isinf(f)
+        if np.any(isinff):
+            print('All infs were converted to nans.')
+            f[isinff] = float("NaN")
+        
+        isnanf = np.isnan(f)
+        rowallnanf = np.all(isnanf,1)
+        if np.any(rowallnanf):
+            print('Row(s) %s removed due to nans.' % np.array2string(np.where(rowallnanf)[0]))
+            j = np.where(np.logical_not(rowallnanf))[0]
+            f = f[j,:]
+            theta = theta[j,:]
+        
+        numthetamin = 2 * theta.shape[1]
         if theta.ndim < 0.5 or theta.ndim > 2.5:
             raise ValueError('theta must have either 1 or 2 demensions.')
         
-        if theta.shape[0] < 2 * theta.shape[1]:
+        if theta.shape[0] < numthetamin:
             raise ValueError('theta should have at least 2 more' +
                              'rows than columns.')
-            
+        
+        colnumnanf = np.sum(isnanf,0)
+        enoughvals = colnumnanf >= numthetamin
+        if np.any(colnumnanf):
+            print('Column(s) %s removed due to not enough completed values.'
+                  % np.array2string(np.where(enoughvals)[0]))
+            j = np.where(np.logical_not(enoughvals))[0]
+            f = f[:,j]
+            x = x[j,:]
+        
         if f.shape[0] is not theta.shape[0]:
             raise ValueError('The rows in f must match' +
                              ' the rows in theta')
