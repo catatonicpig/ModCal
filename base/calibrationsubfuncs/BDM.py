@@ -44,10 +44,12 @@ def fit(fitinfo, emu, x, y,  args=None):
         fitinfo['thetaprior'].rnd(s) : Get s random draws from the prior predictive distribution on
             theta.
         fitinfo['thetaprior'].lpdf(theta) : Get the logpdf at theta(s).
-        In addition, calibration can directly use:
+        The following are optional preloads based on user input
+        fitinfo[yvar] : The vector of observation variances at y
+        In addition, calibration can directly use and communicate back to the user if you include:
         fitinfo['thetamean'] : the mean of the prediction of theta
         fitinfo['thetavar'] : the var of the predictive variance on theta
-        fitinfo['thetarand'] : some number draws from the predictive distribution on theta
+        fitinfo['thetarnd'] : some number draws from the predictive distribution on theta
     emu : instance of emulator class
         An emulator class instatance as defined in emulation
     x : array of objects
@@ -61,10 +63,10 @@ def fit(fitinfo, emu, x, y,  args=None):
     thetaprior = fitinfo['thetaprior']
     theta = thetaprior.rnd(1000)
     
-    if 'obsvar' in args.keys():
-        obsvar = args['obsvar']
+    if 'yvar' in fitinfo.keys():
+        obsvar = fitinfo['yvar']
     else:
-        raise ValueError('Must provide a prior on statistical parameters in this software.')
+        raise ValueError('Must provide yvar in this software.')
     
     if 'phiprior' in args.keys():
         phiprior = args['phiprior']
@@ -95,9 +97,9 @@ def fit(fitinfo, emu, x, y,  args=None):
         
         inds = np.where(np.isfinite(logpost))[0]
         if phi is None:
-            logpost[inds] += loglik(emu, theta[inds], None, y, x, args)
+            logpost[inds] += loglik(fitinfo, emu, theta[inds], None, y, x, args)
         else:
-            logpost[inds] += loglik(emu, theta[inds], phi[inds], y, x, args)
+            logpost[inds] += loglik(fitinfo,emu, theta[inds], phi[inds], y, x, args)
         return logpost
     
     numsamp = 1000
@@ -151,14 +153,16 @@ def predict(predinfo, fitinfo, emu, x, args=None):
     """
     
     y = fitinfo['y']
+    
     theta = fitinfo['thetarnd']
     phi = fitinfo['phirnd']
     if theta.ndim == 1 and fitinfo['theta'].shape[1] > 1.5:
         theta = theta.reshape((1, theta.shape[0]))
-    elif 'obsvar' in args.keys():
-        obsvar = args['obsvar']
+    
+    if 'yvar' in fitinfo.keys():
+        obsvar = fitinfo['yvar']
     else:
-        raise ValueError('Must provide obsvar at this moment.')
+        raise ValueError('Must provide yvar in this software.')
     
     if 'cov_disc' in args.keys():
         cov_disc = args['cov_disc']
@@ -184,6 +188,7 @@ def predict(predinfo, fitinfo, emu, x, args=None):
         mut = np.squeeze(y) - emupredict()[(k, xind)]
         m0 = emumean[k]
         St = emucov[k]
+        St[np.isnan(St)] = 0
         S0 = St[xind,:][:,xind]
         S10 = St[xindnew,:][:,xind]
         S11 =St[xindnew,:][:,xindnew]
@@ -232,20 +237,21 @@ def thetarnd(fitinfo, s=100, args=None):
 ##############################################################################
 """
 
-def loglik(emu, theta, phi, y, x, args):
+def loglik(fitinfo, emu, theta, phi, y, x, args):
     r"""
     This is a optional docstring for an internal function.
     """
     
-    if 'obsvar' in args.keys():
-        obsvar = args['obsvar']
+    
+    if 'yvar' in fitinfo.keys():
+        obsvar = fitinfo['yvar']
     else:
-        raise ValueError('Must provide obsvar at this moment.')
+        raise ValueError('Must provide yvar in this software.')
     
     if 'cov_disc' in args.keys():
         cov_disc = args['cov_disc']
     else:
-        raise ValueError('Must provide obsvar at this moment.')
+        raise ValueError('Must provide cov_disc at this moment.')
     emupredict = emu.predict(theta, x)
     emumean = emupredict.mean()
     emucov = emupredict.cov()

@@ -115,7 +115,8 @@ def cov_delta(x,phi):
 cal_lin = calibrator(emu_lin, y, x, # need to build a calibrator
                     thetaprior = priorphys_lin,
                     software = 'BDM',
-                    args = {'obsvar': obsvar, 'cov_disc': cov_delta,
+                    yvar = obsvar,
+                    args = {'cov_disc': cov_delta,
                                'phiprior': priorstatdisc_model})# the arguments are being passed 
                                                                 # to the BDM software
 pred_lin = cal_lin.predict(xtot) # getting a prediction object
@@ -123,6 +124,7 @@ pred_lin = cal_lin.predict(xtot) # getting a prediction object
 cal_grav = calibrator(emu_grav, y, x, # need to build a calibrator
                        thetaprior = priorphys_grav,
                        software = 'BDM',
+                    yvar = obsvar,
                     args = {'obsvar': obsvar, 'cov_disc': cov_delta,
                                'phiprior': priorstatdisc_model}) # the arguments are being passed 
                                                                 # to the BDM software

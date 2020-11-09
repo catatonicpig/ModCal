@@ -9,7 +9,7 @@ class calibrator(object):
     A class to represent a calibrator.  cal.info will give the dictionary from the software.
     """
 
-    def __init__(self, emu=None, y=None, x=None, thetaprior=None, software='BDM', args={}):
+    def __init__(self, emu=None, y=None, x=None, thetaprior=None, yvar=None, software='BDM', args={}):
         r"""
         Intitalizes a calibration model.
 
@@ -27,10 +27,12 @@ class calibrator(object):
             An array of x values that match the definition of "emu.x".  Currently, it must be a
             subset of "emu.x".
         thetaprior : distribution class instatance with two built in functions
-            thetaprior.rvs(n) :  produces n draws from the prior on theta, arranged in either a
+            thetaprior.rnd(n) :  produces n draws from the prior on theta, arranged in either a
             matrix or list.  It must align with the defination in "emu.theta"
-            thetaprior.logpdf(theta) :  produces the log pdf from the prior on theta, arranged in a
+            thetaprior.lpdf(theta) :  produces the log pdf from the prior on theta, arranged in a
             vector.
+        yvar : array of float
+            A one demensional array of the variance of observed values at x.  This is not required.
         software : str
             A string that points to the file located in "calibrationsubfuncs" you would
             like to use.
@@ -42,54 +44,105 @@ class calibrator(object):
         cal : instance of calibration class
             An instance of the calibration class that can be used with the functions listed below.
         """
+        self.args = args
         if y is None:
             raise ValueError('You have not provided any y.')
+        if y.shape[0] < 5:
+            raise ValueError('5 is the minimum number of observations at this time.')
+        if y.ndim > 1.5:
+            raise ValueError('y must be a vector of length at least 5.')
+        self.y = y
+        if emu is None:
+            raise ValueError('You have not provided any emulator.')
+        self.emu = emu
+        if thetaprior is None:
+            raise ValueError('You have not provided any prior function, stopping...')
+        try:
+            thetatestsamp = thetaprior.rnd(100)
+            if thetatestsamp.shape[0] != 100:
+                raise ValueError('thetaprior.rnd(100) failed to give 100 values.')
+        except:
+            raise ValueError('thetaprior.rnd(100) failed.')
+        try:
+            thetatestlpdf = thetaprior.lpdf(thetatestsamp)
+            if thetatestlpdf.shape[0] != 100:
+                raise ValueError('thetaprior.lpdf(thetaprior.rnd(100)) failed to give 100 values.')
+            if thetatestlpdf.ndim != 1:
+                raise ValueError('thetaprior.lpdf(thetaprior.rnd(100)) is demension higher than 1.')
+        except:
+            raise ValueError('thetaprior.lpdf(thetaprior.rnd(100)) failed.')
+        self.info = {}
+        self.info['thetaprior'] = copy.deepcopy(thetaprior)
+        
+        if x is not None:
+            if x.shape[0] != y.shape[0]:
+                raise ValueError('If x is provided, shape[0] must align with the length of y.')
+        self.x = copy.deepcopy(x)
+        if type(emu) is not tuple:
+            predtry = emu.predict(thetatestsamp, x = copy.deepcopy(self.x))
+            if y.shape[0] != predtry().shape[1]:
+                if x is None:
+                    raise ValueError('y and emu.predict(theta) must have the same shape')
+                else:
+                    raise ValueError('y and emu.predict(theta,x) must have the same shape')
+            else:
+                prednotfinite = np.logical_not(np.isfinite(predtry()))
+                if np.any(prednotfinite):
+                    print('We have received some non-finite values from emulation.')
+                    fracfail = np.mean(prednotfinite, 0)
+                    if np.sum(fracfail <= 10**(-3)) < 5:
+                        print('Your emulator failed enough places to give up.')
+                    else: 
+                        print('It looks like some locations are ok.')
+                        print('Current protocol is to remove observations that have nonfinite values.')
+                        whichrm = np.where(fracfail > 10**(-3))[0]
+                        print('Removing values at %s.' % np.array2string(whichrm))
+                        whichkeep = np.where(fracfail <= 10**(-3))[0]
+                        if x is not None:
+                            self.x = self.x[whichkeep,:]
+                        self.y = self.y[whichkeep]
+                else:
+                    whichkeep = None
         else:
-            if emu is None:
-                raise ValueError('You have not provided any emulator.')
-            else:
-                if thetaprior is None:
-                    raise ValueError('You have not provided any prior function, stopping...')
-                elif type(emu) is tuple:
-                    for k in range(0, len(emu)):
-                        try:
-                            ftry = emu[k].predict(emu[k].theta[0, :]).mean()
-                        except:
-                            raise ValueError('Your provided emulator failed to predict.')
-                else:
-                    try:
-                        ftry = emu.predict(copy.deepcopy(emu.theta[0, :]), 
-                                           x=copy.deepcopy(emu.x[range(0,10,2), :]))
-                    except:
-                        raise ValueError('Your provided emulator failed to predict.')
-            self.emu = emu
-            self.y = y
-            
-            if x is None:
-                if y.shape[0] != ftry.shape[0]:
-                    raise ValueError('If x is not provided, predictions must align with y and emu.predict()')
-            if x is not None:
-                if x.shape[0] != y.shape[0]:
-                    raise ValueError('If x is provided, predictions must align with y and emu.predict()')
-                else:
-                    if x is not None:
-                        self.x = x
+            for k in range(0, len(emu)):
+                try:
+                    predtry = emu[k].predict(thetatestsamp, x = copy.deepcopy(x))
+                    if y.shape[0] != predtry().shape[0]:
+                        if x is None:
+                            raise ValueError('y and emu.predict(theta) must have the same shape')
+                        else:
+                            raise ValueError('y and emu.predict(theta,x) must have the same shape')
                     else:
-                        self.x = self.emu0.x
-            try:
-                self.software = importlib.import_module('base.calibrationsubfuncs.' + software)
-            except:
-                raise ValueError('Module not found!')
-            
-            self.info = {}
-            self.args = args
-            if thetaprior is None:
-                raise ValueError('You must give a prior for theta.')
-            else:
-                self.info['thetaprior'] = thetaprior
-            
-            self.fit()
-            self.theta = thetadist(self)
+                        self.whichcols = [np.array(0) for x in range(0, len(emu))]
+                        prednotfinite = np.logical_not(np.isfinite(predtry()))
+                        if np.any(prednotfinite):
+                            print('We have received some non-finite values from emulation.')
+                            if np.sum(np.sum(prednotfinite,1) > 4) > 3:
+                                print('Your emulator failed enought places to give up.')
+                            else: 
+                                print('It looks like some locations are ok.')
+                                print('Current protocol is to remove observations that have nonfinite values.')
+                                prednotfinite = np.logical_not(np.isfinite(predtry()))
+                                self.whichcols[k] = np.where(np.sum(prednotfinite,1) > 4,0)[0]
+                except:
+                    raise ValueError('Your provided emulator failed to predict.')
+        if yvar is not None:
+            if yvar.shape[0] != y.shape[0] and yvar.shape[0] > 1.5:
+                raise ValueError('yvar must be the same size as y or of size 1.')
+            if np.min(yvar) < 0:
+                raise ValueError('yvar has at least one negative value.')
+            if np.min(yvar) < 10 ** (-6) or np.max(yvar) > 10 ** (6):
+                raise ValueError('please rescale your problem so that the yvar is between 10 ^ -6 and 10 ^ 6.')
+            self.info['yvar'] = copy.deepcopy(yvar)
+            if whichkeep is not None:
+                self.info['yvar'] = self.info['yvar'][whichkeep]
+        try:
+            self.software = importlib.import_module('base.calibrationsubfuncs.' + software)
+        except:
+            raise ValueError('Module not found!')
+        
+        self.fit()
+        self.theta = thetadist(self)
 
     def __repr__(self):
         object_methods = [method_name for method_name in dir(self)
@@ -121,7 +174,6 @@ class calibrator(object):
         """
         if args is None:
             args = self.args
-        
         self.software.fit(self.info, self.emu, self.x, self.y, args)
         return None
 
