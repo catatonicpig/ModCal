@@ -68,12 +68,12 @@ class emulator(object):
             raise ValueError('theta should have at least 2 more' +
                              'rows than columns.')
         
-        colnumnanf = np.sum(isnanf,0)
-        enoughvals = colnumnanf >= numthetamin
-        if np.any(colnumnanf):
+        colnumdone = np.sum(1-isnanf,0)
+        notenoughvals = (colnumdone < numthetamin)
+        if np.any(notenoughvals):
             print('Column(s) %s removed due to not enough completed values.'
-                  % np.array2string(np.where(enoughvals)[0]))
-            j = np.where(np.logical_not(enoughvals))[0]
+                  % np.array2string(np.where(notenoughvals)[0]))
+            j = np.where((colnumdone >= numthetamin))[0]
             f = f[:,j]
             x = x[j,:]
         
