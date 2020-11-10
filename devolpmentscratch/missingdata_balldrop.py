@@ -121,6 +121,15 @@ cal_lin = calibrator(emu_lin, y, x, # need to build a calibrator
                                                                 # to the BDM software
 pred_lin = cal_lin.predict(xtot) # getting a prediction object
 
+
+thetaposs = np.vstack((emu_lin._emulator__theta,cal_lin.theta(20)))
+newtheta = emu_lin.supplement(10, theta=thetaposs)
+newtheta = emu_lin.supplement(10, theta=thetaposs, append=True)
+newtheta = emu_lin.supplement(10, theta=thetaposs, append=True)
+newtheta = emu_lin.supplement(10, theta=thetaposs, append=True)
+#emu_lin.supplement(100, cal_lin, append=True)
+
+asdas
 cal_grav = calibrator(emu_grav, y, x, # need to build a calibrator
                        thetaprior = priorphys_grav,
                        software = 'BDM',

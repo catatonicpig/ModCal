@@ -8,7 +8,7 @@ import copy
 class emulator(object):
     """A class used to represent an emulator or surrogate model."""
 
-    def __init__(self, theta, f, x, software='PCGP', args={}):
+    def __init__(self, theta, f, x, software='PCGP', args={}, options={}):
         r"""
         Intitalizes an emulator or surrogate.
 
@@ -35,6 +35,9 @@ class emulator(object):
             [software].fit(theta, f, x, args)
             or
             [software].predict(theta, args)
+        options : dict
+            Optional options dictionary containing options you would like emulation
+            to have.  This does not get passed to the software
 
         Returns
         -------
@@ -89,10 +92,11 @@ class emulator(object):
             raise ValueError('The columns in f must match' +
                              ' the rows in x')
         
-        self.theta = theta
-        self.f = f
-        self.x = x
-        self.args = args
+        self.__theta = copy.deepcopy(theta)
+        self.__f = copy.deepcopy(f)
+        self.__x = copy.deepcopy(x)
+        self._options = copy.deepcopy(options)
+        self._args = copy.deepcopy(args)
         try:
             self.software = importlib.import_module('base.emulationsubfuncs.' + software)
         except:
@@ -105,7 +109,7 @@ class emulator(object):
         if "predict" not in dir(self.software):
             raise ValueError('Function \"predict\" not found in module!')
         
-        self.info = {}
+        self._info = {}
         self.fit()
 
     def __repr__(self):
@@ -118,16 +122,15 @@ class emulator(object):
                    ' emu.predict(theta).  Run help(emu) for the document string.')
         return strrepr
     
-    
     def __call__(self, x=None):
-        return self.predict(x)
+        return self.predict(self.__theta, x)
 
     def fit(self, args= None):
         r"""
         Fits an emulator or surrogate.
         
         Calls
-        emu.info = [software].fit(emu.theta, emu.f, emu.x, args = args)
+        emu._info = [software].fit(emu.theta, emu.f, emu.x, args = args)
 
         Parameters
         ----------
@@ -147,13 +150,13 @@ class emulator(object):
 
         Returns
         -------
-        emu.info : dict
+        emu._info : dict
             An arbitrary dictionary that can be used with [software].pred
         """
         if args is None:
-            args = self.args
-        self.software.fit(self.info, copy.deepcopy(self.theta), copy.deepcopy(self.f), 
-                                      copy.deepcopy(self.x), args = args)
+            args = self._args
+        self.software.fit(self._info, copy.deepcopy(self.__theta), copy.deepcopy(self.__f), 
+                                      copy.deepcopy(self.__x), args = args)
 
 
     def predict(self, theta, x=None, args=None):
@@ -177,34 +180,181 @@ class emulator(object):
         Returns
         -------
         prediction : an instance of emulation class prediction
-            prediction.info : Gives the dictionary of what was produced by the software.
+            prediction._info : Gives the dictionary of what was produced by the software.
         """
         if args is None:
-            args = self.args
+            args = self._args
         if theta.ndim < 1.5:
             theta = theta.reshape([-1, theta.shape[0]])
-        if theta[0].shape[0] is not self.theta[0].shape[0]:
+        if theta[0].shape[0] is not self.__theta[0].shape[0]:
             raise ValueError('The new parameters do not match old parameters.')
             
         if x is None:
-            x = copy.deepcopy(self.x)
+            x = copy.deepcopy(self.__x)
         else:
-            if x[0].shape[0] is not self.x[0].shape[0]:
+            if x[0].shape[0] is not self.__x[0].shape[0]:
                 raise ValueError('The new inputs do not match old inputs.')
-        info = {}
-        self.software.predict(info, self.info, copy.deepcopy(theta),
+        _info = {}
+        self.software.predict(_info, self._info, copy.deepcopy(theta),
                               copy.deepcopy(x), args)
-        return prediction(info, self)
+        return prediction(_info, self)
+    
+    def supplement(self, n, cal=None, theta=None, args=None, append=False):
+        r"""
+        Chooses a new theta to be investigated.
+        
+        It can either come from the software or is automatted to use fit and
+        predict from the software to complete the operation.
 
+        Parameters
+        ----------
+        n : option array of float
+            The number of thetas you would like to use
+        theta : optional array of float
+            An array of parameters where you would like to predict
+        cal : optional calibrator object
+            A calibrator object that contains information about calibration.
+        args : optional dict
+            A dictionary containing options you would like to pass to
+            [software].selecttheta(theta, phi, args). 
+            Defaults to the one used to build emu.
+        append : optional dict
+            Do you want to append emu.__supptheta?  If append is False, 
+            emu.__supptheta is replaced.
 
+        Returns
+        -------
+        theta : at most n new values of parameters to include
+        """
+        
+        allowreps = False
+        if 'reps' in self.__options.keys():
+            allowreps = self.__options.keys('reps')
+                
+        if args is None:
+            args = self._args
+        if n < 0.5:
+            raise ValueError('The number of new parameters must be a positive integer.')
+        if cal is None and theta is None:
+            raise ValueError('Either a calibrator or thetas must be provided.')
+        if cal is not None:
+            try:
+                thetadraw = cal.theta(np.minimum(10*n,np.maximum(1000, 2*n)))
+            except:
+                raise ValueError('cal.theta(1000) failed.')
+        else:
+            if self.__theta.shape[1] != theta.shape[1]:
+                raise ValueError('theta has the wrong shape, it does not match emu.theta.')
+            if theta.shape[0] < n:
+                raise ValueError('you want to predict at less than n values,' + 
+                                 'just run them you silly goose')
+            if theta.shape[0] > 10000:
+                print('To stop memory issues, supply less than 10000 thetas...')
+            thetadraw = theta[:10000,:]
+        supptheta = copy.deepcopy(thetadraw)
+        if append and self.__supptheta is not None:
+            cutoff = (10 ** (-8)) * np.std(np.vstack((self.__theta,
+                                                      self.__supptheta,
+                                                      supptheta)),0)
+            if not allowreps:
+                MAT = np.array(np.all(np.abs(self.__supptheta[:,None,:]-
+                                       supptheta[None,:,:]) / cutoff < 1,axis=-1).nonzero()).T
+                keepinds = set(range(0,supptheta.shape[0])) - set(np.unique(MAT[:,1]))
+            else:
+                keepinds = set(range(0,supptheta.shape[0]))
+            if len(keepinds) < 0.5:
+                print('Was not able to assign any new values because everything ' +
+                      'was a replication of emu.__supptheta.')
+                return self.supptheta
+            elif len(keepinds) < supptheta.shape[0]:
+                print('Had to remove replications versus previous emu.__supptheta.')
+                supptheta = supptheta[np.array(list(keepinds)),:]
+        else:
+            cutoff = (10 ** (-8)) * np.std(np.vstack((self.__theta,
+                                                      supptheta)),0)
+        if not allowreps:
+            MAT = np.array(np.all(np.abs(self.__theta[:,None,:]-
+                                   supptheta[None,:,:]) / cutoff < 1,axis=-1).nonzero()).T
+            keepinds = set(range(0,supptheta.shape[0])) - set(np.unique(MAT[:,1]))
+        else:
+            keepinds = set(range(0,supptheta.shape[0]))
+        if len(keepinds) < 0.5:
+            print('Was not able to assign any new values because everything ' +
+                  'was a replication of emu.__theta.')
+            if not append:
+                self.__supptheta = None
+        else:
+            if len(keepinds) < supptheta.shape[0]:
+                print('Had to remove replications versus emu.__theta.')
+                supptheta = supptheta[np.array(list(keepinds)),:]
+            if append:
+                self.__supptheta = np.vstack((self.__supptheta,supptheta[:n,:]))
+            else:
+                self.__supptheta = supptheta[:n,:]
+        return copy.deepcopy(self.__supptheta)
+    
+    def update(self, f, theta=None, x=None, args=None, options=None):
+        r"""
+        Chooses a new theta to be investigated.
+        
+        It can either come from the software or is automatted to use fit and
+        predict from the software to complete the operation.
+
+        Parameters
+        ----------
+        f : new f values
+            A 2d array of responses at (theta, emu.__supptheta and/or emu.__theta)
+            and (x, emu.__x).
+        theta : optional array of float
+            thetas you would like to append. Defaults to emu.__supptheta.
+            Will attempt to resolve if using all theta and supptheta.
+        x : optional array of float
+            xs you would like to append. Defaults to emu.__x.
+            Will attempt to resolve if using all x and emu.__x.
+        args : optional dict
+            A dictionary containing options you would like to pass to
+            [software].update(f,theta,x,args). 
+            Defaults to the one used to build emu.
+        options : optional dict
+            A dictionary containing options you would like to keep around
+            to build the emulator.  Modify with update when you want to change
+            it.
+
+        Returns
+        -------
+        """
+        f = copy.deepcopy(f)
+        if args is not None:
+            self._args = copy.deepcopy(args)        
+        if options is not None:
+            self.options = copy.deepcopy(options)
+        
+        if f.shape[1] == self.__f.shape[1]:
+            if theta is None:
+                if self.__supptheta is not None:
+                    if f.shape[0] == self.__supptheta.shape[0]:
+                        self.__theta = np.vstack((self.__theta, self.__supptheta))
+                        self.__f = np.vstack((self.__f,f))
+                        self.__supptheta = None
+                elif f.shape[0] == self.__theta.shape[0]:
+                    self.__f = f
+                else:
+                    raise ValueError('Could not resolve absense of theta,' +
+                                     'please provide theta')
+            else:
+                if np.array_equal(theta, self.__supptheta):
+                    self.__f = np.vstack((self.__f,f))
+                if np.arrayequal
+        return
+        
 class prediction(object):
     r"""
     A class to represent an emulation prediction.  
-    predict.info will give the dictionary from the software.
+    predict._info will give the dictionary from the software.
     """
 
-    def __init__(self, info, emu):
-        self.info = info
+    def __init__(self, _info, emu):
+        self._info = _info
         self.emu = emu
 
     def __repr__(self):
@@ -230,9 +380,9 @@ class prediction(object):
     def __softwarenotfoundstr(self, pfstr, opstr):
         print(pfstr + opstr + ' functionality not in software... \n' +
               ' Key labeled ' + opstr + ' not ' +
-              'provided in ' + pfstr + '.info... \n' +
+              'provided in ' + pfstr + '._info... \n' +
               ' Key labeled rnd not ' +
-              'provided in ' + pfstr + '.info...')
+              'provided in ' + pfstr + '._info...')
         return 'Could not reconsile a good way to compute this value in current software.'
 
     def mean(self, args = None):
@@ -244,11 +394,11 @@ class prediction(object):
         if (pfstr + opstr) in dir(self.emu.software):
             if args is None:
                 args = self.emu.args
-            return copy.deepcopy(self.emu.software.predictmean(self.info, args))
-        elif opstr in self.info.keys():
-            return self.info[opstr]
-        elif 'rnd' in self.info.keys():
-            return copy.deepcopy(np.mean(self.info['rnd'], 0))
+            return copy.deepcopy(self.emu.software.predictmean(self._info, args))
+        elif opstr in self._info.keys():
+            return self._info[opstr]
+        elif 'rnd' in self._info.keys():
+            return copy.deepcopy(np.mean(self._info['rnd'], 0))
         else:
             raise ValueError(self.__softwarenotfoundstr(pfstr, opstr))
 
@@ -261,11 +411,11 @@ class prediction(object):
         if (pfstr + opstr) in dir(self.emu.software):
             if args is None:
                 args = self.emu.args
-            return copy.deepcopy(self.emu.software.predictvar(self.info, args))
-        elif opstr in self.info.keys():
-            return copy.deepcopy(self.info[opstr])
-        elif 'rnd' in self.info.keys():
-            return copy.deepcopy(np.var(self.info['rnd'], 0))
+            return copy.deepcopy(self.emu.software.predictvar(self._info, args))
+        elif opstr in self._info.keys():
+            return copy.deepcopy(self._info[opstr])
+        elif 'rnd' in self._info.keys():
+            return copy.deepcopy(np.var(self._info['rnd'], 0))
         else:
             raise ValueError(self.__softwarenotfoundstr(pfstr, opstr))
 
@@ -278,20 +428,20 @@ class prediction(object):
         if (pfstr + opstr) in dir(self.emu.software):
             if args is None:
                 args = self.emu.args
-            return copy.deepcopy(self.emu.software.predictcov(self.info, args))
-        elif opstr in self.info.keys():
-            return copy.deepcopy(self.info[opstr])
-        elif 'covhalf' in self.info.keys():
-            if self.info['covhalf'].ndim == 2:
-                return self.info['covhalf'].T @ self.info['covhalf']
+            return copy.deepcopy(self.emu.software.predictcov(self._info, args))
+        elif opstr in self._info.keys():
+            return copy.deepcopy(self._info[opstr])
+        elif 'covhalf' in self._info.keys():
+            if self._info['covhalf'].ndim == 2:
+                return self._info['covhalf'].T @ self._info['covhalf']
             else:
-                am = self.info['covhalf'].shape
+                am = self._info['covhalf'].shape
                 cov = np.ones((am[0],am[2],am[2]))
-                for k in range(0, self.info['covhalf'].shape[0]):
-                    A = self.info['covhalf'][k]
+                for k in range(0, self._info['covhalf'].shape[0]):
+                    A = self._info['covhalf'][k]
                     cov[k,:,:] = A.T @ A
-            self.info['cov'] = cov
-            return copy.deepcopy(self.info[opstr])
+            self._info['cov'] = cov
+            return copy.deepcopy(self._info[opstr])
         else:
             raise ValueError(self.__softwarenotfoundstr(pfstr, opstr))
 
@@ -305,20 +455,20 @@ class prediction(object):
         if (pfstr + opstr) in dir(self.emu.software):
             if args is None:
                 args = self.emu.args
-            return copy.deepcopy(self.emu.software.predictcov(self.info, args))
-        elif opstr in self.info.keys():
-            return copy.deepcopy(self.info[opstr])
-        elif 'cov' in self.info.keys():
-            covhalf = np.ones(self.info['cov'].shape)
-            if self.info['cov'].ndim == 2:
-                W, V = np.linalg.eigh(self.info['cov'])
+            return copy.deepcopy(self.emu.software.predictcov(self._info, args))
+        elif opstr in self._info.keys():
+            return copy.deepcopy(self._info[opstr])
+        elif 'cov' in self._info.keys():
+            covhalf = np.ones(self._info['cov'].shape)
+            if self._info['cov'].ndim == 2:
+                W, V = np.linalg.eigh(self._info['cov'])
                 covhalf = (V @ (np.sqrt(np.abs(W)) * V.T))
             else:
-                for k in range(0, self.info['cov'].shape[0]):
-                    W, V = np.linalg.eigh(self.info['cov'][k])
+                for k in range(0, self._info['cov'].shape[0]):
+                    W, V = np.linalg.eigh(self._info['cov'][k])
                     covhalf[k,:,:] = (V @ (np.sqrt(np.abs(W)) * V.T))
-            self.info['covhalf'] = covhalf
-            return copy.deepcopy(self.info[opstr])
+            self._info['covhalf'] = covhalf
+            return copy.deepcopy(self._info[opstr])
         else:
             raise ValueError(self.__softwarenotfoundstr(pfstr, opstr))
 
