@@ -23,15 +23,16 @@ import copy
 """
 def fit(fitinfo, theta, f, x, args=None):
     r"""
-    Fits a calibration model.
+    Fits a emulation model.
 
     Parameters
     ----------
     fitinfo : dict
         An arbitary dictionary where you should place all of your fitting information once complete.
         This dictionary is pass by reference, so there is no reason to return anything. Keep
-        only stuff that will be used by predict below. 
-        theta : array of float
+        only stuff that will be used by predict below.  Note that if you want to leverage speedy,
+        updates fitinfo will contain the previous fitinfo!  So use that information to accelerate 
+        anything you wany, keeping in mind that the user might have changed theta, f, and x.
     theta :  An n-by-d matrix of parameters. n should be at least 2 times m. Each row in theta should
         correspond to a row in f.
     f : array of float

@@ -436,7 +436,7 @@ class emulator(object):
         if 'rmnan' not in self.__options.keys():
             self.__options['rmnan'] = 'all'
         if 'minsampsize' not in self.__options.keys():
-            self.__options['minsampsize'] = 20
+            self.__options['minsampsize'] = 10
 
     def __preprocess(self):
         theta = copy.copy(self.__theta)

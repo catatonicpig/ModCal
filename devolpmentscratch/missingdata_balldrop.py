@@ -46,7 +46,7 @@ xtot[xtot[:,1] == 50, 1] = 'highdrop'
 # this should include those important to the study AND the data
 
 # we now create a computer experiment to build an emulator
-thetacompexp_lin = priorphys_lin.rnd(60)  # drawing 50 rndom parameters from the prior
+thetacompexp_lin = priorphys_lin.rnd(30)  # drawing 50 rndom parameters from the prior
 linear_results = balldropmodel_linear(thetacompexp_lin, xtotv)  # the value of the linear simulation
 linear_results[0] = np.float("inf")
 linear_results[2] = np.float("inf")
@@ -181,7 +181,6 @@ print(np.mean(np.mean(np.abs(pred2()-ftest),0)[3:]))
 print(np.mean(np.mean(np.abs(pred3()-ftest),0)[3:]))
 print(np.mean(np.mean(np.abs(pred4()-ftest),0)[3:]))
 print(np.mean(np.mean(np.abs(pred5()-ftest),0)[3:]))
-asdas
 
 cal_grav = calibrator(emu_grav, y, x, # need to build a calibrator
                        thetaprior = priorphys_grav,
@@ -191,6 +190,11 @@ cal_grav = calibrator(emu_grav, y, x, # need to build a calibrator
                                'phiprior': priorstatdisc_model}) # the arguments are being passed 
                                                                 # to the BDM software
 pred_grav = cal_grav.predict(xtot) # getting a prediction object
+
+thetaposs = np.vstack((emu_grav._emulator__theta,cal_grav.theta(100)))
+newtheta = emu_grav.supplement(50, theta=thetaposs)
+emu_grav.update(f = balldropmodel_grav(newtheta, xtotv))
+
 
 import matplotlib.pyplot as plt 
 from scipy.stats import kde
