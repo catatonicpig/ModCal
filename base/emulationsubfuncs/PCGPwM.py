@@ -194,14 +194,17 @@ def __standardizef(fitinfo):
         scale = np.maximum(scale, 10 ** (-12) * np.max(scale))
         for k in range(0, f.shape[1]):
             fs[:,k] = (f[:,k] - offset[k]) / scale[k]
-            fs[np.where(mof[:, k])[0], k] = (offset[k] / scale[k])
-        
+            if np.sum(mof[:,k]) > 0:
+                a = np.empty((np.sum(mof[:,k]),))
+                a[::2] = 1
+                a[1::2] = -1
+                fs[np.where(mof[:, k])[0], k] = 0.25*a
         for iters in range(0,20):
             U, S, _ = np.linalg.svd(fs.T, full_matrices=False)
-            epsilon = np.minimum(10 ** (-8), 0.9 * (S[1] ** 2))
+            epsilon = 10 ** (-8)
             Sp = S ** 2 - epsilon
-            Up = U[:, Sp > 1.1*epsilon]
-            Sp = Sp[Sp > 1.1*epsilon]
+            Up = U[:, Sp > 0]
+            Sp = np.sqrt(Sp[Sp > 0])
             for j in range(0,mofrows.shape[0]):
                 rv = mofrows[j]
                 wheremof = np.where(mof[rv,:] > 0.5)[0]
@@ -211,7 +214,6 @@ def __standardizef(fitinfo):
                 J = Up[wherenotmof,:].T @ fs[rv,wherenotmof]
                 fs[rv,wheremof] = (Up[wheremof,:] * ((Sp / np.sqrt(epsilon)) ** 2)) @ (J -\
                     H @ (np.linalg.solve(Amat, J)))
-    
     # Assigning new values to the dictionary
     fitinfo['offset'] = offset
     fitinfo['scale'] = scale
@@ -227,25 +229,23 @@ def __PCs(fitinfo):
     mof = fitinfo['mof']
     mofrows = fitinfo['mofrows']
     theta = fitinfo['theta']
-    
     U, S, _ = np.linalg.svd(fs.T, full_matrices=False)
-    epsilon = np.minimum(10 ** (-8), 0.9 * (S[1] ** 2))
+    epsilon = 10 ** (-4)
     Sp = S ** 2 - epsilon
-    pct = U[:, Sp > 1.1*epsilon]
-    pcw = np.sqrt(Sp[Sp > 1.1*epsilon])
+    pct = U[:, Sp > epsilon]
+    pcw = np.sqrt(Sp[Sp > epsilon])
     pc = np.zeros((f.shape[0],pct.shape[1]))
     pc = fs @ pct
     pcstdvar = np.zeros((f.shape[0],pct.shape[1]))
     if mof is not None:
         for j in range(0,mofrows.shape[0]):
             rv = mofrows[j]
-            wheremof = np.where(mof[rv,:] > 0.5)[0]
             wherenotmof = np.where(mof[rv,:] < 0.5)[0]
             H = pct[wherenotmof,:].T @ pct[wherenotmof,:]
             Amat =  np.diag(epsilon / (pcw ** 2)) + H
             J = pct[wherenotmof,:].T @ fs[rv,wherenotmof]
             pc[rv,:] = (pcw ** 2 /epsilon + 1) * (J - H @ np.linalg.solve(Amat, J))
-            pcstdvar[rv, :] = np.abs((np.diag(H) -  np.sum(H * np.linalg.solve(Amat, H.T),0)) *\
+            pcstdvar[rv, :] = 1-np.abs((np.diag(H) -  np.sum(H * np.linalg.solve(Amat, H.T),0)) *\
                 (pcw ** 2 / epsilon + 1))
     fitinfo['pcw'] = pc
     fitinfo['pct'] = pct
@@ -259,13 +259,16 @@ def __fitGP1d(theta, g, gvar=None, hypstarts=None, hypinds=None):
     subinfo = {}
     subinfo['hypregmean'] = np.append(0.5 + np.log(np.std(theta, 0)), (0, -10))
     subinfo['hypregLB'] = np.append(-1 + np.log(np.std(theta, 0)), (-10, -20))
-    subinfo['hypregUB'] = np.append(3 + np.log(np.std(theta, 0)), (1, -4))
+    subinfo['hypregUB'] = np.append(3 + np.log(np.std(theta, 0)), (1, -1))
     subinfo['hypregstd'] = (subinfo['hypregUB'] - subinfo['hypregLB']) / 3
     subinfo['hypregstd'][-2] = 2
     subinfo['hypregstd'][-1] = 0.5
     subinfo['hyp'] = 1*subinfo['hypregmean']
-    nhyptrain = np.min((20*theta.shape[1], theta.shape[0]))
-    thetac = np.random.choice(theta.shape[0], nhyptrain, replace=False)
+    if theta.shape[0] > 100:
+        nhyptrain = np.max(np.min((20*theta.shape[1], theta.shape[0])))
+        thetac = np.random.choice(theta.shape[0], nhyptrain, replace=False)
+    else:
+        thetac = range(0,theta.shape[0])
     subinfo['theta'] = theta[thetac, :]
     subinfo['g'] = g[thetac]
     subinfo['gvar'] = gvar[thetac]
@@ -308,7 +311,6 @@ def __fitGP1d(theta, g, gvar=None, hypstarts=None, hypinds=None):
         fcenter = Vh.T @ g
         subinfo['sig2'] = np.mean(fcenter ** 2)
         subinfo['Rinv'] = V @ np.diag(1/W) @ V.T
-        Rinv = subinfo['Rinv']
     else:
         subinfo['hyp'] = opval.x[:]
         subinfo['hypind'] = -1
@@ -317,14 +319,13 @@ def __fitGP1d(theta, g, gvar=None, hypstarts=None, hypinds=None):
         R =  __covmat(theta, theta, subinfo['hypcov'])
         subinfo['R'] =  (1-subinfo['nug'])*R + subinfo['nug'] * np.eye(R.shape[0])
         if subinfo['gvar'] is not None:
-            R += np.diag(gvar)
-        W, V = np.linalg.eigh(R)
+            subinfo['R'] += np.diag(gvar)
+        W, V = np.linalg.eigh(subinfo['R'])
         Vh = V / np.sqrt(np.abs(W))
         fcenter = Vh.T @ g
         subinfo['sig2'] = np.mean(fcenter ** 2)
         subinfo['Rinv'] = V @ np.diag(1/W) @ V.T
-        Rinv = subinfo['Rinv']
-    subinfo['pw'] = Rinv @ g
+    subinfo['pw'] = subinfo['Rinv'] @ g
     return subinfo
 
 

@@ -37,48 +37,22 @@ class emulator(object):
             [software].predict(theta, args)
         options : dict
             Optional options dictionary containing options you would like emulation
-            to have.  This does not get passed to the software
+            to have.  This does not get passed to the software.  Some options are below:
+                
 
         Returns
         -------
         emu : instance of emulation class
             An instance of the emulation class that can be used with the functions listed below.
         """
+        self.__options = {}
+        self.__optionsset(options)
+        
         if f is None or theta is None:
             raise ValueError('You have no provided any theta and/or f.')
         
         if f.ndim < 0.5 or f.ndim > 2.5:
             raise ValueError('f must have either 1 or 2 demensions.')
-        
-        isinff = np.isinf(f)
-        if np.any(isinff):
-            print('All infs were converted to nans.')
-            f[isinff] = float("NaN")
-        
-        isnanf = np.isnan(f)
-        rowallnanf = np.all(isnanf,1)
-        if np.any(rowallnanf):
-            print('Row(s) %s removed due to nans.' % np.array2string(np.where(rowallnanf)[0]))
-            j = np.where(np.logical_not(rowallnanf))[0]
-            f = f[j,:]
-            theta = theta[j,:]
-        
-        numthetamin = 2 * theta.shape[1]
-        if theta.ndim < 0.5 or theta.ndim > 2.5:
-            raise ValueError('theta must have either 1 or 2 demensions.')
-        
-        if theta.shape[0] < numthetamin:
-            raise ValueError('theta should have at least 2 more' +
-                             'rows than columns.')
-        
-        colnumdone = np.sum(1-isnanf,0)
-        notenoughvals = (colnumdone < numthetamin)
-        if np.any(notenoughvals):
-            print('Column(s) %s removed due to not enough completed values.'
-                  % np.array2string(np.where(notenoughvals)[0]))
-            j = np.where((colnumdone >= numthetamin))[0]
-            f = f[:,j]
-            x = x[j,:]
         
         if f.shape[0] is not theta.shape[0]:
             raise ValueError('The rows in f must match' +
@@ -92,7 +66,15 @@ class emulator(object):
             raise ValueError('The columns in f must match' +
                              ' the rows in x')
         
+        if theta.ndim < 0.5 or theta.ndim > 2.5:
+            raise ValueError('theta must have either 1 or 2 demensions.')
+        
+        if theta.shape[0] < self.__options['minsampsize']:
+            raise ValueError('theta should have at minsampsize' +
+                             'rows.  change this in options if you do not like it.')
+            
         self.__theta = copy.deepcopy(theta)
+        self.__supptheta = None
         self.__f = copy.deepcopy(f)
         self.__x = copy.deepcopy(x)
         self._options = copy.deepcopy(options)
@@ -122,8 +104,12 @@ class emulator(object):
                    ' emu.predict(theta).  Run help(emu) for the document string.')
         return strrepr
     
-    def __call__(self, x=None):
-        return self.predict(self.__theta, x)
+    def __call__(self, theta=None, x=None):
+        if theta is None:
+            theta = self.__theta
+        if x is None:
+            x = self.__x
+        return self.predict(theta, x)
 
     def fit(self, args= None):
         r"""
@@ -155,8 +141,8 @@ class emulator(object):
         """
         if args is None:
             args = self._args
-        self.software.fit(self._info, copy.deepcopy(self.__theta), copy.deepcopy(self.__f), 
-                                      copy.deepcopy(self.__x), args = args)
+        theta, f, x = self.__preprocess()
+        self.software.fit(self._info, theta, f, x, args = args)
 
 
     def predict(self, theta, x=None, args=None):
@@ -188,7 +174,6 @@ class emulator(object):
             theta = theta.reshape([-1, theta.shape[0]])
         if theta[0].shape[0] is not self.__theta[0].shape[0]:
             raise ValueError('The new parameters do not match old parameters.')
-            
         if x is None:
             x = copy.deepcopy(self.__x)
         else:
@@ -196,7 +181,7 @@ class emulator(object):
                 raise ValueError('The new inputs do not match old inputs.')
         _info = {}
         self.software.predict(_info, self._info, copy.deepcopy(theta),
-                              copy.deepcopy(x), args)
+                              copy.deepcopy(x), copy.deepcopy(args))
         return prediction(_info, self)
     
     def supplement(self, n, cal=None, theta=None, args=None, append=False):
@@ -227,14 +212,15 @@ class emulator(object):
         theta : at most n new values of parameters to include
         """
         
-        allowreps = False
         if 'reps' in self.__options.keys():
-            allowreps = self.__options.keys('reps')
-                
+            allowreps = self.__options['reps']
         if args is None:
             args = self._args
         if n < 0.5:
-            raise ValueError('The number of new parameters must be a positive integer.')
+            if n == 0:
+                return copy.deepcopy(self.__supptheta)
+            else:
+                raise ValueError('The number of new parameters must be a positive integer.')
         if cal is None and theta is None:
             raise ValueError('Either a calibrator or thetas must be provided.')
         if cal is not None:
@@ -252,48 +238,40 @@ class emulator(object):
                 print('To stop memory issues, supply less than 10000 thetas...')
             thetadraw = theta[:10000,:]
         supptheta = copy.deepcopy(thetadraw)
+        if not allowreps:
+            supptheta = np.unique(supptheta, axis=0)
         if append and self.__supptheta is not None:
-            cutoff = (10 ** (-8)) * np.std(np.vstack((self.__theta,
-                                                      self.__supptheta,
-                                                      supptheta)),0)
             if not allowreps:
-                MAT = np.array(np.all(np.abs(self.__supptheta[:,None,:]-
-                                       supptheta[None,:,:]) / cutoff < 1,axis=-1).nonzero()).T
-                keepinds = set(range(0,supptheta.shape[0])) - set(np.unique(MAT[:,1]))
+                nc, c, r = _matrixmatching(self.__supptheta, supptheta)
             else:
-                keepinds = set(range(0,supptheta.shape[0]))
-            if len(keepinds) < 0.5:
+                nc = np.array(range(0,supptheta.shape[0])).astype('int')
+            if nc.shape[0] < 0.5:
                 print('Was not able to assign any new values because everything ' +
                       'was a replication of emu.__supptheta.')
                 return self.supptheta
-            elif len(keepinds) < supptheta.shape[0]:
+            elif nc.shape[0] < supptheta.shape[0]:
                 print('Had to remove replications versus previous emu.__supptheta.')
-                supptheta = supptheta[np.array(list(keepinds)),:]
-        else:
-            cutoff = (10 ** (-8)) * np.std(np.vstack((self.__theta,
-                                                      supptheta)),0)
+                supptheta = supptheta[nc,:]
         if not allowreps:
-            MAT = np.array(np.all(np.abs(self.__theta[:,None,:]-
-                                   supptheta[None,:,:]) / cutoff < 1,axis=-1).nonzero()).T
-            keepinds = set(range(0,supptheta.shape[0])) - set(np.unique(MAT[:,1]))
+            nc, c, r = _matrixmatching(self.__theta, supptheta)
         else:
-            keepinds = set(range(0,supptheta.shape[0]))
-        if len(keepinds) < 0.5:
+            nc = np.array(range(0,supptheta.shape[0])).astype('int')
+        if nc.shape[0] < 0.5:
             print('Was not able to assign any new values because everything ' +
                   'was a replication of emu.__theta.')
             if not append:
                 self.__supptheta = None
         else:
-            if len(keepinds) < supptheta.shape[0]:
+            if nc.shape[0] < supptheta.shape[0]:
                 print('Had to remove replications versus emu.__theta.')
-                supptheta = supptheta[np.array(list(keepinds)),:]
+                supptheta = supptheta[nc,:]
             if append:
                 self.__supptheta = np.vstack((self.__supptheta,supptheta[:n,:]))
             else:
                 self.__supptheta = supptheta[:n,:]
         return copy.deepcopy(self.__supptheta)
     
-    def update(self, f, theta=None, x=None, args=None, options=None):
+    def update(self,theta=None, f=None,  x=None, args=None, options=None):
         r"""
         Chooses a new theta to be investigated.
         
@@ -323,30 +301,181 @@ class emulator(object):
         Returns
         -------
         """
-        f = copy.deepcopy(f)
-        if args is not None:
-            self._args = copy.deepcopy(args)        
+        if theta is not None:
+            theta = copy.deepcopy(theta)
+        if f is not None:
+            f = copy.deepcopy(f)
+        if x is not None:
+            x = copy.deepcopy(x)
         if options is not None:
-            self.options = copy.deepcopy(options)
-        
-        if f.shape[1] == self.__f.shape[1]:
-            if theta is None:
+            self.__optionsset(copy.deepcopy(options))
+        if args is not None:
+            self._args = {**self._args, **copy.deepcopy(args)} #properly merge the arguments
+        if f is not None and theta is None and x is None:
+            if f.shape[1] == self.__f.shape[1]:
                 if self.__supptheta is not None:
                     if f.shape[0] == self.__supptheta.shape[0]:
                         self.__theta = np.vstack((self.__theta, self.__supptheta))
                         self.__f = np.vstack((self.__f,f))
                         self.__supptheta = None
+                    elif f.shape[0] == (self.__theta.shape[0] + self.__supptheta.shape[0]):
+                        self.__theta = np.vstack((self.__theta, self.__supptheta))
+                        self.__f = f
+                        self.__supptheta = None
+                    else:
+                        raise ValueError('Could not resolve absense of theta,' +
+                                     'please provide theta')
                 elif f.shape[0] == self.__theta.shape[0]:
                     self.__f = f
                 else:
                     raise ValueError('Could not resolve absense of theta,' +
                                      'please provide theta')
             else:
-                if np.array_equal(theta, self.__supptheta):
-                    self.__f = np.vstack((self.__f,f))
-                if np.arrayequal
-        return
+                raise ValueError('Could not resolve absense of x,' +
+                                 'please provide x')
+        if (x is not None) and (f is None):
+            if x.shape[0] != self.__f.shape[1]:
+                print('you have change the number of x, but not provided a new f...')
+            else:
+                self.__x = x
+        if (theta is not None) and (f is None):
+            if theta.shape[0] != self.__f.shape[0]:
+                print('you have change the number of theta, but not provided a new f...')
+            else:
+                self.__theta = theta
         
+        if (f is not None) and (theta is not None) and (x is None):
+            if theta.shape[0] != f.shape[0]:
+                raise ValueError('number of rows between theta and f does not align.')
+            if theta.shape[1] != self.__theta.shape[1]:
+                raise ValueError('theta shape does not match old one,'
+                                 + ' use emu.update(theta = theta) to update it first if' + 
+                                 ' you changed your parameterization.')
+            if f.shape[1] != self.__f.shape[1]:
+                raise ValueError('Columns of f are different than those provided originally,' +
+                                 'please provide x to allow for alignment')
+            if self.__options['reps']:
+                    self.__theta = np.vstack((self.__theta, theta))
+                    self.__f = np.vstack((self.__f,f))
+            else:
+                nc, c, r = _matrixmatching(self.__theta, theta)
+                self.__f[r, :] = f[c,:]
+                if nc.shape[0] > 0.5:
+                    f = f[nc, :]
+                    theta = theta[nc, :]
+                    nc, c, r = _matrixmatching(self.__supptheta, theta)
+                    self.__f = np.vstack((self.__f, f[c,:]))
+                    self.__theta = np.vstack((self.__theta, theta[c,:]))
+                    self.__supptheta = np.delete(self.__supptheta, r, axis = 0)
+                if nc.shape[0] > 0.5:
+                    f = f[nc, :]
+                    theta = theta[nc, :]
+                    self.__f = np.vstack(self.__f,f[c,:])
+                    self.__theta = np.vstack(self.__f,theta[c,:])
+        
+        if (f is not None) and (theta is None) and (x is not None):
+            if x.shape[0] != f.shape[1]:
+                raise ValueError('number of columns in f and rows in x does not align.')
+            if x.shape[1] != self.__x.shape[1]:
+                raise ValueError('x shape does not match old one,'
+                                 + ' use emu.update(x = x) to update it first if' + 
+                                 ' you changed your description of x.')
+            if f.shape[0] != self.__f.shape[0]:
+                raise ValueError('Rows of f are different than those provided originally,' +
+                                 'please provide theta to allow for alignment')
+            if options['reps']:
+                self.__x = np.vstack((self.__x, x))
+                self.__f = np.hstack((self.__f,f))
+            else:
+                nc, c, r = _matrixmatching(self.__x, x)
+                self.__f[:, r] = f[:, c]
+                if nc.shape[0] > 0.5:
+                    self.__f = np.hstack(self.__f, f[c,:])
+        
+        if (f is not None) and (theta is not None) and (x is not None):
+                raise ValueError('Simultaneously adding new theta and x at once is currently'+
+                                 'not supported.  Please supply either theta OR x.')
+        
+        self.fit()
+        return
+    
+    
+    def __optionsset(self, options=None):
+        options = copy.deepcopy(options)
+        options =  {k.lower(): v for k, v in options.items()} #options will always be lowercase
+        
+        if 'reps' in options.keys():
+            if type(options['reps']) is bool:
+                self.__options['reps'] = options['reps']
+            else:
+                raise ValueError('option reps must be true or false')
+        
+        if 'rmnan' in options.keys():
+            if type(options['rmnan']) is bool:
+                if options['rmnan']:
+                    self.__options['rmnan'] = 'all'
+                else:
+                    self.__options['rmnan'] = 'never'
+            elif options['rmnan'] is str and (options['rmnan']=='any' or 
+                                              options['rmnan']=='all' or
+                                              options['rmnan']=='never'):
+                self.__options['rmnan'] = options['rmnan']
+            else:
+                raise ValueError('option rmnan must be True, False, ''all'', ''any'', ''never''')
+        
+        if 'minsampsize' in options.keys():
+            if type(options['minsampsize']) is int and options['minsampsize'] > -0.5:
+                self.__options['minsampsize'] = options['minsampsize']
+            elif type(options['minsampsize']) is False:
+                self.__options['rmnan'] = options['rmnan']
+            else:
+                raise ValueError('option minsampsize must be False or postitive integer.')
+        
+        if 'reps' not in self.__options.keys():
+            self.__options['reps'] = False
+        if 'rmnan' not in self.__options.keys():
+            self.__options['rmnan'] = 'all'
+        if 'minsampsize' not in self.__options.keys():
+            self.__options['minsampsize'] = 20
+
+    def __preprocess(self):
+        theta = copy.copy(self.__theta)
+        f = copy.copy(self.__f)
+        x = copy.copy(self.__x)
+        options = self.__options
+        
+        
+        isinff = np.isinf(f)
+        if np.any(isinff):
+            print('All infs were converted to nans.')
+            f[isinff] = float("NaN")
+        
+        isnanf = np.isnan(f)
+        if options['rmnan'] == 'all':
+            rownanf = np.all(isnanf,1)
+        if options['rmnan'] == 'any':
+            rownanf = np.any(isnanf,1)
+        if options['rmnan'] != 'never' and np.any(rownanf):
+            print('Row(s) %s removed due to nans.' % np.array2string(np.where(rownanf)[0]))
+            j = np.where(np.logical_not(rownanf))[0]
+            f = f[j,:]
+            theta = theta[j,:]
+        
+        if options['minsampsize'] < 2 * theta.shape[1] and options['minsampsize'] == 10:
+            options['minsampsize'] = 2 * theta.shape[1]
+        
+        colnumdone = np.sum(1-isnanf,0)
+        notenoughvals = (colnumdone < options['minsampsize'])
+        if np.any(notenoughvals):
+            print('Column(s) %s removed due to not enough completed values.'
+                  % np.array2string(np.where(notenoughvals)[0]))
+            j = np.where(np.logical_not(notenoughvals))[0]
+            f = f[:,j]
+            x = x[j,:]
+        return theta, f, x
+
+
+
 class prediction(object):
     r"""
     A class to represent an emulation prediction.  
@@ -483,3 +612,33 @@ class prediction(object):
         Returns a log pdf at theta and x 
         """
         raise ValueError('lpdf functionality not in software')
+
+#### Below are some functions that I found useful.
+
+def _matrixmatching(mat1, mat2):
+    #This is an internal function to do matching between two vectors
+    #it just came up alot
+    #It returns the where each row of mat2 is first found in mat1
+    #If a row of mat2 is never found in mat1, then 'nan' is in that location
+    
+    
+    if (mat1.shape[0] > (10 ** (4))) or (mat2.shape[0] > (10 ** (4))):
+        raise ValueError('too many matchings attempted.  Don''t make the software work so hard!')
+    if mat1.ndim != mat2.ndim:
+        raise ValueError('Somehow sent non-matching information to _matrixmatching')
+    if mat1.ndim == 1:
+        matchingmatrix = np.isclose(mat1[:,None].astype('float'),
+                 mat2.astype('float'))
+    else:
+        matchingmatrix = np.isclose(mat1[:,0][:,None].astype('float'),
+                         mat2[:,0].astype('float'))
+        for k in range(1,mat2.shape[1]):
+            try:
+                matchingmatrix *= np.isclose(mat1[:,k][:,None].astype('float'),
+                         mat2[:,k].astype('float'))
+            except:
+                matchingmatrix *= np.equal(mat1[:,k],mat2[:,k])
+    r, c = np.where(matchingmatrix.cumsum(axis=0).cumsum(axis=0) == 1)
+    
+    nc = np.array(list(set(range(0,mat2.shape[0])) - set(c))).astype('int')
+    return nc, c, r

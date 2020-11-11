@@ -122,14 +122,67 @@ cal_lin = calibrator(emu_lin, y, x, # need to build a calibrator
 pred_lin = cal_lin.predict(xtot) # getting a prediction object
 
 
-thetaposs = np.vstack((emu_lin._emulator__theta,cal_lin.theta(20)))
-newtheta = emu_lin.supplement(10, theta=thetaposs)
-newtheta = emu_lin.supplement(10, theta=thetaposs, append=True)
-newtheta = emu_lin.supplement(10, theta=thetaposs, append=True)
-newtheta = emu_lin.supplement(10, theta=thetaposs, append=True)
-#emu_lin.supplement(100, cal_lin, append=True)
+thetaposs = np.vstack((emu_lin._emulator__theta,cal_lin.theta(100)))
 
+
+emu_lin2 = emulator(thetacompexp_lin, linear_results, xtot, software = 'PCGPwM')  # this builds an emulator 
+newtheta = emu_lin2.supplement(30, theta=thetaposs)
+newtheta = emu_lin2.supplement(30, theta=thetaposs, append=True)
+newf = balldropmodel_linear(newtheta, xtotv)
+emu_lin2.update(f = newf[:50,:], theta = newtheta[:50,:], options = {'reps': True, 'minsampsize': 10})
+
+
+
+emu_lin3 = emulator(thetacompexp_lin, linear_results, xtot, software = 'PCGPwM')  # this builds an emulator 
+newtheta = emu_lin3.supplement(50, theta=thetaposs)
+fnew = balldropmodel_linear(newtheta, xtotv)
+emu_lin3.update(f = fnew, options = {'minsampsize': 10})
+
+
+thetap = np.vstack((thetacompexp_lin,newtheta))
+fp = np.vstack((linear_results,fnew))
+emu_lin4 = emulator(thetap, fp, xtot, software = 'PCGPwM', options = {'minsampsize': 50})  # this builds an emulator 
+
+
+emu_lin5 = emulator(thetacompexp_lin, linear_results, xtot, software = 'PCGPwM')  # this builds an emulator 
+newtheta = emu_lin5.supplement(50, theta=thetaposs)
+fnew = balldropmodel_linear(newtheta, xtotv)
+emu_lin5.update(f = np.vstack((linear_results,fnew)), options = {'minsampsize': 10})
+
+pred1 = emu_lin(newtheta)
+pred2 = emu_lin2(newtheta)
+pred3 = emu_lin3(newtheta)
+pred4 = emu_lin4(newtheta)
+pred5 = emu_lin5(newtheta)
+
+ftest = balldropmodel_linear(newtheta, xtotv)
+print(np.nanmean(np.abs(pred1()-ftest)))
+print(np.nanmean(np.abs(pred2()-ftest)))
+print(np.nanmean(np.abs(pred3()-ftest)))
+print(np.nanmean(np.abs(pred4()-ftest)))
+print(np.nanmean(np.abs(pred5()-ftest)))
+
+thetatest = cal_lin.theta(100)
+pred1 = emu_lin(thetatest)
+pred2 = emu_lin2(thetatest)
+pred3 = emu_lin3(thetatest)
+pred4 = emu_lin4(thetatest)
+pred5 = emu_lin5(thetatest)
+
+ftest = balldropmodel_linear(thetatest, xtotv)
+print((np.mean(np.abs(pred1()-ftest),0)[2]))
+print((np.mean(np.abs(pred2()-ftest),0)[2]))
+print((np.mean(np.abs(pred3()-ftest),0)[2]))
+print((np.mean(np.abs(pred4()-ftest),0)[2]))
+print((np.mean(np.abs(pred5()-ftest),0)[2]))
+
+print(np.mean(np.mean(np.abs(pred1()-ftest),0)[3:]))
+print(np.mean(np.mean(np.abs(pred2()-ftest),0)[3:]))
+print(np.mean(np.mean(np.abs(pred3()-ftest),0)[3:]))
+print(np.mean(np.mean(np.abs(pred4()-ftest),0)[3:]))
+print(np.mean(np.mean(np.abs(pred5()-ftest),0)[3:]))
 asdas
+
 cal_grav = calibrator(emu_grav, y, x, # need to build a calibrator
                        thetaprior = priorphys_grav,
                        software = 'BDM',
