@@ -70,7 +70,7 @@ class emulator(object):
             raise ValueError('theta must have either 1 or 2 demensions.')
         
         if theta.shape[0] < self.__options['minsampsize']:
-            raise ValueError('theta should have at minsampsize' +
+            raise ValueError('theta should have at least minsampsize' +
                              'rows.  change this in options if you do not like it.')
             
         self.__theta = copy.deepcopy(theta)

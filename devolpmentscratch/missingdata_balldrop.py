@@ -134,14 +134,20 @@ emu_lin2.update(f = newf[:50,:], theta = newtheta[:50,:], options = {'reps': Tru
 
 
 emu_lin3 = emulator(thetacompexp_lin, linear_results, xtot, software = 'PCGPwM')  # this builds an emulator 
-newtheta = emu_lin3.supplement(50, theta=thetaposs)
+newtheta = emu_lin3.supplement(20, theta=thetaposs)
+fnew = balldropmodel_linear(newtheta, xtotv)
+emu_lin3.update(f = fnew, options = {'minsampsize': 10})
+newtheta = emu_lin3.supplement(20, theta=thetaposs)
+fnew = balldropmodel_linear(newtheta, xtotv)
+emu_lin3.update(f = fnew, options = {'minsampsize': 10})
+newtheta = emu_lin3.supplement(10, theta=thetaposs)
 fnew = balldropmodel_linear(newtheta, xtotv)
 emu_lin3.update(f = fnew, options = {'minsampsize': 10})
 
 
-thetap = np.vstack((thetacompexp_lin,newtheta))
+thetap = np.vstack((thetacompexp_lin, newtheta))
 fp = np.vstack((linear_results,fnew))
-emu_lin4 = emulator(thetap, fp, xtot, software = 'PCGPwM', options = {'minsampsize': 50})  # this builds an emulator 
+emu_lin4 = emulator(thetap, fp, xtot, software = 'PCGPwM', options = {'minsampsize': 20})  # this builds an emulator 
 
 
 emu_lin5 = emulator(thetacompexp_lin, linear_results, xtot, software = 'PCGPwM')  # this builds an emulator 
@@ -192,7 +198,9 @@ cal_grav = calibrator(emu_grav, y, x, # need to build a calibrator
 pred_grav = cal_grav.predict(xtot) # getting a prediction object
 
 thetaposs = np.vstack((emu_grav._emulator__theta,cal_grav.theta(100)))
-newtheta = emu_grav.supplement(50, theta=thetaposs)
+newtheta = emu_grav.supplement(20, theta=thetaposs)
+emu_grav.update(f = balldropmodel_grav(newtheta, xtotv))
+newtheta = emu_grav.supplement(10, theta=thetaposs)
 emu_grav.update(f = balldropmodel_grav(newtheta, xtotv))
 
 
