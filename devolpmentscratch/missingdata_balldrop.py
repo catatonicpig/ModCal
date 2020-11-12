@@ -19,20 +19,20 @@ from base.calibration import calibrator
 class priorphys_lin:
     """ This defines the class instance of priors provided to the software. """
     def lpdf(theta):
-        return np.squeeze(sps.norm.logpdf(theta[:, 0], 0, 5) +  # initial height deviation
-                          sps.gamma.logpdf(theta[:, 1], 2, 0, 10))   # terminal velocity
+        return np.squeeze(sps.norm.logpdf(theta[:, 0], 0, 20) +  # initial height deviation
+                          sps.gamma.logpdf(theta[:, 1], 0.5, 0, 20))   # terminal velocity
 
     def rnd(n):
-        return np.vstack((sps.norm.rvs(0, 5, size=n),  # initial height deviation
-                          sps.gamma.rvs(2, 0, 10, size=n))).T  # terminal velocity
+        return np.vstack((sps.norm.rvs(0, 20, size=n),  # initial height deviation
+                          sps.gamma.rvs(0.5, 0, 20, size=n))).T  # terminal velocity
 
 class priorphys_grav:
     """ This defines the class instance of priors provided to the software. """
     def lpdf(theta):
-        return np.squeeze(sps.gamma.logpdf(theta, 2, 0, 5))  # gravity
+        return np.squeeze(sps.gamma.logpdf(theta, 0.5, 0, 20))  # gravity
 
     def rnd(n):
-        return np.reshape(sps.gamma.rvs(2, 0, 5, size=n), (-1,1))  # gravity
+        return np.reshape(sps.gamma.rvs(0.5, 0, 20, size=n), (-1,1))  # gravity
 
 tvec = np.concatenate((np.arange(0.1, 4.3, 0.1),
                        np.arange(0.1, 4.3, 0.1)))  # the time vector of interest
@@ -46,18 +46,18 @@ xtot[xtot[:,1] == 50, 1] = 'highdrop'
 # this should include those important to the study AND the data
 
 # we now create a computer experiment to build an emulator
-thetacompexp_lin = priorphys_lin.rnd(30)  # drawing 50 rndom parameters from the prior
+thetacompexp_lin = priorphys_lin.rnd(20)  # drawing 50 rndom parameters from the prior
 linear_results = balldropmodel_linear(thetacompexp_lin, xtotv)  # the value of the linear simulation
 linear_results[0] = np.float("inf")
 linear_results[2] = np.float("inf")
 linear_results[:,2] = np.float("inf")
 linear_results[3,1] = np.float("inf")
-linear_results[5,:6] = np.float("inf")
+linear_results[5,-6:] = np.float("inf")
 # This is for all vectors in the input of interest
 emu_lin = emulator(thetacompexp_lin, linear_results, xtot, software = 'PCGPwM')  # this builds an emulator 
 # for the linear simulation. this is a specialized class specific to ModCal.
 
-thetacompexp_grav = priorphys_grav.rnd(20)  # drawing 50 rndom parameters from the prior
+thetacompexp_grav = priorphys_grav.rnd(12)  # drawing 50 rndom parameters from the prior
 grav_results = balldropmodel_grav(thetacompexp_grav, xtotv)  # the value of the gravity simulation
 emu_grav = emulator(thetacompexp_grav, grav_results, xtot, software = 'PCGPwM')  # this builds an
 # emulator for the gravity simulation. this is a specialized class specific to ModCal.
@@ -124,19 +124,12 @@ pred_lin = cal_lin.predict(xtot) # getting a prediction object
 
 thetaposs = np.vstack((emu_lin._emulator__theta,cal_lin.theta(100)))
 
-
-emu_lin2 = emulator(thetacompexp_lin, linear_results, xtot, software = 'PCGPwM')  # this builds an emulator 
-newtheta = emu_lin2.supplement(30, theta=thetaposs)
-newtheta = emu_lin2.supplement(30, theta=thetaposs, append=True)
-newf = balldropmodel_linear(newtheta, xtotv)
-emu_lin2.update(f = newf[:50,:], theta = newtheta[:50,:], options = {'reps': True, 'minsampsize': 10})
-
-
-
 emu_lin3 = emulator(thetacompexp_lin, linear_results, xtot, software = 'PCGPwM')  # this builds an emulator 
+mypred = emu_lin3.predict(thetaposs, emu_lin3._info['x'])
 newtheta = emu_lin3.supplement(20, theta=thetaposs)
 fnew = balldropmodel_linear(newtheta, xtotv)
 emu_lin3.update(f = fnew, options = {'minsampsize': 10})
+mypred = emu_lin3.predict(thetaposs, emu_lin3._info['x'])
 newtheta = emu_lin3.supplement(20, theta=thetaposs)
 fnew = balldropmodel_linear(newtheta, xtotv)
 emu_lin3.update(f = fnew, options = {'minsampsize': 10})
@@ -145,48 +138,23 @@ fnew = balldropmodel_linear(newtheta, xtotv)
 emu_lin3.update(f = fnew, options = {'minsampsize': 10})
 
 
-thetap = np.vstack((thetacompexp_lin, newtheta))
-fp = np.vstack((linear_results,fnew))
-emu_lin4 = emulator(thetap, fp, xtot, software = 'PCGPwM', options = {'minsampsize': 20})  # this builds an emulator 
-
-
-emu_lin5 = emulator(thetacompexp_lin, linear_results, xtot, software = 'PCGPwM')  # this builds an emulator 
-newtheta = emu_lin5.supplement(50, theta=thetaposs)
-fnew = balldropmodel_linear(newtheta, xtotv)
-emu_lin5.update(f = np.vstack((linear_results,fnew)), options = {'minsampsize': 10})
-
 pred1 = emu_lin(newtheta)
-pred2 = emu_lin2(newtheta)
 pred3 = emu_lin3(newtheta)
-pred4 = emu_lin4(newtheta)
-pred5 = emu_lin5(newtheta)
 
 ftest = balldropmodel_linear(newtheta, xtotv)
 print(np.nanmean(np.abs(pred1()-ftest)))
-print(np.nanmean(np.abs(pred2()-ftest)))
 print(np.nanmean(np.abs(pred3()-ftest)))
-print(np.nanmean(np.abs(pred4()-ftest)))
-print(np.nanmean(np.abs(pred5()-ftest)))
 
 thetatest = cal_lin.theta(100)
 pred1 = emu_lin(thetatest)
-pred2 = emu_lin2(thetatest)
 pred3 = emu_lin3(thetatest)
-pred4 = emu_lin4(thetatest)
-pred5 = emu_lin5(thetatest)
 
 ftest = balldropmodel_linear(thetatest, xtotv)
 print((np.mean(np.abs(pred1()-ftest),0)[2]))
-print((np.mean(np.abs(pred2()-ftest),0)[2]))
 print((np.mean(np.abs(pred3()-ftest),0)[2]))
-print((np.mean(np.abs(pred4()-ftest),0)[2]))
-print((np.mean(np.abs(pred5()-ftest),0)[2]))
-
 print(np.mean(np.mean(np.abs(pred1()-ftest),0)[3:]))
-print(np.mean(np.mean(np.abs(pred2()-ftest),0)[3:]))
 print(np.mean(np.mean(np.abs(pred3()-ftest),0)[3:]))
-print(np.mean(np.mean(np.abs(pred4()-ftest),0)[3:]))
-print(np.mean(np.mean(np.abs(pred5()-ftest),0)[3:]))
+
 
 cal_grav = calibrator(emu_grav, y, x, # need to build a calibrator
                        thetaprior = priorphys_grav,
@@ -198,7 +166,7 @@ cal_grav = calibrator(emu_grav, y, x, # need to build a calibrator
 pred_grav = cal_grav.predict(xtot) # getting a prediction object
 
 thetaposs = np.vstack((emu_grav._emulator__theta,cal_grav.theta(100)))
-newtheta = emu_grav.supplement(20, theta=thetaposs)
+newtheta = emu_grav.supplement(5, theta=thetaposs)
 emu_grav.update(f = balldropmodel_grav(newtheta, xtotv))
 newtheta = emu_grav.supplement(10, theta=thetaposs)
 emu_grav.update(f = balldropmodel_grav(newtheta, xtotv))

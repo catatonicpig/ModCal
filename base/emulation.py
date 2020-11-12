@@ -2,6 +2,7 @@
 """Header here."""
 import numpy as np
 import importlib
+import scipy.stats as sps
 import copy
 
 
@@ -240,9 +241,9 @@ class emulator(object):
         
         if 'supplement' not in dir(self.software):
             print('Using the default supplement function.')
-            supptheta = self.__defaultsupp(n, copy.deepcopy(thetadraw))
+            supptheta = copy.deepcopy(self.__defaultsupp(n, copy.deepcopy(thetadraw)))
         else:
-            supptheta = self.software.supplement(n, self._info, copy.deepcopy(thetadraw))
+            supptheta = copy.deepcopy(self.software.supplement(n, self._info, copy.deepcopy(thetadraw)))
         if append and self.__supptheta is not None:
             if not allowreps:
                 nc, c, r = _matrixmatching(self.__supptheta, supptheta)
@@ -262,20 +263,16 @@ class emulator(object):
         if nc.shape[0] < 0.5:
             print('Was not able to assign any new values because everything ' +
                   'was a replication of emu.__theta.')
-            print(self.__theta)
-            print(supptheta)
-            asdada
             if not append:
                 self.__supptheta = None
         else:
             if nc.shape[0] < supptheta.shape[0]:
                 print('Had to remove replications versus emu.__theta.')
                 supptheta = supptheta[nc,:]
-        
         if not append or self.__supptheta is None:
             self.__supptheta = supptheta
         else:
-            self.__supptheta = np.append(self.__supptheta, theta, 0)
+            self.__supptheta = np.append(self.__supptheta, supptheta, 0)
         
         return copy.deepcopy(self.__supptheta)
     
@@ -490,13 +487,12 @@ class emulator(object):
         pred = self.predict(supptheta, x)
         fstd = np.nanstd(f,0)
         fstd = np.maximum(fstd,10 ** (-10) * np.max(fstd))
-        scvar = np.nanmean(pred.var() / fstd,1)
+        scvar = np.mean(pred.var(),1)
         mval = pred.mean()
         orderedlist = np.arange(np.minimum(supptheta.shape[0], 2*n))
         fulllist = np.arange(supptheta.shape[0])
         infotemp = copy.deepcopy(self._info)
         suppthetatemp = copy.copy(supptheta)
-        
         val = np.zeros(2*n)
         for k in range(0, np.minimum(supptheta.shape[0], 2*n)):
             jstar = np.argmax(scvar)
@@ -511,21 +507,20 @@ class emulator(object):
                                   copy.deepcopy(x), self._args)
             pred = prediction(predinfo, self)
             mval = pred.mean()
-            scvar = np.nanmean(pred.var(),1)
-            print(scvar)
-            print(infotemp['theta'])
-            print(supptheta)
-            sadasd
+            H = pred.cov()[jstar]
+            #mval += H @  sps.norm.rvs(0,1,H.shape[1])
+            scvar = np.nanmean(pred.var() ,1)
             val[k] -= scvar[jstar]
+            if k > 0.5:
+                if val[k] > val[0] * 100:
+                    orderedlist = orderedlist[:(k-1)]
+                    break
             if not self.__options['reps']:
                 suppthetatemp = np.delete(suppthetatemp, jstar, axis = 0)
                 scvar = np.delete(scvar, jstar)
                 mval = np.delete(mval, jstar, axis = 0)
                 fulllist = np.delete(fulllist, jstar)
         supptheta = supptheta[orderedlist,:]
-        print(orderedlist)
-        print(val)
-        asdad
         return supptheta[:n,:]
 
 
