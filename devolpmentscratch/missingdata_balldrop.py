@@ -51,7 +51,7 @@ linear_results = balldropmodel_linear(thetacompexp_lin, xtotv)  # the value of t
 linear_results[0] = np.float("inf")
 linear_results[2] = np.float("inf")
 linear_results[:,2] = np.float("inf")
-linear_results[1,1] = np.float("inf")
+linear_results[3,1] = np.float("inf")
 linear_results[5,:6] = np.float("inf")
 # This is for all vectors in the input of interest
 emu_lin = emulator(thetacompexp_lin, linear_results, xtot, software = 'PCGPwM')  # this builds an emulator 

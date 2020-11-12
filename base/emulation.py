@@ -179,10 +179,10 @@ class emulator(object):
         else:
             if x[0].shape[0] is not self.__x[0].shape[0]:
                 raise ValueError('The new inputs do not match old inputs.')
-        _info = {}
-        self.software.predict(_info, self._info, copy.deepcopy(theta),
+        info = {}
+        self.software.predict(info, self._info, copy.deepcopy(theta),
                               copy.deepcopy(x), copy.deepcopy(args))
-        return prediction(_info, self)
+        return prediction(info, self)
     
     def supplement(self, n, cal=None, theta=None, args=None, append=False):
         r"""
@@ -237,9 +237,12 @@ class emulator(object):
             if theta.shape[0] > 10000:
                 print('To stop memory issues, supply less than 10000 thetas...')
             thetadraw = theta[:10000,:]
-        supptheta = copy.deepcopy(thetadraw)
-        if not allowreps:
-            supptheta = np.unique(supptheta, axis=0)
+        
+        if 'supplement' not in dir(self.software):
+            print('Using the default supplement function.')
+            supptheta = self.__defaultsupp(n, copy.deepcopy(thetadraw))
+        else:
+            supptheta = self.software.supplement(n, self._info, copy.deepcopy(thetadraw))
         if append and self.__supptheta is not None:
             if not allowreps:
                 nc, c, r = _matrixmatching(self.__supptheta, supptheta)
@@ -259,16 +262,21 @@ class emulator(object):
         if nc.shape[0] < 0.5:
             print('Was not able to assign any new values because everything ' +
                   'was a replication of emu.__theta.')
+            print(self.__theta)
+            print(supptheta)
+            asdada
             if not append:
                 self.__supptheta = None
         else:
             if nc.shape[0] < supptheta.shape[0]:
                 print('Had to remove replications versus emu.__theta.')
                 supptheta = supptheta[nc,:]
-            if append:
-                self.__supptheta = np.vstack((self.__supptheta,supptheta[:n,:]))
-            else:
-                self.__supptheta = supptheta[:n,:]
+        
+        if not append or self.__supptheta is None:
+            self.__supptheta = supptheta
+        else:
+            self.__supptheta = np.append(self.__supptheta, theta, 0)
+        
         return copy.deepcopy(self.__supptheta)
     
     def update(self,theta=None, f=None,  x=None, args=None, options=None):
@@ -473,6 +481,52 @@ class emulator(object):
             f = f[:,j]
             x = x[j,:]
         return theta, f, x
+    
+    def __defaultsupp(self, n, supptheta):
+        #if not self.__options['reps']:
+        #    supptheta = np.unique(supptheta, axis=0)
+        
+        theta, f, x = self.__preprocess()
+        pred = self.predict(supptheta, x)
+        fstd = np.nanstd(f,0)
+        fstd = np.maximum(fstd,10 ** (-10) * np.max(fstd))
+        scvar = np.nanmean(pred.var() / fstd,1)
+        mval = pred.mean()
+        orderedlist = np.arange(np.minimum(supptheta.shape[0], 2*n))
+        fulllist = np.arange(supptheta.shape[0])
+        infotemp = copy.deepcopy(self._info)
+        suppthetatemp = copy.copy(supptheta)
+        
+        val = np.zeros(2*n)
+        for k in range(0, np.minimum(supptheta.shape[0], 2*n)):
+            jstar = np.argmax(scvar)
+            orderedlist[k] = fulllist[jstar]
+            val[k] = scvar[jstar]
+            predinfo = {}
+            theta = np.vstack((theta,suppthetatemp[jstar,:]))
+            f = np.vstack((f,mval[jstar,:]))
+            self.software.fit(infotemp, theta, f, x, self._args)
+            predinfo = {}
+            self.software.predict(predinfo, infotemp, copy.deepcopy(suppthetatemp),
+                                  copy.deepcopy(x), self._args)
+            pred = prediction(predinfo, self)
+            mval = pred.mean()
+            scvar = np.nanmean(pred.var(),1)
+            print(scvar)
+            print(infotemp['theta'])
+            print(supptheta)
+            sadasd
+            val[k] -= scvar[jstar]
+            if not self.__options['reps']:
+                suppthetatemp = np.delete(suppthetatemp, jstar, axis = 0)
+                scvar = np.delete(scvar, jstar)
+                mval = np.delete(mval, jstar, axis = 0)
+                fulllist = np.delete(fulllist, jstar)
+        supptheta = supptheta[orderedlist,:]
+        print(orderedlist)
+        print(val)
+        asdad
+        return supptheta[:n,:]
 
 
 

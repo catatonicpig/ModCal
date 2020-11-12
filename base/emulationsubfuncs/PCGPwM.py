@@ -82,7 +82,6 @@ def fit(fitinfo, theta, f, x, args=None):
             whichhyp = emulist[pcanum]['hypind']
             __fitGP1d(theta, fitinfo['pc'][:, pcanum],
                                         fitinfo['pcstdvar'][:, pcanum], prevsubmodel = emulist[pcanum])
-            print('skipped re-optimization!')
         else:
             if pcanum > 0.5:
                 hypwhere = np.where(hypinds == np.array(range(0, numpcs)))[0]
@@ -164,7 +163,7 @@ def predict(predinfo, fitinfo, theta, x, args=None):
     predinfo['var'] = np.full((theta.shape[0], x.shape[0]),np.nan)
     predinfo['mean'][:,xnewind] = (predvecs @ fitinfo['pct'][xind,:].T)*fitinfo['scale'][xind] +\
         fitinfo['offset'][xind]
-    predinfo['var'][:,xnewind] = (fitinfo['extravar'][xind] + predvars @ (fitinfo['pct'][xind,:] ** 2).T) *\
+    predinfo['var'][:,xnewind] = (0*fitinfo['extravar'][xind] + predvars @ (fitinfo['pct'][xind,:] ** 2).T) *\
         (fitinfo['scale'][xind] ** 2)
     CH = (np.sqrt(np.abs(predvars))[:,:,np.newaxis] *
                              (fitinfo['pct'][xind,:].T)[np.newaxis,:,:])
@@ -201,11 +200,8 @@ def __standardizef(fitinfo, offset=None, scale=None):
     if (offset is not None) and (scale is not None):
         if offset.shape[0] == f.shape[1] and scale.shape[0] == f.shape[1]:
             if np.any(np.nanmean(np.abs(f-offset)/scale,1) > 4):
-                print(np.nanmean(np.abs(f-offset)/scale))
                 offset = None
                 scale = None
-            else:
-                print('skipped standarization!')
         else:
             offset = None
             scale = None
@@ -269,7 +265,6 @@ def __PCs(fitinfo, pct=None, pcw=None, extravar=None):
                 pcw = None
                 extravar = None
             else:
-                print('Skipped PCA!')
                 PCAskip = True
         else:
             pct = None
@@ -308,7 +303,7 @@ def __fitGP1d(theta, g, gvar=None, hypstarts=None, hypinds=None,prevsubmodel=Non
         subinfo = {}
         subinfo['hypregmean'] = np.append(0.5 + np.log(np.std(theta, 0)), (0, -10))
         subinfo['hypregLB'] = np.append(-1 + np.log(np.std(theta, 0)), (-10, -20))
-        subinfo['hypregUB'] = np.append(3 + np.log(np.std(theta, 0)), (1, -1))
+        subinfo['hypregUB'] = np.append(3 + np.log(np.std(theta, 0)), (1, 0))
         subinfo['hypregstd'] = (subinfo['hypregUB'] - subinfo['hypregLB']) / 3
         subinfo['hypregstd'][-2] = 2
         subinfo['hypregstd'][-1] = 0.5
