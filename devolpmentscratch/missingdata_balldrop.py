@@ -46,7 +46,7 @@ xtot[xtot[:,1] == 50, 1] = 'highdrop'
 # this should include those important to the study AND the data
 
 # we now create a computer experiment to build an emulator
-thetacompexp_lin = priorphys_lin.rnd(20)  # drawing 50 rndom parameters from the prior
+thetacompexp_lin = priorphys_lin.rnd(12)  # drawing 50 rndom parameters from the prior
 linear_results = balldropmodel_linear(thetacompexp_lin, xtotv)  # the value of the linear simulation
 linear_results[0] = np.float("inf")
 linear_results[2] = np.float("inf")
@@ -126,14 +126,14 @@ thetaposs = np.vstack((emu_lin._emulator__theta,cal_lin.theta(100)))
 
 emu_lin3 = emulator(thetacompexp_lin, linear_results, xtot, software = 'PCGPwM')  # this builds an emulator 
 mypred = emu_lin3.predict(thetaposs, emu_lin3._info['x'])
-newtheta = emu_lin3.supplement(20, theta=thetaposs)
+newtheta, newx, info = emu_lin3.supplement(400, theta=thetaposs)
 fnew = balldropmodel_linear(newtheta, xtotv)
 emu_lin3.update(f = fnew, options = {'minsampsize': 10})
 mypred = emu_lin3.predict(thetaposs, emu_lin3._info['x'])
-newtheta = emu_lin3.supplement(20, theta=thetaposs)
+newtheta, newx, info = emu_lin3.supplement(400, theta=thetaposs)
 fnew = balldropmodel_linear(newtheta, xtotv)
 emu_lin3.update(f = fnew, options = {'minsampsize': 10})
-newtheta = emu_lin3.supplement(10, theta=thetaposs)
+newtheta, newx, info =emu_lin3.supplement(400, theta=thetaposs)
 fnew = balldropmodel_linear(newtheta, xtotv)
 emu_lin3.update(f = fnew, options = {'minsampsize': 10})
 
@@ -166,9 +166,9 @@ cal_grav = calibrator(emu_grav, y, x, # need to build a calibrator
 pred_grav = cal_grav.predict(xtot) # getting a prediction object
 
 thetaposs = np.vstack((emu_grav._emulator__theta,cal_grav.theta(100)))
-newtheta = emu_grav.supplement(5, theta=thetaposs)
+newtheta, newx, info = emu_grav.supplement(300, theta=thetaposs)
 emu_grav.update(f = balldropmodel_grav(newtheta, xtotv))
-newtheta = emu_grav.supplement(10, theta=thetaposs)
+newtheta, newx, info = emu_grav.supplement(300, theta=thetaposs)
 emu_grav.update(f = balldropmodel_grav(newtheta, xtotv))
 
 

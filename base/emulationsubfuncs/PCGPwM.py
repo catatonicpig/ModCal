@@ -70,7 +70,6 @@ def fit(fitinfo, theta, f, x, args=None):
         __PCs(fitinfo)
     numpcs = fitinfo['pc'].shape[1]
     
-    fitinfo['PCAskip'] = False
     if not fitinfo['PCAskip'] or not np.sum(np.isfinite(f)) < 2 * fitinfo['lastup']:
         fitinfo['PCAskip'] = False
         fitinfo['lastup'] = np.sum(np.isfinite(f))
@@ -81,8 +80,6 @@ def fit(fitinfo, theta, f, x, args=None):
             __fitGP1d(theta, fitinfo['pc'][:, pcanum],
                                         fitinfo['pcstdvar'][:, pcanum],
                                         prevsubmodel = fitinfo['emulist'][pcanum])
-            print('was here')
-            print(fitinfo['emulist'][pcanum]['sig2'])
     else:
         for pcanum in range(0, numpcs):
             if pcanum > 0.5:
@@ -128,7 +125,7 @@ def predict(predinfo, fitinfo, theta, x, args=None):
     fitinfo : dict
         An arbitary dictionary where you placed all your important fitting information from the 
         fit function above.
-    emu : instance of emulator class
+    theta : instance of emulator class
         An emulator class instatance as defined in emulation.
     x : array of float
         An array of x values where you want to predict.
@@ -169,7 +166,7 @@ def predict(predinfo, fitinfo, theta, x, args=None):
                              (fitinfo['pct'][xind,:].T)[np.newaxis,:,:])
     predinfo['covhalf'] = np.full((theta.shape[0], CH.shape[1], x.shape[0]), np.nan)
     predinfo['covhalf'][:,:,xnewind] = CH
-    return 
+    return
 
 """
 ##############################################################################
@@ -181,6 +178,92 @@ def predict(predinfo, fitinfo, theta, x, args=None):
 ##############################################################################
 ##############################################################################
 """
+
+
+def supplement(fitinfo, size, cal, theta, x):
+    r"""
+    Finds supplement theta and x given the dictionary fitinfo.
+
+    Parameters
+    ----------
+    fitinfo : dict
+        An arbitary dictionary where you placed all your important fitting information from the 
+        fit function above.
+    cal : instance of emulator class
+        An emulator class instance as defined in calibration.  This will not always be provided.
+    theta : array
+        An array of theta values where you want to predict.
+    x : array
+        An array of x values where you want to predict.
+    args : dict
+        A dictionary containing options passed to you.
+        
+    Returns
+    ----------
+    Note that we should have theta.shape[0] * x.shape[0] < size
+    theta : array
+        An array of theta values where you should sample.
+    x : array
+        An array of x values where you should sample.
+    info : array
+        An an optional info dictionary you can pass back to the user.
+    """
+    
+    ntheta = np.floor(size / fitinfo['x'].shape[0]).astype('int')
+    infos = copy.copy(fitinfo['emulist'])
+    thetaold = copy.copy(fitinfo['theta'])
+    norig = thetaold.shape[0]
+    varpca = copy.copy(fitinfo['pcstdvar'])
+    
+    thetaposs = copy.copy(theta)
+    if thetaposs.shape[0] > 10 * ntheta:
+        thetac = np.random.choice(thetaposs.shape[0], 10 * ntheta, replace=False)
+        thetaposs = thetaposs[thetac,:]
+    
+    rsave = np.array(np.ones(len(infos)), dtype=object)
+    rposssave = np.array(np.ones(len(infos)), dtype=object)
+    rnewsave = np.array(np.ones(len(infos)), dtype=object)
+    R = np.array(np.ones(len(infos)), dtype=object)
+    crit = np.zeros(thetaposs.shape[0])
+    weightma = np.mean(fitinfo['pct'] ** 2,0)
+    for k in range(0, len(infos)):
+        if infos[k]['hypind'] == k:
+            rsave[k] = (1-infos[k]['nug']) * __covmat(theta, thetaold, infos[k]['hypcov'])
+            rposssave[k] = (1-infos[k]['nug']) * __covmat(thetaposs, thetaold, infos[k]['hypcov'])
+            rnewsave[k] = (1-infos[k]['nug']) * __covmat(thetaposs, theta, infos[k]['hypcov'])
+            R[k] = __covmat(thetaold, thetaold, infos[k]['hypcov'])
+            R[k] = (1-infos[k]['nug']) * R[k] + np.eye(R[k].shape[0]) * infos[k]['nug']
+    critsave = np.zeros(thetaposs.shape[0])
+    for j in range(0,ntheta):
+        crit = 0*crit
+        if thetaposs.shape[0] < 1.5:
+            thetaold = np.vstack((thetaold, thetaposs))
+            break
+        for k in range(0, len(infos)):
+            Rh = R[infos[k]['hypind']] + np.diag(varpca[:, k])
+            p = rnewsave[infos[k]['hypind']]
+            q = rposssave[infos[k]['hypind']] @ np.linalg.solve(Rh,rsave[infos[k]['hypind']].T)
+            r = rposssave[infos[k]['hypind']].T * np.linalg.solve(Rh,rposssave[infos[k]['hypind']].T)
+            crit += weightma[k] * np.mean((p-q) ** 2,1) / (1 - np.sum(r,0))
+        jstar = np.argmax(crit)
+        critsave[j] = crit[jstar]
+        thetaold = np.vstack((thetaold, thetaposs[jstar]))
+        thetaposs = np.delete(thetaposs, jstar, 0)
+        for k in range(0, len(infos)):
+            if infos[k]['hypind'] == k:
+                R[k] = np.vstack((R[k],rposssave[k][jstar,:]))
+                R[k] = np.vstack((R[k].T,np.append(rposssave[k][jstar,:],1))).T
+                newr = (1-infos[k]['nug']) * __covmat(thetaposs, thetaold[-1,:], infos[k]['hypcov'])
+                rposssave[k] = np.delete(rposssave[k], jstar, 0)
+                rposssave[k] = np.hstack((rposssave[k], newr))
+                rsave[k] = np.hstack((rsave[k], rnewsave[k][jstar,:][:,None]))
+                rnewsave[k] = np.delete(rnewsave[k], jstar, 0)
+        crit = np.delete(crit, jstar)
+        varpca = np.vstack((varpca,0*varpca[0, :]))
+    
+    info ={}
+    info['crit'] = critsave
+    return thetaold[norig:,:], x, info
 
 """
 ##############################################################################
@@ -304,7 +387,7 @@ def __fitGP1d(theta, g, gvar=None, hypstarts=None, hypinds=None,prevsubmodel=Non
         subinfo['hypregmean'] = np.append(-0.25 + np.log(theta.shape[1]) + np.log(np.std(theta, 0)), (0, -20))
         subinfo['hypregLB'] = np.append(-2 + np.log(np.std(theta, 0)), (-10, -30))
         subinfo['hypregUB'] = np.append(3 + np.log(np.std(theta, 0)), (1, -1))
-        subinfo['hypregstd'] = (subinfo['hypregUB'] - subinfo['hypregLB']) / 3
+        subinfo['hypregstd'] = (subinfo['hypregUB'] - subinfo['hypregLB']) / 5
         subinfo['hypregstd'][-2] = 2
         subinfo['hypregstd'][-1] = 4
         subinfo['hyp'] = 1*subinfo['hypregmean']

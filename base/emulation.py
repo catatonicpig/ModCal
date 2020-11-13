@@ -185,7 +185,7 @@ class emulator(object):
                               copy.deepcopy(x), copy.deepcopy(args))
         return prediction(info, self)
     
-    def supplement(self, n, cal=None, theta=None, args=None, append=False):
+    def supplement(self, size, cal=None, theta=None, x=None, args=None, append=False):
         r"""
         Chooses a new theta to be investigated.
         
@@ -194,7 +194,7 @@ class emulator(object):
 
         Parameters
         ----------
-        n : option array of float
+        size : option array of float
             The number of thetas you would like to use
         theta : optional array of float
             An array of parameters where you would like to predict
@@ -217,7 +217,7 @@ class emulator(object):
             allowreps = self.__options['reps']
         if args is None:
             args = self._args
-        if n < 0.5:
+        if size < 0.5:
             if n == 0:
                 return copy.deepcopy(self.__supptheta)
             else:
@@ -232,9 +232,6 @@ class emulator(object):
         else:
             if self.__theta.shape[1] != theta.shape[1]:
                 raise ValueError('theta has the wrong shape, it does not match emu.theta.')
-            if theta.shape[0] < n:
-                raise ValueError('you want to predict at less than n values,' + 
-                                 'just run them you silly goose')
             if theta.shape[0] > 10000:
                 print('To stop memory issues, supply less than 10000 thetas...')
             thetadraw = theta[:10000,:]
@@ -242,8 +239,17 @@ class emulator(object):
         if 'supplement' not in dir(self.software):
             print('Using the default supplement function.')
             supptheta = copy.deepcopy(self.__defaultsupp(n, copy.deepcopy(thetadraw)))
+            suppx = None
+            info = None
         else:
-            supptheta = copy.deepcopy(self.software.supplement(n, self._info, copy.deepcopy(thetadraw)))
+            #try:
+            supptheta, suppx, suppinfo = copy.deepcopy(self.software.supplement(self._info, 
+                                                                size,
+                                                               cal,
+                                                               copy.deepcopy(thetadraw),
+                                                               copy.deepcopy(self.__x)))
+            #except:
+                #supptheta = copy.deepcopy(self.__defaultsupp(n, copy.deepcopy(thetadraw)))
         if append and self.__supptheta is not None:
             if not allowreps:
                 nc, c, r = _matrixmatching(self.__supptheta, supptheta)
@@ -274,7 +280,7 @@ class emulator(object):
         else:
             self.__supptheta = np.append(self.__supptheta, supptheta, 0)
         
-        return copy.deepcopy(self.__supptheta)
+        return copy.deepcopy(self.__supptheta), None, suppinfo
     
     def update(self,theta=None, f=None,  x=None, args=None, options=None):
         r"""
