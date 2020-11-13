@@ -3,7 +3,7 @@
 import numpy as np
 
 
-def balldropmodel_linear(theta, x):
+def balldropmodel_linear(x, theta):
     """Place description here."""
     f = np.zeros((theta.shape[0], x.shape[0]))
     for k in range(0, theta.shape[0]):
@@ -12,10 +12,10 @@ def balldropmodel_linear(theta, x):
         vter = theta[k, 1]
         # g = theta[k, 2]
         f[k, :] = h0 - vter * t
-    return f
+    return f.T
 
 
-def balldropmodel_grav(theta, x):
+def balldropmodel_grav(x, theta):
     """Place description here."""
     f = np.zeros((theta.shape[0], x.shape[0]))
     for k in range(0, theta.shape[0]):
@@ -24,7 +24,7 @@ def balldropmodel_grav(theta, x):
         # vter = theta[k, 1]
         g = theta[k]
         f[k, :] = h0 - (g / 2) * (t ** 2)
-    return f
+    return f.T
 
 def balldroptrue(x):
     """Place description here."""

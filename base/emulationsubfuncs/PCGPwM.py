@@ -22,7 +22,7 @@ import copy
 ##############################################################################
 ##############################################################################
 """
-def fit(fitinfo, theta, f, x, args=None):
+def fit(fitinfo, x, theta, f, args):
     r"""
     Fits a emulation model.
 
@@ -34,17 +34,17 @@ def fit(fitinfo, theta, f, x, args=None):
         only stuff that will be used by predict below.  Note that if you want to leverage speedy,
         updates fitinfo will contain the previous fitinfo!  So use that information to accelerate 
         anything you wany, keeping in mind that the user might have changed theta, f, and x.
-    theta :  An n-by-d matrix of parameters. n should be at least 2 times m. Each row in theta should
-        correspond to a row in f.
-    f : array of float
-        An n-by-m matrix of responses with 'nan' representing responses not yet available. Each
-        row in f should correspond to a row in theta. Each column should correspond to a row in
-        x.
     x : array of objects
-        An m-by-p matrix of inputs. Each column should correspond to a row in f.
+        An matrix (vector) of inputs. Each row should correspond to a row in f.
+    theta :  array of objects
+        An matrix (vector) of parameters. Each row should correspond to a row in f.
+    f : array of float
+        An matrix (vector) of responses.  Each row in f should correspond to a row in x. Each 
+        column should correspond to a row in theta.
     args : dict
         A dictionary containing options passed to you.
     """
+    f = f.T
     if not np.all(np.isfinite(f)):
         fitinfo['mof'] = np.logical_not(np.isfinite(f))
         fitinfo['mofrows'] = np.where(np.any(fitinfo['mof'] > 0.5,1))[0]
@@ -52,8 +52,8 @@ def fit(fitinfo, theta, f, x, args=None):
         fitinfo['mof'] = None
         fitinfo['mofrows'] = None
     #Storing these values for future reference
-    fitinfo['theta'] = theta
     fitinfo['x'] = x
+    fitinfo['theta'] = theta
     fitinfo['f'] = f
     #The double underline should be used to represent my local functions
     skipstnd = False
@@ -107,7 +107,7 @@ def fit(fitinfo, theta, f, x, args=None):
 ##############################################################################
 ##############################################################################
 """
-def predict(predinfo, fitinfo, theta, x, args=None):
+def predict(predinfo, fitinfo, x, theta,  args=None):
     r"""
     Finds prediction at theta and x given the dictionary fitinfo.
 
@@ -125,14 +125,13 @@ def predict(predinfo, fitinfo, theta, x, args=None):
     fitinfo : dict
         An arbitary dictionary where you placed all your important fitting information from the 
         fit function above.
-    theta : instance of emulator class
-        An emulator class instatance as defined in emulation.
-    x : array of float
-        An array of x values where you want to predict.
+    x : array of objects
+        An matrix (vector) of inputs for prediction.
+    theta :  array of objects
+        An matrix (vector) of parameters to prediction.
     args : dict
         A dictionary containing options passed to you.
     """
-    
     infos = fitinfo['emulist']
     predvecs = np.zeros((theta.shape[0], len(infos)))
     predvars = np.zeros((theta.shape[0], len(infos)))
@@ -156,16 +155,17 @@ def predict(predinfo, fitinfo, theta, x, args=None):
         rVh = r @ infos[k]['Vh']
         predvecs[:, k] = r @ infos[k]['pw']
         predvars[:, k] = infos[k]['sig2'] * (1 - np.sum(rVh ** 2, 1))
-    predinfo['mean'] = np.full((theta.shape[0], x.shape[0]),np.nan)
-    predinfo['var'] = np.full((theta.shape[0], x.shape[0]),np.nan)
-    predinfo['mean'][:,xnewind] = (predvecs @ fitinfo['pct'][xind,:].T)*fitinfo['scale'][xind] +\
-        fitinfo['offset'][xind]
-    predinfo['var'][:,xnewind] = (fitinfo['extravar'][xind] + predvars @ (fitinfo['pct'][xind,:] ** 2).T) *\
-        (fitinfo['scale'][xind] ** 2)
+    predinfo['mean'] = np.full((x.shape[0], theta.shape[0]),np.nan)
+    predinfo['var'] = np.full((x.shape[0], theta.shape[0]),np.nan)
+    predinfo['mean'][xnewind,:] = ((predvecs @ fitinfo['pct'][xind,:].T)*fitinfo['scale'][xind] +\
+        fitinfo['offset'][xind]).T
+    predinfo['var'][xnewind,:] = ((fitinfo['extravar'][xind] + predvars @ (fitinfo['pct'][xind,:] ** 2).T) *\
+        (fitinfo['scale'][xind] ** 2)).T
     CH = (np.sqrt(np.abs(predvars))[:,:,np.newaxis] *
                              (fitinfo['pct'][xind,:].T)[np.newaxis,:,:])
-    predinfo['covhalf'] = np.full((theta.shape[0], CH.shape[1], x.shape[0]), np.nan)
-    predinfo['covhalf'][:,:,xnewind] = CH
+    predinfo['covxhalf'] = np.full((theta.shape[0],CH.shape[1],x.shape[0]), np.nan)
+    predinfo['covxhalf'][:,:,xnewind] = CH
+    predinfo['covxhalf'] = predinfo['covxhalf'].transpose((1,0,2))
     return
 
 """
@@ -180,7 +180,7 @@ def predict(predinfo, fitinfo, theta, x, args=None):
 """
 
 
-def supplement(fitinfo, size, cal, theta, x):
+def supplement(fitinfo, size, x=None, theta=None, cal=None):
     r"""
     Finds supplement theta and x given the dictionary fitinfo.
 
@@ -189,12 +189,12 @@ def supplement(fitinfo, size, cal, theta, x):
     fitinfo : dict
         An arbitary dictionary where you placed all your important fitting information from the 
         fit function above.
-    cal : instance of emulator class
-        An emulator class instance as defined in calibration.  This will not always be provided.
-    theta : array
-        An array of theta values where you want to predict.
     x : array
         An array of x values where you want to predict.
+    theta : array
+        An array of theta values where you want to predict.
+    cal : instance of emulator class
+        An emulator class instance as defined in calibration.  This will not always be provided.
     args : dict
         A dictionary containing options passed to you.
         
@@ -209,7 +209,7 @@ def supplement(fitinfo, size, cal, theta, x):
         An an optional info dictionary you can pass back to the user.
     """
     
-    ntheta = np.floor(size / fitinfo['x'].shape[0]).astype('int')
+    ntheta = size
     infos = copy.copy(fitinfo['emulist'])
     thetaold = copy.copy(fitinfo['theta'])
     norig = thetaold.shape[0]

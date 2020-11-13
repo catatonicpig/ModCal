@@ -47,14 +47,14 @@ xtot[xtot[:,1] == 50, 1] = 'highdrop'
 
 # we now create a computer experiment to build an emulator
 thetacompexp_lin = priorphys_lin.rnd(50)  # drawing 50 rndom parameters from the prior
-linear_results = balldropmodel_linear(thetacompexp_lin, xtotv)  # the value of the linear simulation
+linear_results = balldropmodel_linear(xtotv, thetacompexp_lin)  # the value of the linear simulation
 # This is for all vectors in the input of interest
-emu_lin = emulator(thetacompexp_lin, linear_results, xtot)  # this builds an emulator 
+emu_lin = emulator(xtot, thetacompexp_lin, linear_results, software = 'PCGPwM')  # this builds an emulator 
 # for the linear simulation. this is a specialized class specific to ModCal.
 
 thetacompexp_grav = priorphys_grav.rnd(20)  # drawing 50 rndom parameters from the prior
-grav_results = balldropmodel_grav(thetacompexp_grav, xtotv)  # the value of the gravity simulation
-emu_grav = emulator(thetacompexp_grav, grav_results, xtot)  # this builds an
+grav_results = balldropmodel_grav(xtotv, thetacompexp_grav)  # the value of the gravity simulation
+emu_grav = emulator(xtot, thetacompexp_grav, grav_results, software = 'PCGPwM')  # this builds an
 # emulator for the gravity simulation. this is a specialized class specific to ModCal.
 
 x = np.array([[ 0.1, 25. ],

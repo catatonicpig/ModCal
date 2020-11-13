@@ -171,23 +171,23 @@ def predict(predinfo, fitinfo, emu, x, args=None):
     
     xtot = np.vstack((fitinfo['x'],x))
     mx =fitinfo['x'].shape[0]
-    emupredict = emu.predict(theta, xtot)
-    meanfull = copy.deepcopy(emupredict()[:,mx:])
-    varfull = copy.deepcopy(emupredict()[:,mx:])
-    predinfo['rnd'] = copy.deepcopy(emupredict()[:,mx:])
-    predinfo['modelrnd'] = copy.deepcopy(emupredict()[:,mx:])
+    emupredict = emu.predict(xtot, theta)
+    meanfull = copy.deepcopy(emupredict()[mx:,:]).T
+    varfull = copy.deepcopy(emupredict()[mx:,:]).T
+    predinfo['rnd'] = copy.deepcopy(emupredict()[mx:,:]).T
+    predinfo['modelrnd'] = copy.deepcopy(emupredict()[mx:,:]).T
     
     
-    emupredict = emu.predict(theta, xtot)
+    emupredict = emu.predict(xtot, theta)
     emumean = emupredict.mean()
-    emucov = emupredict.cov()
+    emucov = emupredict.covx()
     xind = range(0,mx)
     xindnew = range(mx,xtot.shape[0])
     for k in range(0, theta.shape[0]):
         m0 = np.squeeze(y) * 0
-        mut = np.squeeze(y) - emupredict()[(k, xind)]
-        m0 = emumean[k]
-        St = emucov[k]
+        mut = np.squeeze(y) - emupredict()[(xind,k)]
+        m0 = emumean[:,k]
+        St = emucov[:,k,:]
         St[np.isnan(St)] = 0
         S0 = St[xind,:][:,xind]
         S10 = St[xindnew,:][:,xind]
@@ -197,7 +197,7 @@ def predict(predinfo, fitinfo, emu, x, args=None):
         S10 += C[xindnew,:][:,xind]
         S11 += C[xindnew,:][:,xindnew]
         S0 += np.diag(obsvar)
-        mus0 = emupredict()[(k, xindnew)]
+        mus0 = emupredict()[(xindnew, k)]
         meanfull[k, :] = mus0 + S10 @ np.linalg.solve(S0, mut)
         varfull[k, :] = np.diag(S11 - S10 @ np.linalg.solve(S0, S10.T))
         Wmat, Vmat = np.linalg.eigh(S11 - S10 @ np.linalg.solve(S0, S10.T))
@@ -252,13 +252,13 @@ def loglik(fitinfo, emu, theta, phi, y, x, args):
         cov_disc = args['cov_disc']
     else:
         raise ValueError('Must provide cov_disc at this moment.')
-    emupredict = emu.predict(theta, x)
+    emupredict = emu.predict(x, theta)
     emumean = emupredict.mean()
-    emucov = emupredict.cov()
+    emucov = emupredict.covx()
     loglik = np.zeros(theta.shape[0])
     for k in range(0, theta.shape[0]):
-        m0 = emumean[k]
-        S0 = emucov[k]#Shalf.T @ Shalf
+        m0 = emumean[:,k]
+        S0 = emucov[:,k]#Shalf.T @ Shalf
         S0 += cov_disc(x, phi[k,:])
         W, V = np.linalg.eigh(np.diag(obsvar) + S0)
         muadj = V.T @ (np.squeeze(y) - m0)

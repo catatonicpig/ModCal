@@ -78,54 +78,30 @@ class calibrator(object):
             if x.shape[0] != y.shape[0]:
                 raise ValueError('If x is provided, shape[0] must align with the length of y.')
         self.x = copy.deepcopy(x)
-        if type(emu) is not tuple:
-            predtry = emu.predict(thetatestsamp, x = copy.deepcopy(self.x))
-            if y.shape[0] != predtry().shape[1]:
-                if x is None:
-                    raise ValueError('y and emu.predict(theta) must have the same shape')
-                else:
-                    raise ValueError('y and emu.predict(theta,x) must have the same shape')
+        predtry = emu.predict(copy.copy(self.x), thetatestsamp)
+        if y.shape[0] != predtry().shape[0]:
+            if x is None:
+                raise ValueError('y and emu.predict(theta) must have the same shape')
             else:
-                prednotfinite = np.logical_not(np.isfinite(predtry()))
-                if np.any(prednotfinite):
-                    print('We have received some non-finite values from emulation.')
-                    fracfail = np.mean(prednotfinite, 0)
-                    if np.sum(fracfail <= 10**(-3)) < 5:
-                        print('Your emulator failed enough places to give up.')
-                    else: 
-                        print('It looks like some locations are ok.')
-                        print('Current protocol is to remove observations that have nonfinite values.')
-                        whichrm = np.where(fracfail > 10**(-3))[0]
-                        print('Removing values at %s.' % np.array2string(whichrm))
-                        whichkeep = np.where(fracfail <= 10**(-3))[0]
-                        if x is not None:
-                            self.x = self.x[whichkeep,:]
-                        self.y = self.y[whichkeep]
-                else:
-                    whichkeep = None
+                raise ValueError('y and emu.predict(x,theta) must have the same shape')
         else:
-            for k in range(0, len(emu)):
-                try:
-                    predtry = emu[k].predict(thetatestsamp, x = copy.deepcopy(x))
-                    if y.shape[0] != predtry().shape[0]:
-                        if x is None:
-                            raise ValueError('y and emu.predict(theta) must have the same shape')
-                        else:
-                            raise ValueError('y and emu.predict(theta,x) must have the same shape')
-                    else:
-                        self.whichcols = [np.array(0) for x in range(0, len(emu))]
-                        prednotfinite = np.logical_not(np.isfinite(predtry()))
-                        if np.any(prednotfinite):
-                            print('We have received some non-finite values from emulation.')
-                            if np.sum(np.sum(prednotfinite,1) > 4) > 3:
-                                print('Your emulator failed enought places to give up.')
-                            else: 
-                                print('It looks like some locations are ok.')
-                                print('Current protocol is to remove observations that have nonfinite values.')
-                                prednotfinite = np.logical_not(np.isfinite(predtry()))
-                                self.whichcols[k] = np.where(np.sum(prednotfinite,1) > 4,0)[0]
-                except:
-                    raise ValueError('Your provided emulator failed to predict.')
+            prednotfinite = np.logical_not(np.isfinite(predtry()))
+            if np.any(prednotfinite):
+                print('We have received some non-finite values from emulation.')
+                fracfail = np.mean(prednotfinite, 1)
+                if np.sum(fracfail <= 10**(-3)) < 5:
+                    raise ValueError('Your emulator failed enough places to give up.')
+                else: 
+                    print('It looks like some locations are ok.')
+                    print('Current protocol is to remove observations that have nonfinite values.')
+                    whichrm = np.where(fracfail > 10**(-3))[0]
+                    print('Removing values at %s.' % np.array2string(whichrm))
+                    whichkeep = np.where(fracfail <= 10**(-3))[0]
+                    if x is not None:
+                        self.x = self.x[whichkeep,:]
+                    self.y = self.y[whichkeep]
+            else:
+                whichkeep = None
         if yvar is not None:
             if yvar.shape[0] != y.shape[0] and yvar.shape[0] > 1.5:
                 raise ValueError('yvar must be the same size as y or of size 1.')
