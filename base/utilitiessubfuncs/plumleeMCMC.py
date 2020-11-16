@@ -5,7 +5,7 @@ import numpy as np
 
 def plumleepostsampler(thetastart, logpostfunc, numsamp, tarESS):
     """
-    Return draws from the posterior.
+    Return draws from the post.
 
     Parameters
     ----------
