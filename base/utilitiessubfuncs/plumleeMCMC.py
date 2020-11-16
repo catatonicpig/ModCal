@@ -12,7 +12,7 @@ def plumleepostsampler(thetastart, logpostfunc, numsamp, tarESS):
     thetastart : array of float
         Some matrix of parameters where function evaluations as starting points.
     logpost : function
-        A function call describing the log of the prior distribution
+        A function call describing the log of the posterior distribution
     numsamp : integer
         Number of samples returned
     tarESS : integer
