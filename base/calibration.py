@@ -6,15 +6,15 @@ from base.utilities import postsampler
 
 class calibrator(object):
     r"""
-    A class to represent a calibrator.  cal.info will give the dictionary from the software.
+    A class to represent a calibrator.  cal.info will give the dictionary from the method.
     """
 
-    def __init__(self, emu=None, y=None, x=None, thetaprior=None, yvar=None, software='BDM', args={}):
+    def __init__(self, emu=None, y=None, x=None, thetaprior=None, yvar=None, method='BDM', args={}):
         r"""
         Intitalizes a calibration model.
 
-        It directly calls "calibrationmethods.[software]" where [software] is
-        the user option with default listed above. If you would like to change this software, just
+        It directly calls "calibrationmethods.[method]" where [method] is
+        the user option with default listed above. If you would like to change this method, just
         drop a new file in the "calibrationmethods" folder with the required formatting.
 
         Parameters
@@ -33,7 +33,7 @@ class calibrator(object):
             vector.
         yvar : array of float
             A one demensional array of the variance of observed values at x.  This is not required.
-        software : str
+        method : str
             A string that points to the file located in "calibrationmethods" you would
             like to use.
         args : dict
@@ -112,9 +112,9 @@ class calibrator(object):
             self.info['yvar'] = copy.deepcopy(yvar)
             if whichkeep is not None:
                 self.info['yvar'] = self.info['yvar'][whichkeep]
-        self.software = importlib.import_module('base.calibrationmethods.' + software)
+        self.method = importlib.import_module('base.calibrationmethods.' + method)
         try:
-            self.software = importlib.import_module('base.calibrationmethods.' + software)
+            self.method = importlib.import_module('base.calibrationmethods.' + method)
         except:
             raise ValueError('Module not found!')
         
@@ -122,13 +122,13 @@ class calibrator(object):
         self.theta = thetadist(self)
 
     def __repr__(self):
-        object_methods = [method_name for method_name in dir(self)
+        object_method = [method_name for method_name in dir(self)
                   if callable(getattr(self, method_name))]
-        object_methods = [x for x in object_methods if not x.startswith('__')]
-        object_methods = [x for x in object_methods if not x.startswith('emu')]
+        object_method = [x for x in object_method if not x.startswith('__')]
+        object_method = [x for x in object_method if not x.startswith('emu')]
         strrepr = ('A calibration object where the code in located in the file '
-                   + ' calibration.  The main methods are cal.' +
-                   ', cal.'. join(object_methods) + '.  Default of cal(x) is cal.predict(x).' +
+                   + ' calibration.  The main method are cal.' +
+                   ', cal.'. join(object_method) + '.  Default of cal(x) is cal.predict(x).' +
                    '  Run help(cal) for the document string.')
         return strrepr
     
@@ -141,7 +141,7 @@ class calibrator(object):
         r"""
         Returns a draws from theta and phi given data.
 
-        It directly calls  \"calibrationmethods.[software].fit\" where \"[software]\" is
+        It directly calls  \"calibrationmethods.[method].fit\" where \"[method]\" is
         the user option.
 
         Parameters
@@ -151,7 +151,7 @@ class calibrator(object):
         """
         if args is None:
             args = self.args
-        self.software.fit(self.info, self.emu, self.x, self.y, args)
+        self.method.fit(self.info, self.emu, self.x, self.y, args)
         return None
 
 
@@ -159,7 +159,7 @@ class calibrator(object):
         r"""
         Returns a predictions at x.
 
-        It directly calls  \"calibrationmethods.[software].predict\" where \"[software]\" is
+        It directly calls  \"calibrationmethods.[method].predict\" where \"[method]\" is
         the user option.
 
         Parameters
@@ -172,21 +172,21 @@ class calibrator(object):
         Returns
         -------
         prediction : an instance of calibration class prediction
-            prediction.predinfo : Gives the dictionary of what was produced by the software.
+            prediction.predinfo : Gives the dictionary of what was produced by the method.
         """
         if args is None:
             args = self.args
         if args is x:
             x = self.x
         info = {}
-        self.software.predict(info, self.info, self.emu, x, args)
+        self.method.predict(info, self.info, self.emu, x, args)
         return prediction(info, self)
 
 
 class prediction(object):
     r"""
     A class to represent a calibration prediction.  
-    predict.info will give the dictionary from the software.
+    predict.info will give the dictionary from the method.
     """
 
     def __init__(self, info, cal):
@@ -194,13 +194,13 @@ class prediction(object):
         self.cal = cal
 
     def __repr__(self):
-        object_methods = [method_name for method_name in dir(self)
+        object_method = [method_name for method_name in dir(self)
                   if callable(getattr(self, method_name))]
-        object_methods = [x for x in object_methods if not x.startswith('_')]
-        object_methods = [x for x in object_methods if not x.startswith('cal')]
+        object_method = [x for x in object_method if not x.startswith('_')]
+        object_method = [x for x in object_method if not x.startswith('cal')]
         strrepr = ('A calibration prediction object predict where the code in located in the file '
-                   + ' calibration.  The main methods are predict.' +
-                   ', predict.'.join(object_methods) + '.  Default of predict() is' +
+                   + ' calibration.  The main method are predict.' +
+                   ', predict.'.join(object_method) + '.  Default of predict() is' +
                    ' predict.mean() and ' +
                    'predict(s) will run predict.rnd(s).  Run help(predict) for the document' +
                    ' string.')
@@ -213,13 +213,13 @@ class prediction(object):
             return self.rnd(s, args)
         
 
-    def __softwarenotfoundstr(self, pfstr, opstr):
-        print(pfstr + opstr + ' functionality not in software... \n' +
+    def __methodnotfoundstr(self, pfstr, opstr):
+        print(pfstr + opstr + ' functionality not in method... \n' +
               ' Key labeled ' + opstr + ' not ' +
               'provided in ' + pfstr + '.info... \n' +
               ' Key labeled rnd not ' +
               'provided in ' + pfstr + '.info...')
-        return 'Could not reconsile a good way to compute this value in current software.'
+        return 'Could not reconsile a good way to compute this value in current method.'
 
     def mean(self, args = None):
         r"""
@@ -227,17 +227,17 @@ class prediction(object):
         """
         pfstr = 'predict' #prefix string
         opstr = 'mean' #operation string
-        if (pfstr + opstr) in dir(self.cal.software):
+        if (pfstr + opstr) in dir(self.cal.method):
             if args is None:
                 args = self.cal.args
-            return copy.deepcopy(self.cal.software.predictmean(self.info, args))
+            return copy.deepcopy(self.cal.method.predictmean(self.info, args))
         elif opstr in self.info.keys():
             return copy.deepcopy(self.info[opstr])
         elif 'rnd' in self.info.keys():
             self.info[opstr] = np.mean(self.info['rnd'], 0)
             return copy.deepcopy(self.info[opstr])
         else:
-            raise ValueError(self.__softwarenotfoundstr(pfstr, opstr))
+            raise ValueError(self.__methodnotfoundstr(pfstr, opstr))
 
     def var(self, args = None):
         r"""
@@ -245,17 +245,17 @@ class prediction(object):
         """
         pfstr = 'predict' #prefix string
         opstr = 'var' #operation string
-        if (pfstr + opstr) in dir(self.cal.software):
+        if (pfstr + opstr) in dir(self.cal.method):
             if args is None:
                 args = self.cal.args
-            return copy.deepcopy(self.cal.software.predictvar(self.info, args))
+            return copy.deepcopy(self.cal.method.predictvar(self.info, args))
         elif opstr in self.info.keys():
             return copy.deepcopy(self.info[opstr])
         elif 'rnd' in self.info.keys():
             self.info[opstr] = np.var(self.info['rnd'], 0)
             return copy.deepcopy(self.info[opstr])
         else:
-            raise ValueError(self.__softwarenotfoundstr(pfstr, opstr))
+            raise ValueError(self.__methodnotfoundstr(pfstr, opstr))
     
     def rnd(self, s=100, args=None):
         r"""
@@ -263,20 +263,20 @@ class prediction(object):
         """
         pfstr = 'predict' #prefix string
         opstr = 'rnd' #operation string
-        if (pfstr + opstr) in dir(self.cal.software):
+        if (pfstr + opstr) in dir(self.cal.method):
             if args is None:
                 args = self.cal.args
-            return copy.deepcopy(self.cal.software.predictrnd(self.info, args))
+            return copy.deepcopy(self.cal.method.predictrnd(self.info, args))
         elif 'rnd' in self.info.keys():
             return self.info['rnd'][np.random.choice(self.info['rnd'].shape[0], size=s), :]
         else:
-            raise ValueError(self.__softwarenotfoundstr(pfstr, opstr))
+            raise ValueError(self.__methodnotfoundstr(pfstr, opstr))
 
     def lpdf(self, y=None, args=None):
         r"""
         Returns a log pdf given theta.
         """
-        raise ValueError('lpdf functionality not in software')
+        raise ValueError('lpdf functionality not in method')
 
 class thetadist(object):
     r"""
@@ -287,13 +287,13 @@ class thetadist(object):
         self.cal = cal
 
     def __repr__(self):
-        object_methods = [method_name for method_name in dir(self)
+        object_method = [method_name for method_name in dir(self)
                   if callable(getattr(self, method_name))]
-        object_methods = [x for x in object_methods if not x.startswith('_')]
-        object_methods = [x for x in object_methods if not x.startswith('cal')]
+        object_method = [x for x in object_method if not x.startswith('_')]
+        object_method = [x for x in object_method if not x.startswith('cal')]
         strrepr = ('A theta distribution object where the code in located in the file '
-                   + ' calibration.  The main methods are cal.theta' +
-                   ', cal.theta.'.join(object_methods) + '.  Default of predict() is' +
+                   + ' calibration.  The main method are cal.theta' +
+                   ', cal.theta.'.join(object_method) + '.  Default of predict() is' +
                    ' cal.theta.mean() and ' +
                    'cal.theta(s) will cal.theta.rnd(s).  Run help(cal.theta) for the document' +
                    ' string.')
@@ -305,13 +305,13 @@ class thetadist(object):
         else:
             return self.rnd(s, args)
     
-    def __softwarenotfoundstr(self, pfstr, opstr):
-        print(pfstr + opstr + 'functionality not in software... \n' +
+    def __methodnotfoundstr(self, pfstr, opstr):
+        print(pfstr + opstr + 'functionality not in method... \n' +
               ' Key labeled ' + (pfstr+opstr) + ' not ' +
               'provided in cal.info... \n' +
               ' Key labeled ' + pfstr + 'rnd not ' +
               'provided in cal.info...')
-        return 'Could not reconsile a good way to compute this value in current software.'
+        return 'Could not reconsile a good way to compute this value in current method.'
     
     def mean(self, args = None):
         r"""
@@ -319,17 +319,17 @@ class thetadist(object):
         """
         pfstr = 'theta' #prefix string
         opstr = 'mean' #operation string
-        if (pfstr + opstr) in dir(self.cal.software):
+        if (pfstr + opstr) in dir(self.cal.method):
             if args is None:
                 args = self.cal.args
-            return copy.deepcopy(self.cal.software.thetamean(self.cal.info, args))
+            return copy.deepcopy(self.cal.method.thetamean(self.cal.info, args))
         elif (pfstr+opstr) in self.cal.info.keys():
             return copy.deepcopy(self.cal.info[(pfstr+opstr)])
         elif (pfstr+'rnd') in self.cal.info.keys():
             self.cal.info[(pfstr+opstr)] = np.mean(self.cal.info[(pfstr+'rnd')], 0)
             return copy.deepcopy(self.cal.info[(pfstr+opstr)])
         else:
-            raise ValueError(self.__softwarenotfoundstr(pfstr, opstr))
+            raise ValueError(self.__methodnotfoundstr(pfstr, opstr))
 
     def var(self, args = None):
         r"""
@@ -337,17 +337,17 @@ class thetadist(object):
         """
         pfstr = 'theta'  # prefix string
         opstr = 'var'  # operation string
-        if (pfstr + opstr) in dir(self.cal.software):
+        if (pfstr + opstr) in dir(self.cal.method):
             if args is None:
                 args = self.cal.args
-            return copy.deepcopy(self.cal.software.thetavar(self.cal.info, args))
+            return copy.deepcopy(self.cal.method.thetavar(self.cal.info, args))
         elif (pfstr+opstr) in self.cal.info.keys():
             return copy.deepcopy(self.cal.info[(pfstr+opstr)])
         elif (pfstr+'rnd') in self.cal.info.keys():
             self.cal.info[(pfstr+opstr)] = np.var(self.cal.info[(pfstr+'rnd')], 0)
             return copy.deepcopy(self.cal.info[(pfstr+opstr)])
         else:
-            raise ValueError(self.__softwarenotfoundstr(pfstr, opstr))
+            raise ValueError(self.__methodnotfoundstr(pfstr, opstr))
     
     def rnd(self, s=100, args=None):
         r"""
@@ -355,18 +355,18 @@ class thetadist(object):
         """
         pfstr = 'theta' #prefix string
         opstr = 'rnd' #operation string
-        if (pfstr + opstr) in dir(self.cal.software):
+        if (pfstr + opstr) in dir(self.cal.method):
             if args is None:
                 args = self.cal.args
-            return copy.deepcopy(self.cal.software.thetarnd(self.cal.info, s, args))
+            return copy.deepcopy(self.cal.method.thetarnd(self.cal.info, s, args))
         elif (pfstr+opstr) in self.cal.info.keys():
             return self.cal.info['thetarnd'][
                         np.random.choice(self.cal.info['thetarnd'].shape[0], size=s), :]
         else:
-            raise ValueError(self.__softwarenotfoundstr(pfstr, opstr))
+            raise ValueError(self.__methodnotfoundstr(pfstr, opstr))
     
     def lpdf(self, theta=None, args=None):
         r"""
         Returns a log pdf given theta.
         """
-        raise ValueError('lpdf functionality not in software')
+        raise ValueError('lpdf functionality not in method')

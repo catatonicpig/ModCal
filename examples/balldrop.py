@@ -17,7 +17,7 @@ from base.calibration import calibrator
 #sorry about that!
 
 class priorphys_lin:
-    """ This defines the class instance of priors provided to the software. """
+    """ This defines the class instance of priors provided to the method. """
     def lpdf(theta):
         return np.squeeze(sps.norm.logpdf(theta[:, 0], 0, 5) +  # initial height deviation
                           sps.gamma.logpdf(theta[:, 1], 2, 0, 10))   # terminal velocity
@@ -27,7 +27,7 @@ class priorphys_lin:
                           sps.gamma.rvs(2, 0, 10, size=n))).T  # terminal velocity
 
 class priorphys_grav:
-    """ This defines the class instance of priors provided to the software. """
+    """ This defines the class instance of priors provided to the method. """
     def lpdf(theta):
         return np.squeeze(sps.gamma.logpdf(theta, 2, 0, 5))  # gravity
 
@@ -49,12 +49,12 @@ xtot[xtot[:,1] == 50, 1] = 'highdrop'
 thetacompexp_lin = priorphys_lin.rnd(50)  # drawing 50 rndom parameters from the prior
 linear_results = balldropmodel_linear(xtotv, thetacompexp_lin)  # the value of the linear simulation
 # This is for all vectors in the input of interest
-emu_lin = emulator(xtot, thetacompexp_lin, linear_results, software = 'PCGPwM')  # this builds an emulator 
+emu_lin = emulator(xtot, thetacompexp_lin, linear_results, method = 'PCGPwM')  # this builds an emulator 
 # for the linear simulation. this is a specialized class specific to ModCal.
 
 thetacompexp_grav = priorphys_grav.rnd(20)  # drawing 50 rndom parameters from the prior
 grav_results = balldropmodel_grav(xtotv, thetacompexp_grav)  # the value of the gravity simulation
-emu_grav = emulator(xtot, thetacompexp_grav, grav_results, software = 'PCGPwM')  # this builds an
+emu_grav = emulator(xtot, thetacompexp_grav, grav_results, method = 'PCGPwM')  # this builds an
 # emulator for the gravity simulation. this is a specialized class specific to ModCal.
 
 x = np.array([[ 0.1, 25. ],
@@ -109,20 +109,20 @@ def cov_delta(x,phi):
 
 cal_lin = calibrator(emu_lin, y, x, # need to build a calibrator
                     thetaprior = priorphys_lin,
-                    software = 'BDM',
+                    method = 'BDM',
                     yvar = obsvar,
                     args = {'cov_disc': cov_delta,
                                'phiprior': priorstatdisc_model})# the arguments are being passed 
-                                                                # to the BDM software
+                                                                # to the BDM method
 pred_lin = cal_lin.predict(xtot) # getting a prediction object
 
 cal_grav = calibrator(emu_grav, y, x, # need to build a calibrator
                        thetaprior = priorphys_grav,
-                       software = 'BDM',
+                       method = 'BDM',
                     yvar = obsvar,
                     args = { 'cov_disc': cov_delta,
                                'phiprior': priorstatdisc_model}) # the arguments are being passed 
-                                                                # to the BDM software
+                                                                # to the BDM method
 pred_grav = cal_grav.predict(xtot) # getting a prediction object
 
 import matplotlib.pyplot as plt 

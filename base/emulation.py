@@ -8,12 +8,12 @@ import copy
 class emulator(object):
     """A class used to represent an emulator or surrogate model."""
 
-    def __init__(self, x=None, theta=None, f=None,  software='PCGP', args={}, options={}):
+    def __init__(self, x=None, theta=None, f=None,  method='PCGP', args={}, options={}):
         r"""
         Intitalizes an emulator or surrogate.
 
-        It directly calls "emulationmethods.[software]" where [software] is
-        the user option with default listed above. If you would like to change this software, just
+        It directly calls "emulationmethods.[method]" where [method] is
+        the user option with default listed above. If you would like to change this method, just
         drop a new file in the "emulationmethods" folder with the required formatting.
 
         Parameters
@@ -28,17 +28,17 @@ class emulator(object):
             An array of responses with 'nan' representing responses not yet available. Each
             column in f should correspond to a row in x. Each row should correspond to a row in
             f. We will attempt to resolve if these are flipped.
-        software : str
+        method : str
             A string that points to the file located in "emulationmethods" you would
             like to use.
         args : dict
             Optional dictionary containing options you would like to pass to
-            [software].fit(x, theta, f, args)
+            [method].fit(x, theta, f, args)
             or
-            [software].predict(x, theta args)
+            [method].predict(x, theta args)
         options : dict
             Optional options dictionary containing options you would like emulation
-            to have.  This does not get passed to the software.  Some options are below:
+            to have.  This does not get passed to the method.  Some options are below:
                 
 
         Returns
@@ -114,14 +114,14 @@ class emulator(object):
             self.__f = None
         
         try:
-            self.software = importlib.import_module('base.emulationmethods.' + software)
+            self.method = importlib.import_module('base.emulationmethods.' + method)
         except:
             raise ValueError('Module not loaded correctly.')
-        if "fit" not in dir(self.software):
+        if "fit" not in dir(self.method):
             raise ValueError('Function fit not found in module!')
-        if "predict" not in dir(self.software):
+        if "predict" not in dir(self.method):
             raise ValueError('Function predict not found in module!')
-        if "supplement" not in dir(self.software):
+        if "supplement" not in dir(self.method):
             print('Function supplement not found in module!')
         self.__options = {}
         self.__optionsset(options)
@@ -131,12 +131,12 @@ class emulator(object):
             self.fit()
 
     def __repr__(self):
-        object_methods = [method_name for method_name in dir(self)
+        object_method = [method_name for method_name in dir(self)
                   if callable(getattr(self, method_name))]
-        object_methods = [x for x in object_methods if not x.startswith('__')]
+        object_method = [x for x in object_method if not x.startswith('__')]
         strrepr = ('An emulation object where the code in located in the file '
-                   + ' emulation.  The main methods are emu.' +
-                   ', emu.'. join(object_methods) + '.  Default of emu(x,theta) is' +
+                   + ' emulation.  The main method are emu.' +
+                   ', emu.'. join(object_method) + '.  Default of emu(x,theta) is' +
                    ' emu.predict(x,theta).  Run help(emu) for the document string.')
         return strrepr
     
@@ -148,7 +148,7 @@ class emulator(object):
         Fits an emulator or surrogate and places that in emu._info
         
         Calls
-        emu._info = [software].fit(emu.__theta, emu.__f, emu.__x, args = args)
+        emu._info = [method].fit(emu.__theta, emu.__f, emu.__x, args = args)
 
         Parameters
         ----------
@@ -161,7 +161,7 @@ class emulator(object):
         else:
             argstemp = copy.copy(self._args)
         x, theta, f = self.__preprocess()
-        self.software.fit(self._info, x, theta, f, args = argstemp)
+        self.method.fit(self._info, x, theta, f, args = argstemp)
 
 
     def predict(self, x=None, theta=None, args=None):
@@ -169,7 +169,7 @@ class emulator(object):
         Fits an emulator or surrogate.
         
         Calls
-        preddict = [software].predict(emu.theta, args = args)
+        preddict = [method].predict(emu.theta, args = args)
 
         Parameters
         ----------
@@ -181,13 +181,13 @@ class emulator(object):
             attempt to resolve if these are flipped.
         args : dict
             A dictionary containing options you would like to pass to
-            [software].fit(theta, phi, args). 
+            [method].fit(theta, phi, args). 
             Defaults to the one used to build emu.
 
         Returns
         -------
         prediction : an instance of emulation class prediction
-            prediction._info : Gives the dictionary of what was produced by the software.
+            prediction._info : Gives the dictionary of what was produced by the method.
         """
         if args is not None:
             argstemp = {**self._args, **copy.deepcopy(args)} #properly merge the arguments
@@ -223,7 +223,7 @@ class emulator(object):
                 raise ValueError('Your theta shape seems to not agree with the emulator build.')
         
         info = {}
-        self.software.predict(info, self._info, copy.copy(x), copy.copy(theta),
+        self.method.predict(info, self._info, copy.copy(x), copy.copy(theta),
                               copy.deepcopy(args))
         return prediction(info, self)
     
@@ -231,8 +231,8 @@ class emulator(object):
         r"""
         Chooses a new theta to be investigated.
         
-        It can either come from the software or is automatted to use fit and
-        predict from the software to complete the operation.
+        It can either come from the method or is automatted to use fit and
+        predict from the method to complete the operation.
 
         Parameters
         ----------
@@ -251,7 +251,7 @@ class emulator(object):
             A calibrator object that contains information about calibration. You must provide either 
             theta, x or both or another object like cal.
         args : optional dict
-            A dictionary containing options you would like to pass to  [software].supplement(theta, 
+            A dictionary containing options you would like to pass to  [method].supplement(theta, 
             phi, args).  Defaults to the one used to build emu.
         overwrite : boolean
             Do you want to replace existing supplement?  If not, and one exists, it will return 
@@ -295,7 +295,7 @@ class emulator(object):
                 print('To stop memory issues, supply less than 10000 thetas...')
             thetadraw = theta[:10000,:]
         
-        supptheta, suppx, suppinfo = self.software.supplement(self._info,size,
+        supptheta, suppx, suppinfo = self.method.supplement(self._info,size,
                                                               copy.deepcopy(self.__x),
                                                               copy.deepcopy(thetadraw),
                                                               cal)
@@ -327,8 +327,8 @@ class emulator(object):
         r"""
         Chooses a new theta to be investigated.
         
-        It can either come from the software or is automatted to use fit and
-        predict from the software to complete the operation.
+        It can either come from the method or is automatted to use fit and
+        predict from the method to complete the operation.
 
         Parameters
         ----------
@@ -343,7 +343,7 @@ class emulator(object):
             Will attempt to resolve if using all x and emu.__x.
         args : optional dict
             A dictionary containing options you would like to pass to
-            [software].update(f,theta,x,args). 
+            [method].update(f,theta,x,args). 
             Defaults to the one used to build emu.
         options : optional dict
             A dictionary containing options you would like to keep around
@@ -571,7 +571,7 @@ class emulator(object):
 class prediction(object):
     r"""
     A class to represent an emulation prediction.  
-    predict._info will give the dictionary from the software.
+    predict._info will give the dictionary from the method.
     """
 
     def __init__(self, _info, emu):
@@ -579,13 +579,13 @@ class prediction(object):
         self.emu = emu
 
     def __repr__(self):
-        object_methods = [method_name for method_name in dir(self)
+        object_method = [method_name for method_name in dir(self)
                   if callable(getattr(self, method_name))]
-        object_methods = [x for x in object_methods if not x.startswith('_')]
-        object_methods = [x for x in object_methods if not x.startswith('emu')]
+        object_method = [x for x in object_method if not x.startswith('_')]
+        object_method = [x for x in object_method if not x.startswith('emu')]
         strrepr = ('A emulation prediction object predict where the code in located in the file '
-                   + ' emulation.  The main methods are predict.' +
-                   ', predict.'.join(object_methods) + '.  Default of predict() is' +
+                   + ' emulation.  The main method are predict.' +
+                   ', predict.'.join(object_method) + '.  Default of predict() is' +
                    ' predict.mean() and ' +
                    'predict(s) will run pred.rnd(s).  Run help(predict) for the document' +
                    ' string.')
@@ -598,13 +598,13 @@ class prediction(object):
             return self.rnd(s, args)
         
 
-    def __softwarenotfoundstr(self, pfstr, opstr):
-        print(pfstr + opstr + ' functionality not in software... \n' +
+    def __methodnotfoundstr(self, pfstr, opstr):
+        print(pfstr + opstr + ' functionality not in method... \n' +
               ' Key labeled ' + opstr + ' not ' +
               'provided in ' + pfstr + '._info... \n' +
               ' Key labeled rnd not ' +
               'provided in ' + pfstr + '._info...')
-        return 'Could not reconsile a good way to compute this value in current software.'
+        return 'Could not reconsile a good way to compute this value in current method.'
 
     def mean(self, args = None):
         r"""
@@ -612,16 +612,16 @@ class prediction(object):
         """
         pfstr = 'predict' #prefix string
         opstr = 'mean' #operation string
-        if (pfstr + opstr) in dir(self.emu.software):
+        if (pfstr + opstr) in dir(self.emu.method):
             if args is None:
                 args = self.emu.args
-            return copy.deepcopy(self.emu.software.predictmean(self._info, args))
+            return copy.deepcopy(self.emu.method.predictmean(self._info, args))
         elif opstr in self._info.keys():
             return self._info[opstr]
         elif 'rnd' in self._info.keys():
             return copy.deepcopy(np.mean(self._info['rnd'], 0))
         else:
-            raise ValueError(self.__softwarenotfoundstr(pfstr, opstr))
+            raise ValueError(self.__methodnotfoundstr(pfstr, opstr))
 
     def var(self, args = None):
         r"""
@@ -629,16 +629,16 @@ class prediction(object):
         """
         pfstr = 'predict' #prefix string
         opstr = 'var' #operation string
-        if (pfstr + opstr) in dir(self.emu.software):
+        if (pfstr + opstr) in dir(self.emu.method):
             if args is None:
                 args = self.emu.args
-            return copy.deepcopy(self.emu.software.predictvar(self._info, args))
+            return copy.deepcopy(self.emu.method.predictvar(self._info, args))
         elif opstr in self._info.keys():
             return copy.deepcopy(self._info[opstr])
         elif 'rnd' in self._info.keys():
             return copy.deepcopy(np.var(self._info['rnd'], 0))
         else:
-            raise ValueError(self.__softwarenotfoundstr(pfstr, opstr))
+            raise ValueError(self.__methodnotfoundstr(pfstr, opstr))
 
     def covx(self, args = None):
         r"""
@@ -646,10 +646,10 @@ class prediction(object):
         """
         pfstr = 'predict' #prefix string
         opstr = 'covx' #operation string
-        if (pfstr + opstr) in dir(self.emu.software):
+        if (pfstr + opstr) in dir(self.emu.method):
             if args is None:
                 args = self.emu.args
-            return copy.deepcopy(self.emu.software.predictcov(self._info, args))
+            return copy.deepcopy(self.emu.method.predictcov(self._info, args))
         elif opstr in self._info.keys():
             return copy.deepcopy(self._info[opstr])
         elif 'covxhalf' in self._info.keys():
@@ -664,7 +664,7 @@ class prediction(object):
             self._info['covx'] = covx
             return copy.deepcopy(self._info[opstr])
         else:
-            raise ValueError(self.__softwarenotfoundstr(pfstr, opstr))
+            raise ValueError(self.__methodnotfoundstr(pfstr, opstr))
 
     def covxhalf(self, args = None):
         r"""
@@ -673,10 +673,10 @@ class prediction(object):
         """
         pfstr = 'predict' #prefix string
         opstr = 'covhalf' #operation string
-        if (pfstr + opstr) in dir(self.emu.software):
+        if (pfstr + opstr) in dir(self.emu.method):
             if args is None:
                 args = self.emu.args
-            return copy.deepcopy(self.emu.software.predictcov(self._info, args))
+            return copy.deepcopy(self.emu.method.predictcov(self._info, args))
         elif opstr in self._info.keys():
             return copy.deepcopy(self._info[opstr])
         elif 'covx' in self._info.keys():
@@ -691,19 +691,19 @@ class prediction(object):
             self._info['covxhalf'] = covxhalf
             return copy.deepcopy(self._info[opstr])
         else:
-            raise ValueError(self.__softwarenotfoundstr(pfstr, opstr))
+            raise ValueError(self.__methodnotfoundstr(pfstr, opstr))
 
     def rnd(self, s=100, args=None):
         r"""
         Returns a rnd draws of size s at theta and x 
         """
-        raise ValueError('rnd functionality not in software')
+        raise ValueError('rnd functionality not in method')
 
     def lpdf(self, f=None, args=None):
         r"""
         Returns a log pdf at theta and x 
         """
-        raise ValueError('lpdf functionality not in software')
+        raise ValueError('lpdf functionality not in method')
 
 #### Below are some functions that I found useful.
 
@@ -715,7 +715,7 @@ def _matrixmatching(mat1, mat2):
     
     
     if (mat1.shape[0] > (10 ** (4))) or (mat2.shape[0] > (10 ** (4))):
-        raise ValueError('too many matchings attempted.  Don''t make the software work so hard!')
+        raise ValueError('too many matchings attempted.  Don''t make the method work so hard!')
     if mat1.ndim != mat2.ndim:
         raise ValueError('Somehow sent non-matching information to _matrixmatching')
     if mat1.ndim == 1:
