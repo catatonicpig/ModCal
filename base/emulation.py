@@ -12,9 +12,9 @@ class emulator(object):
         r"""
         Intitalizes an emulator or surrogate.
 
-        It directly calls "emulationsubfuncs.[software]" where [software] is
+        It directly calls "emulationmethods.[software]" where [software] is
         the user option with default listed above. If you would like to change this software, just
-        drop a new file in the "emulationsubfuncs" folder with the required formatting.
+        drop a new file in the "emulationmethods" folder with the required formatting.
 
         Parameters
         ----------
@@ -29,7 +29,7 @@ class emulator(object):
             column in f should correspond to a row in x. Each row should correspond to a row in
             f. We will attempt to resolve if these are flipped.
         software : str
-            A string that points to the file located in "emulationsubfuncs" you would
+            A string that points to the file located in "emulationmethods" you would
             like to use.
         args : dict
             Optional dictionary containing options you would like to pass to
@@ -114,7 +114,7 @@ class emulator(object):
             self.__f = None
         
         try:
-            self.software = importlib.import_module('base.emulationsubfuncs.' + software)
+            self.software = importlib.import_module('base.emulationmethods.' + software)
         except:
             raise ValueError('Module not loaded correctly.')
         if "fit" not in dir(self.software):

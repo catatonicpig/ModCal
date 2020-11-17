@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Header here."""
 import numpy as np
-from base.utilitiessubfuncs.plumleeMCMC import plumleepostsampler
+from base.utilitiesmethods.plumleeMCMC import plumleepostsampler
 
 def postsampler(thetastart, logpostfunc, options=None):
     """

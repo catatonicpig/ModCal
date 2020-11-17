@@ -5,16 +5,8 @@ import scipy.optimize as spo
 import scipy.linalg as spla
 import copy
 
-"""
-##############################################################################
-##############################################################################
-###################### THIS BEGINS THE REQUIRED PORTION ######################
-######### THE NEXT FUNCTIONS REQUIRED TO BE CALLED BY CALIBRATION ############
-##############################################################################
-##############################################################################
-"""
-
-"""
+""" 
+This is automatically filled by emulationfitinfo.py when running updatedocs.py
 ##############################################################################
 ################################### fit ######################################
 ### The purpose of this is to take information and plug all of our fit
@@ -25,7 +17,8 @@ import copy
 def fit(fitinfo, x, theta, f, args):
     r"""
     Fits a emulation model.
-
+    This is automatically filled by emulationfitdocstring.py when running updatedocs.py
+    
     Parameters
     ----------
     fitinfo : dict
@@ -100,16 +93,18 @@ def fit(fitinfo, x, theta, f, args):
 
 
 """
+This is automatically filled by emulationpredictinfo.py when running updatedocs.py
 ##############################################################################
 ################################### predict ##################################
 ### The purpose of this is to take an emulator emu alongside fitinfo, and 
-### predict at x. You shove all your information into the dictionary predinfo.
+### predict at x and theta. You shove all your information into the dictionary predinfo.
 ##############################################################################
 ##############################################################################
 """
 def predict(predinfo, fitinfo, x, theta,  args=None):
     r"""
     Finds prediction at theta and x given the dictionary fitinfo.
+    This is automatically filled by emulationpredictdocstring.py when running updatedocs.py
 
     Parameters
     ----------
@@ -169,6 +164,7 @@ def predict(predinfo, fitinfo, x, theta,  args=None):
     return
 
 """
+This is automatically filled by emulationadditionalfuncsinfo.py when running updatedocs.py
 ##############################################################################
 ##############################################################################
 ####################### THIS ENDS THE REQUIRED PORTION #######################
@@ -183,6 +179,7 @@ def predict(predinfo, fitinfo, x, theta,  args=None):
 def supplement(fitinfo, size, x=None, theta=None, cal=None):
     r"""
     Finds supplement theta and x given the dictionary fitinfo.
+    This is automatically filled 
 
     Parameters
     ----------

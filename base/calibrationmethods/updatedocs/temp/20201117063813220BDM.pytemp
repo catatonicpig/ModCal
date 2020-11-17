@@ -6,16 +6,8 @@ import copy
 
 """
 ##############################################################################
-##############################################################################
-###################### THIS BEGINS THE REQUIRED PORTION ######################
-######### THE NEXT FUNCTIONS REQUIRED TO BE CALLED BY CALIBRATION ############
-##############################################################################
-##############################################################################
-"""
-
-"""
-##############################################################################
 ################################### fit ######################################
+This [calibrationfitinfo] automatically filled by docinfo.py when running updatedocs.py
 ### The purpose of this is to take an emulator _emu_ and plug all of our fit
 ### information into _info_, which is a python dictionary. Example emu functions
 ### emupredict = emu(theta, x).predict()
@@ -31,9 +23,11 @@ import copy
 ##############################################################################
 ##############################################################################
 """
+
 def fit(fitinfo, emu, x, y,  args=None):
     r"""
     Fits a calibration model.
+    This [calibrationfitdocstring] automatically filled by docinfo.py when running updatedocs.py
 
     Parameters
     ----------
@@ -121,6 +115,7 @@ def fit(fitinfo, emu, x, y,  args=None):
 
 
 """
+This [calibrationpredictinfo] automatically filled by docinfo.py when running updatedocs.py
 ##############################################################################
 ################################### predict ##################################
 ### The purpose of this is to take an emulator emu alongside fitinfo, and 
@@ -131,6 +126,7 @@ def fit(fitinfo, emu, x, y,  args=None):
 def predict(predinfo, fitinfo, emu, x, args=None):
     r"""
     Finds prediction at x given the emulator _emu_ and dictionary fitinfo.
+    This [calibrationpredictdocstring] automatically filled by docinfo.py when running updatedocs.py
 
     Parameters
     ----------
@@ -212,6 +208,7 @@ def predict(predinfo, fitinfo, emu, x, args=None):
     return
 
 """
+This [calibrationadditionalfuncsinfo] automatically filled by docinfo.py when running updatedocs.py
 ##############################################################################
 ##############################################################################
 ####################### THIS ENDS THE REQUIRED PORTION #######################
@@ -229,6 +226,7 @@ def thetarnd(fitinfo, s=100, args=None):
     return fitinfo['thetarnd'][np.random.choice(fitinfo['thetarnd'].shape[0], size=s), :]
 
 """
+This [endfunctionsflag] is automatically filled by docinfo.py when running updatedocs.py
 ##############################################################################
 ##############################################################################
 ####################### THIS ENDS THE OPTIONAL PORTION #######################
@@ -236,7 +234,6 @@ def thetarnd(fitinfo, s=100, args=None):
 ##############################################################################
 ##############################################################################
 """
-
 def loglik(fitinfo, emu, theta, phi, y, x, args):
     r"""
     This is a optional docstring for an internal function.

@@ -13,9 +13,9 @@ class calibrator(object):
         r"""
         Intitalizes a calibration model.
 
-        It directly calls "calibrationsubfuncs.[software]" where [software] is
+        It directly calls "calibrationmethods.[software]" where [software] is
         the user option with default listed above. If you would like to change this software, just
-        drop a new file in the "calibrationsubfuncs" folder with the required formatting.
+        drop a new file in the "calibrationmethods" folder with the required formatting.
 
         Parameters
         ----------
@@ -34,7 +34,7 @@ class calibrator(object):
         yvar : array of float
             A one demensional array of the variance of observed values at x.  This is not required.
         software : str
-            A string that points to the file located in "calibrationsubfuncs" you would
+            A string that points to the file located in "calibrationmethods" you would
             like to use.
         args : dict
             A dictionary containing options you would like to pass to fit and/or predict
@@ -112,8 +112,9 @@ class calibrator(object):
             self.info['yvar'] = copy.deepcopy(yvar)
             if whichkeep is not None:
                 self.info['yvar'] = self.info['yvar'][whichkeep]
+        self.software = importlib.import_module('base.calibrationmethods.' + software)
         try:
-            self.software = importlib.import_module('base.calibrationsubfuncs.' + software)
+            self.software = importlib.import_module('base.calibrationmethods.' + software)
         except:
             raise ValueError('Module not found!')
         
@@ -140,7 +141,7 @@ class calibrator(object):
         r"""
         Returns a draws from theta and phi given data.
 
-        It directly calls  \"calibrationsubfuncs.[software].fit\" where \"[software]\" is
+        It directly calls  \"calibrationmethods.[software].fit\" where \"[software]\" is
         the user option.
 
         Parameters
@@ -158,7 +159,7 @@ class calibrator(object):
         r"""
         Returns a predictions at x.
 
-        It directly calls  \"calibrationsubfuncs.[software].predict\" where \"[software]\" is
+        It directly calls  \"calibrationmethods.[software].predict\" where \"[software]\" is
         the user option.
 
         Parameters
