@@ -8,7 +8,8 @@ import copy
 class emulator(object):
     """A class used to represent an emulator or surrogate model."""
 
-    def __init__(self, x=None, theta=None, f=None,  method='PCGP', args={}, options={}):
+    def __init__(self, x=None, theta=None, f=None,  method='PCGP', passthroughfunc = None,
+                 args={}, options={}):
         r"""
         Intitalizes an emulator or surrogate.
 
@@ -46,6 +47,9 @@ class emulator(object):
         emu : instance of emulation class
             An instance of the emulation class that can be used with the functions listed below.
         """
+        self.__ptf = passthroughfunc
+        if self.__ptf is not None:
+            return
         self._args = copy.deepcopy(args)
         
         if f is not None:
@@ -189,6 +193,12 @@ class emulator(object):
         prediction : an instance of emulation class prediction
             prediction._info : Gives the dictionary of what was produced by the method.
         """
+        if self.__ptf is not None:
+            info = {}
+            info['mean'] = self.__ptf(x, theta)
+            info['var'] = 0 *  info['mean'] 
+            info['covxhalf'] = 0 *  info['mean'][:,:,None]
+            return prediction(info, self)
         if args is not None:
             argstemp = {**self._args, **copy.deepcopy(args)} #properly merge the arguments
         else:
@@ -652,7 +662,7 @@ class prediction(object):
         """
         pfstr = 'predict' #prefix string
         opstr = 'mean' #operation string
-        if (pfstr + opstr) in dir(self.emu.method):
+        if (self.emu._emulator__ptf is None) and ((pfstr + opstr) in dir(self.emu.method)):
             if args is None:
                 args = self.emu.args
             return copy.deepcopy(self.emu.method.predictmean(self._info, args))
@@ -669,7 +679,7 @@ class prediction(object):
         """
         pfstr = 'predict' #prefix string
         opstr = 'var' #operation string
-        if (pfstr + opstr) in dir(self.emu.method):
+        if (self.emu._emulator__ptf is None) and ((pfstr + opstr) in dir(self.emu.method)):
             if args is None:
                 args = self.emu.args
             return copy.deepcopy(self.emu.method.predictvar(self._info, args))
@@ -686,7 +696,7 @@ class prediction(object):
         """
         pfstr = 'predict' #prefix string
         opstr = 'covx' #operation string
-        if (pfstr + opstr) in dir(self.emu.method):
+        if (self.emu._emulator__ptf is None) and ((pfstr + opstr) in dir(self.emu.method)):
             if args is None:
                 args = self.emu.args
             return copy.deepcopy(self.emu.method.predictcov(self._info, args))
@@ -713,7 +723,7 @@ class prediction(object):
         """
         pfstr = 'predict' #prefix string
         opstr = 'covxhalf' #operation string
-        if (pfstr + opstr) in dir(self.emu.method):
+        if (self.emu._emulator__ptf is None) and ((pfstr + opstr) in dir(self.emu.method)):
             if args is None:
                 args = self.emu.args
             return copy.deepcopy(self.emu.method.predictcov(self._info, args))

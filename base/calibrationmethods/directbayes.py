@@ -48,21 +48,22 @@ def fit(fitinfo, emu, x, y,  args=None):
         raise ValueError('Must provide yvar in this software.')
     
     thetaprior = fitinfo['thetaprior']
-    theta = thetaprior.rnd(1000)
+    theta = thetaprior.rnd(2500)
     thetadim = theta[0].shape[0]
+    
     def logpostfull(theta):
         logpost =thetaprior.lpdf(theta)
         if theta.ndim > 1.5:
             inds = np.where(np.isfinite(logpost))[0]
             logpost[inds] += loglik(fitinfo, emu, theta[inds], y, x, args)
         else:
-            logpost += loglik(fitinfo, emu, theta, y, x, args)
+            if np.isfinite(logpost):
+                logpost += loglik(fitinfo, emu, theta, y, x, args)
         return logpost
-    
-    numsamp = 1000
+    numsamp = 10000
     tarESS = np.max((100, 10 * theta.shape[1]))
     theta = postsampler(theta, logpostfull)
-    
+    Lm = np.max(logpostfull(theta))
     fitinfo['thetarnd'] = theta
     fitinfo['y'] = y
     fitinfo['x'] = x
@@ -179,6 +180,45 @@ This [endfunctionsflag] is automatically filled by docinfo.py when running updat
 ##############################################################################
 ##############################################################################
 """
+# def approxhess(fitinfo, emu, theta, y, x, args):
+#     r"""
+#     This is a optional docstring for an internal function.
+#     """
+    
+#     if 'yvar' in fitinfo.keys():
+#         obsvar = np.squeeze(fitinfo['yvar'])
+#     else:
+#         raise ValueError('Must provide yvar in this software.')
+#     #y = np.squeeze(y)
+#     p = theta.shape[1]
+    
+#     thetastd = np.std(theta,0)
+#     L0 = loglik(fitinfo, emu, theta, y, x, args)
+#     theta0 = theta[np.argmin(L0)]
+#     emumean = emu.predict(x, theta0).mean()
+#     emucovhalf = emu.predict(x, theta0).covxhalf()
+    
+#     fdir = np.zeros((emumean.shape[0], theta.shape[1]))
+#     obsvaradj = obsvar + 1 * np.sum(emucovhalf ** 2,0)
+#     for p in range(0,theta.shape[1]):
+#         thetadj = copy.copy(theta0)
+#         thetadj[p] += 10 ** (-4) * thetastd[p]
+#         emumeanadj1 = emu.predict(x, thetadj).mean()
+#         thetadj[p] -= 2*10 **(-4) * thetastd[p]
+#         emumeanadj2 = emu.predict(x, thetadj).mean()
+#         fdir[:,p] = np.squeeze((emumeanadj1-emumeanadj2) * (10 ** (4)) / 2)
+#     fdiradj = (fdir.T / np.sqrt(obsvaradj)).T
+#     D, W, _ = np.linalg.svd(fdir.T)
+#     W = W ** 2
+#     print(W)
+#     Amat = np.diag(np.sqrt(10**(-12) + W[:3])) @ D[:,:3].T
+#     bvec = - Amat @ theta0
+#     Cmat = D[:,:3] @ np.diag(1/np.sqrt(10**(-12) +W[:3]))
+#     dvec = Cmat @ Amat @ theta0
+    
+#     return Amat, bvec, Cmat, dvec
+
+
 def loglik(fitinfo, emu, theta, y, x, args):
     r"""
     This is a optional docstring for an internal function.
@@ -196,15 +236,24 @@ def loglik(fitinfo, emu, theta, y, x, args):
     loglik = np.zeros(emumean.shape[1])
     for k in range(0, emumean.shape[1]):
         m0 = emumean[:,k]
-        S0 = emucovhalf[:,k,:]
-        obsvaradj = obsvar + np.sum(S0 ** 2,0)
-        J = 1/ np.sqrt(obsvaradj) * emucovhalf[:,k,:]
+        S0 = np.squeeze(emucovhalf[:,k,:])
+        obsvaradj = np.squeeze(obsvar + 0.01*np.squeeze( np.sum(S0 ** 2,0)))
         stndresid = (np.squeeze(y) - m0) / np.sqrt(obsvaradj)
-        J2 =  S0 @ (stndresid / np.sqrt(obsvaradj))
         term1 = np.sum(stndresid ** 2)
-        W, V = np.linalg.eigh(np.eye(J.shape[0]) + J @ J.T)
-        J3 = V.T @ np.squeeze(J2)
-        term2 = np.sum((J3 ** 2) / W)
-        loglik[k] = - 0.5 * (term1-term2) - 0.5 * np.sum(np.log(W))
+        #loglik[k] = - 0.5 * term1
+        J = 1/ np.sqrt(obsvaradj) * S0
+        if J.ndim < 1.5:
+            J = J[:,None].T
+        J2 =  J @ stndresid
+        if J2.shape[0] == 1:
+            term2 =  J2** 2 / (1 + np.sum(J **2))
+            term3 = np.log(1 + np.sum(J **2))
+        else:
+            W, V = np.linalg.eigh(np.eye(J.shape[0]) + J @ J.T)
+            J3 = np.squeeze(V).T @ np.squeeze(J2)
+            term2 = np.sum((J3 ** 2) / W)
+            term3 = np.sum(np.log(W))
+        residsq = term1 - term2
+        loglik[k] += -0.5 * (m0.shape[0]+5) * np.log(residsq+5) - 0.5 * term3
     
     return loglik

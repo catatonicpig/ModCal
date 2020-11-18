@@ -351,7 +351,7 @@ class thetadist(object):
         else:
             raise ValueError(self.__methodnotfoundstr(pfstr, opstr))
     
-    def rnd(self, s=100, args=None):
+    def rnd(self, s=1000, args=None):
         r"""
         Returns s predictive draws for theta found during calibration.
         """

@@ -435,11 +435,11 @@ def __fitGP1d(theta, g, gvar=None, hypstarts=None, hypinds=None,prevsubmodel=Non
     if prevsubmodel is None:
         subinfo = {}
         subinfo['hypregmean'] = np.append(-0.25 + np.log(theta.shape[1]) + np.log(np.std(theta, 0)), (0, -20))
-        subinfo['hypregLB'] = np.append(-2 + np.log(np.std(theta, 0)), (-10, -30))
+        subinfo['hypregLB'] = np.append(-2 + np.log(np.std(theta, 0)), (-14, -30))
         subinfo['hypregUB'] = np.append(3 + np.log(np.std(theta, 0)), (1, -1))
-        subinfo['hypregstd'] = (subinfo['hypregUB'] - subinfo['hypregLB']) / 5
-        subinfo['hypregstd'][-2] = 2
-        subinfo['hypregstd'][-1] = 4
+        subinfo['hypregstd'] = (subinfo['hypregUB'] - subinfo['hypregLB']) / 3
+        subinfo['hypregstd'][-2] = 1
+        subinfo['hypregstd'][-1] = 2
         subinfo['hyp'] = 1*subinfo['hypregmean']
         if theta.shape[0] > 100:
             nhyptrain = np.max(np.min((20*theta.shape[1], theta.shape[0])))
@@ -488,7 +488,7 @@ def __fitGP1d(theta, g, gvar=None, hypstarts=None, hypinds=None,prevsubmodel=Non
             fcenter = Vh.T @ g
             subinfo['Vh'] = Vh
             n = subinfo['R'].shape[0]
-            subinfo['sig2'] = (np.mean(fcenter ** 2)*n + 10)/(n+10)
+            subinfo['sig2'] = (np.mean(fcenter ** 2)*n + 100)/(n+10)
             subinfo['Rinv'] = V @ np.diag(1/W) @ V.T
         else:
             subinfo['hyp'] = opval.x[:]
@@ -503,7 +503,7 @@ def __fitGP1d(theta, g, gvar=None, hypstarts=None, hypinds=None,prevsubmodel=Non
             W, V = np.linalg.eigh(subinfo['R'])
             Vh = V / np.sqrt(np.abs(W))
             fcenter = Vh.T @ g
-            subinfo['sig2'] = (np.mean(fcenter ** 2)*n + 10)/(n+10)
+            subinfo['sig2'] = (np.mean(fcenter ** 2)*n + 100)/(n+10)
             subinfo['Rinv'] = Vh  @ Vh.T
             subinfo['Vh'] = Vh
         subinfo['pw'] = subinfo['Rinv'] @ g
@@ -517,7 +517,7 @@ def __fitGP1d(theta, g, gvar=None, hypstarts=None, hypinds=None,prevsubmodel=Non
         W, V = np.linalg.eigh(subinfo['R'])
         Vh = V / np.sqrt(np.abs(W))
         fcenter = Vh.T @ g
-        subinfo['sig2'] = (np.mean(fcenter ** 2)*n + 10)/(n+10)
+        subinfo['sig2'] = (np.mean(fcenter ** 2)*n + 100)/(n+10)
         subinfo['Rinv'] = V @ np.diag(1/W) @ V.T
         subinfo['Vh'] = Vh
         subinfo['pw'] = subinfo['Rinv'] @ g
@@ -561,7 +561,7 @@ def __negloglik(hyp, info):
     Vh = V / np.sqrt(np.abs(W))
     fcenter = Vh.T @ info['g']
     n = info['g'].shape[0]
-    sig2hat = (n* np.mean(fcenter ** 2) + 10) / (n + 10)
+    sig2hat = (n* np.mean(fcenter ** 2) + 0) / (n + 0)
     negloglik = 1/2 * np.sum(np.log(np.abs(W))) + 1/2 * n * np.log(sig2hat)
     negloglik += 0.5*np.sum(((hyp-info['hypregmean']) ** 2) /
                             (info['hypregstd'] ** 2))
@@ -583,11 +583,11 @@ def __negloglikgrad(hyp, info):
     Vh = V / np.sqrt(np.abs(W))
     fcenter = Vh.T @ info['g']
     n = info['g'].shape[0]
-    sig2hat = (n* np.mean(fcenter ** 2) + 10) / (n + 10)
+    sig2hat = (n* np.mean(fcenter ** 2) + 0) / (n + 0)
     dnegloglik = np.zeros(dR.shape[2])
     Rinv = Vh @ Vh.T
     for k in range(0, dR.shape[2]):
-        dsig2hat =  - np.sum((Vh @ np.multiply.outer(fcenter, fcenter) @ Vh.T) * dR[:, :, k]) / (n+10)
+        dsig2hat =  - np.sum((Vh @ np.multiply.outer(fcenter, fcenter) @ Vh.T) * dR[:, :, k]) / (n+0)
         dnegloglik[k] += 0.5* n * dsig2hat / sig2hat
         dnegloglik[k] += 0.5*np.sum(Rinv * dR[:, :, k])
     dnegloglik += (hyp-info['hypregmean'])/(info['hypregstd'] ** 2)

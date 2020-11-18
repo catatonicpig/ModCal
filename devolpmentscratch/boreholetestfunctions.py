@@ -5,8 +5,6 @@ import numpy as np
 
 def borehole_model(x, theta):
     """Given x and theta, return matrix of [row x] times [row theta] of values."""
-    assert theta.ndim == 2
-    assert x.ndim == 2
 
     theta = tstd2theta(theta)
     x = xstd2x(x)
@@ -23,7 +21,7 @@ def borehole_model(x, theta):
 def borehole_true(x):
     """Given x, return matrix of [row x] times 1 of values."""
     # assume true theta is [0.5]^d
-    theta0 = np.atleast_2d(np.array([0.5] * 6))
+    theta0 = np.atleast_2d(np.array([0.5] * 4))
     f0 = borehole_model(x, theta0)
 
 
@@ -32,46 +30,43 @@ def borehole_true(x):
 
 def borehole_vec(x, theta):
     """Given x and theta, return vector of values."""
-    (Tu, Tl, Hu, Hl, r, Kw) = np.split(theta, theta.shape[1], axis=1)
-    (rw, L) = np.split(x[:, :-1], 2, axis=1)
-    numer = 2 * np.pi * Tu * (Hu - Hl)
-    denom1 = 2 * L * Tu / (np.log(r/rw) * rw**2 * Kw)
-    denom2 = Tu / Tl
+    (Hu, Ld_Kw, Treff, powparam) = np.split(theta, theta.shape[1], axis=1)
+    (rw,  Hl) = np.split(x[:, :-1], 2, axis=1)
+    numer = 2 * np.pi *  (Hu - Hl)
+    denom1 = 2 * Ld_Kw / rw ** 2
+    denom2 = Treff
     
-    f = (numer / (np.log(r/rw) * (1 + denom1 + denom2))).reshape(-1)
-    f[x[:, -1] < 0.5] = np.abs(f[x[:, -1] < 0.5]) ** (0.75)
-    f[x[:, -1] > 0.5] = np.abs(f[x[:, -1] > 0.5]) ** (1.25)
+    f = ((numer / ((denom1 + denom2))) * np.exp(powparam * rw)).reshape(-1)
     return f
 
 
 def tstd2theta(tstd, hard=True):
     """Given standardized theta in [0, 1]^d, return non-standardized theta."""
-    assert tstd.ndim == 2
-    (Tus, Tls, Hus, Hls, rs, Kws) = np.split(tstd, tstd.shape[1], axis=1)
-
-    Tu = Tus * (115600 - 63070) + 63070
-    Tl = Tls * (116 - 63.1) + 63.1
+    if tstd.ndim < 1.5:
+        tstd = tstd[:,None].T
+    (Treffs, Hus, LdKw, powparams) = np.split(tstd, tstd.shape[1], axis=1)
+    
+    Treff = (0.5-0.05) * Treffs + 0.05
     Hu = Hus * (1110 - 990) + 990
-    Hl = Hls * (820 - 700) + 700
-    rs = rs * (np.log(50000) - np.log(100)) + np.log(100)
-    r = np.minimum(np.exp(rs),50000)
-    r = np.maximum(np.exp(rs),100)
     if hard:
-        Kw = Kws * (15000 - 1500) + 1500
+        Ld_Kw = LdKw* (1680/1500 - 1120/15000) + 1120/15000
     else:
-        Kw = Kws * (12045 - 9855) + 9855
-
-    theta = np.hstack((Tu, Tl, Hu, Hl, r, Kw))
+        Ld_Kw = LdKw*(1680/9855 - 1120/12045) + 1120/12045
+    
+    powparam = powparams * (0.5 - (- 0.5)) + (-0.5)
+    
+    theta = np.hstack((Hu, Ld_Kw, Treff, powparam))
     return theta
 
 
 def xstd2x(xstd):
     """Given standardized x in [0, 1]^2 x {0, 1}, return non-standardized x."""
     assert xstd.ndim == 2
-    (rws, Ls, labels) = np.split(xstd, xstd.shape[1], axis=1)
+    (rws, Hls, labels) = np.split(xstd, xstd.shape[1], axis=1)
 
-    rw = rws * (0.15 - 0.05) + 0.05
-    L = Ls * (1680 - 1120) + 1120
+    rw = rws * (np.log(0.5) - np.log(0.05)) + np.log(0.05)
+    rw = np.exp(rw)
+    Hl = Hls * (820 - 700) + 700
 
-    x = np.hstack((rw, L, labels))
+    x = np.hstack((rw, Hl, labels))
     return x
