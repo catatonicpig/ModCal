@@ -48,6 +48,8 @@ xtot[xtot[:,1] == 50, 1] = 'highdrop'
 # we now create a computer experiment to build an emulator
 thetacompexp_lin = priorphys_lin.rnd(50)  # drawing 50 rndom parameters from the prior
 linear_results = balldropmodel_linear(xtotv, thetacompexp_lin)  # the value of the linear simulation
+
+
 # This is for all vectors in the input of interest
 emu_lin = emulator(xtot, thetacompexp_lin, linear_results, method = 'PCGPwM')  # this builds an emulator 
 # for the linear simulation. this is a specialized class specific to ModCal.

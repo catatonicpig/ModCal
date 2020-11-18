@@ -173,7 +173,7 @@ class emulator(object):
         Fits an emulator or surrogate.
         
         Calls
-        preddict = [method].predict(emu.theta, args = args)
+        preddict = [method].predict(x, theta, args = args)
 
         Parameters
         ----------
@@ -210,7 +210,7 @@ class emulator(object):
             if x.ndim == 2 and self.__x.ndim == 1:
                 raise ValueError('Your x shape seems to not agree with the emulator build.')
             elif x.ndim == 1 and self.__x.ndim == 2 and x.shape[0] == self.__x.shape[1]:
-                x = np.reshape(x, (1,-1))
+                x = np.reshape(x, (-1,1))
             elif x.ndim == 1 and self.__x.ndim == 2:
                 raise ValueError('Your x shape seems to not agree with the emulator build.')
             elif x.shape[1] != self.__x.shape[1] and x.shape[0] == self.__x.shape[1]:
@@ -224,7 +224,7 @@ class emulator(object):
             if theta.ndim == 2 and self.__theta.ndim == 1:
                 raise ValueError('Your theta shape seems to not agree with the emulator build.')
             elif theta.ndim == 1 and self.__theta.ndim == 2 and theta.shape[0] == self.__theta.shape[1]:
-                theta = np.reshape(theta, (1,-1))
+                theta = np.reshape(theta, (-1,1))
             elif theta.ndim == 1 and self.__theta.ndim == 2:
                 raise ValueError('Your theta shape seems to not agree with the emulator build.')
             elif theta.shape[1] != self.__theta.shape[1] and theta.shape[0] == self.__theta.shape[1]:
