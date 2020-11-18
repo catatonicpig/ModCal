@@ -46,7 +46,7 @@ def fit(fitinfo, emu, x, y,  args=None):
     theta = thetaprior.rnd(1000)
     
     if 'yvar' in fitinfo.keys():
-        obsvar = fitinfo['yvar']
+        obsvar = np.squeeze(fitinfo['yvar'])
     else:
         raise ValueError('Must provide yvar in this software.')
     
@@ -69,6 +69,10 @@ def fit(fitinfo, emu, x, y,  args=None):
         phidim = (phiprior.rnd(1)).shape[1]
         thetaphi = np.hstack((theta,phi))
     def logpostfull(thetaphi):
+        skipprioradj = False
+        if thetaphi.ndim < 1.5:
+            thetaphi = np.reshape(thetaphi,(1,-1))
+            skipprioradj = True
         if phidim > 0.5:
             theta = thetaphi[:, :thetadim]
             phi = thetaphi[:, thetadim:]
@@ -76,12 +80,14 @@ def fit(fitinfo, emu, x, y,  args=None):
             theta = thetaphi
             phi = None
         logpost =thetaprior.lpdf(theta) + phiprior.lpdf(phi)
-        
         inds = np.where(np.isfinite(logpost))[0]
-        if phi is None:
-            logpost[inds] += loglik(fitinfo, emu, theta[inds], None, y, x, args)
+        if not skipprioradj:
+            if phi is None:
+                logpost[inds] += loglik(fitinfo, emu, theta[inds], None, y, x, args)
+            else:
+                logpost[inds] += loglik(fitinfo,emu, theta[inds], phi[inds], y, x, args)
         else:
-            logpost[inds] += loglik(fitinfo,emu, theta[inds], phi[inds], y, x, args)
+            logpost += loglik(fitinfo,emu, theta, phi, y, x, args)
         return logpost
     
     numsamp = 1000
@@ -144,7 +150,7 @@ def predict(predinfo, fitinfo, emu, x, args=None):
         theta = theta.reshape((1, theta.shape[0]))
     
     if 'yvar' in fitinfo.keys():
-        obsvar = fitinfo['yvar']
+        obsvar = np.squeeze(fitinfo['yvar'])
     else:
         raise ValueError('Must provide yvar in this software.')
     
@@ -229,7 +235,7 @@ def loglik(fitinfo, emu, theta, phi, y, x, args):
     
     
     if 'yvar' in fitinfo.keys():
-        obsvar = fitinfo['yvar']
+        obsvar = np.squeeze(fitinfo['yvar'])
     else:
         raise ValueError('Must provide yvar in this software.')
     

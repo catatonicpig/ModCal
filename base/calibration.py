@@ -47,10 +47,10 @@ class calibrator(object):
         self.args = args
         if y is None:
             raise ValueError('You have not provided any y.')
+        if y.ndim > 1.5:
+            y = np.squeeze(y)
         if y.shape[0] < 5:
             raise ValueError('5 is the minimum number of observations at this time.')
-        if y.ndim > 1.5:
-            raise ValueError('y must be a vector of length at least 5.')
         self.y = y
         if emu is None:
             raise ValueError('You have not provided any emulator.')
@@ -63,14 +63,15 @@ class calibrator(object):
                 raise ValueError('thetaprior.rnd(100) failed to give 100 values.')
         except:
             raise ValueError('thetaprior.rnd(100) failed.')
-        try:
-            thetatestlpdf = thetaprior.lpdf(thetatestsamp)
-            if thetatestlpdf.shape[0] != 100:
-                raise ValueError('thetaprior.lpdf(thetaprior.rnd(100)) failed to give 100 values.')
-            if thetatestlpdf.ndim != 1:
-                raise ValueError('thetaprior.lpdf(thetaprior.rnd(100)) is demension higher than 1.')
-        except:
-            raise ValueError('thetaprior.lpdf(thetaprior.rnd(100)) failed.')
+        
+        thetatestlpdf = thetaprior.lpdf(thetatestsamp)
+        if thetatestlpdf.shape[0] != 100:
+            raise ValueError('thetaprior.lpdf(thetaprior.rnd(100)) failed to give 100 values.')
+        if thetatestlpdf.ndim != 1:
+            raise ValueError('thetaprior.lpdf(thetaprior.rnd(100)) is demension higher than 1.')
+       # except:
+        #    print(thetaprior.lpdf(thetaprior.rnd(100)))
+        #    raise ValueError('thetaprior.lpdf(thetaprior.rnd(100)) failed.')
         self.info = {}
         self.info['thetaprior'] = copy.deepcopy(thetaprior)
         
@@ -119,7 +120,6 @@ class calibrator(object):
             raise ValueError('Module not found!')
         
         self.fit()
-        self.theta = thetadist(self)
 
     def __repr__(self):
         object_method = [method_name for method_name in dir(self)
@@ -152,7 +152,11 @@ class calibrator(object):
         if args is None:
             args = self.args
         self.method.fit(self.info, self.emu, self.x, self.y, args)
-        return None
+        if hasattr(self, 'theta'):
+            del self.theta
+        newtheta = thetadist(self)
+        self.theta = newtheta
+        return
 
 
     def predict(self, x=None, args=None):
@@ -326,8 +330,7 @@ class thetadist(object):
         elif (pfstr+opstr) in self.cal.info.keys():
             return copy.deepcopy(self.cal.info[(pfstr+opstr)])
         elif (pfstr+'rnd') in self.cal.info.keys():
-            self.cal.info[(pfstr+opstr)] = np.mean(self.cal.info[(pfstr+'rnd')], 0)
-            return copy.deepcopy(self.cal.info[(pfstr+opstr)])
+            return np.mean(self.cal.info[(pfstr+'rnd')], 0)
         else:
             raise ValueError(self.__methodnotfoundstr(pfstr, opstr))
 
@@ -344,8 +347,7 @@ class thetadist(object):
         elif (pfstr+opstr) in self.cal.info.keys():
             return copy.deepcopy(self.cal.info[(pfstr+opstr)])
         elif (pfstr+'rnd') in self.cal.info.keys():
-            self.cal.info[(pfstr+opstr)] = np.var(self.cal.info[(pfstr+'rnd')], 0)
-            return copy.deepcopy(self.cal.info[(pfstr+opstr)])
+            return np.var(self.cal.info[(pfstr+'rnd')], 0)
         else:
             raise ValueError(self.__methodnotfoundstr(pfstr, opstr))
     

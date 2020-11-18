@@ -121,8 +121,8 @@ class emulator(object):
             raise ValueError('Function fit not found in module!')
         if "predict" not in dir(self.method):
             raise ValueError('Function predict not found in module!')
-        if "supplement" not in dir(self.method):
-            print('Function supplement not found in module!')
+        if "supplementtheta" not in dir(self.method):
+            print('Function supplementtheta not found in module!')
         self.__options = {}
         self.__optionsset(options)
         self._info = {}
@@ -200,7 +200,7 @@ class emulator(object):
             if x.ndim == 2 and self.__x.ndim == 1:
                 raise ValueError('Your x shape seems to not agree with the emulator build.')
             elif x.ndim == 1 and self.__x.ndim == 2 and x.shape[0] == self.__x.shape[1]:
-                x = reshape(x, (-1,1))
+                x = np.reshape(x, (1,-1))
             elif x.ndim == 1 and self.__x.ndim == 2:
                 raise ValueError('Your x shape seems to not agree with the emulator build.')
             elif x.shape[1] != self.__x.shape[1] and x.shape[0] == self.__x.shape[1]:
@@ -214,17 +214,17 @@ class emulator(object):
             if theta.ndim == 2 and self.__theta.ndim == 1:
                 raise ValueError('Your theta shape seems to not agree with the emulator build.')
             elif theta.ndim == 1 and self.__theta.ndim == 2 and theta.shape[0] == self.__theta.shape[1]:
-                theta = reshape(theta, (-1,1))
+                theta = np.reshape(theta, (1,-1))
             elif theta.ndim == 1 and self.__theta.ndim == 2:
                 raise ValueError('Your theta shape seems to not agree with the emulator build.')
             elif theta.shape[1] != self.__theta.shape[1] and theta.shape[0] == self.__theta.shape[1]:
                 theta = theta.T
+                print('here?')
             elif theta.shape[1] != self.__theta.shape[1] and theta.shape[0] != self.__theta.shape[1]:
                 raise ValueError('Your theta shape seems to not agree with the emulator build.')
         
         info = {}
-        self.method.predict(info, self._info, copy.copy(x), copy.copy(theta),
-                              copy.deepcopy(args))
+        self.method.predict(info, self._info, x, theta, args)
         return prediction(info, self)
     
     def supplement(self, size, theta=None, x=None, cal=None, args=None, overwrite=False):
@@ -240,87 +240,127 @@ class emulator(object):
             The number of of new supplements you would like to choose. If only theta is supplied, 
             it will return at most size of those. If only x is supplied, it will return at most
             size of those. If  both x and theta are supplied, then size will be less than 
-            the product of the returned theta and x.
+            the product of the number of returned theta and the number of x.
         theta : optional array of float
-            An array of parameters where you would like to predict. YYou must provide either theta, 
-            x or both or another object like cal.
+            An array of parameters where you would like to predict. A user must provide either x, 
+            theta or both or another object like cal.
         x : optional array of float
-            An array of parameters where you would like to predict. You must provide either theta, 
-            x or both or another object like cal.
+            An array of parameters where you would like to predict. A user must provide either x, 
+            theta or both or another object like cal.
         cal : optional calibrator object
-            A calibrator object that contains information about calibration. You must provide either 
-            theta, x or both or another object like cal.
+            A calibrator object that contains information about calibration. A user must provide 
+            either x, theta or both or another object like cal.
         args : optional dict
-            A dictionary containing options you would like to pass to  [method].supplement(theta, 
-            phi, args).  Defaults to the one used to build emu.
+            A dictionary containing options you would like to pass to the method.
+            Defaults to the one used to build emu.
         overwrite : boolean
-            Do you want to replace existing supplement?  If not, and one exists, it will return 
+            Do you want to replace existing supplement?  If False, and one exists, it will return 
             without doing anything.
         Returns
         -------
-        theta : at most n new values of parameters to include
+        theta, info : If returning supplemented thetas
+        x, info : If returning supplemented xs
+        x, theta, info : If returning both x and theta
         """
         
-        if args is None:
-            args = self._args
+        if args is not None:
+            argstemp = {**self._args, **copy.deepcopy(args)} #properly merge the arguments
+        else:
+            argstemp = copy.copy(self._args)
         
         if size < 0.5:
             if size == 0:
                 print('since size is zero, we presume you just want to return current supp.  If'+
-                      ' supptheta exists, returning ')
+                      ' supptheta exists, we are returning that now.')
                 return copy.deepcopy(self.__supptheta)
             else:
-                raise ValueError('The number of new parameters must be a positive integer.')
-        if cal is None and theta is None:
+                raise ValueError('The number of new values must be a positive integer.')
+        if cal is None and theta is None and x is None:
             raise ValueError('Either a calibrator or thetas must be provided.')
-            
         if cal is not None:
             try:
-                print('overwriting given theta because cal is provided...')
-                theta = cal.theta(1000)
+                if theta is None:
+                    theta = cal.theta(1000)
             except:
                 raise ValueError('cal.theta(1000) failed.')
+        
+        if x is not None and theta is not None:
+            raise ValueError('You must either provide either x or (theta or cal).')
+        
         
         if x is not None and self.__suppx is not None and (not overwrite):
             raise ValueError('You must either evaulate the stuff in emu._emulator__suppx  or select'
                             + ' overwrite = True.')
+        elif x is not None:
+            x = copy.copy(x)
+            if self.__x.shape[1] != x.shape[1]:
+                raise ValueError('x has the wrong shape, it does not match emu._emulator__x.')
+        else:
+            x = None
+        
         if theta is not None and self.__supptheta is not None and (not overwrite):
             raise ValueError('You must either evaulate the stuff in emu._emulator__supptheta or select'
                             + ' overwrite = True.')
-        
-        else:
+        elif theta is not None:
+            theta = copy.copy(theta)
             if self.__theta.shape[1] != theta.shape[1]:
-                raise ValueError('theta has the wrong shape, it does not match emu.theta.')
-            if theta.shape[0] > 10000:
-                print('To stop memory issues, supply less than 10000 thetas...')
-            thetadraw = theta[:10000,:]
+                raise ValueError('theta has the wrong shape, it does not match emu._emulator__theta.')
+        elif cal is not None:
+            theta = copy.copy(cal.theta(1000))
+            if self.__theta.shape[1] != theta.shape[1]:
+                raise ValueError('cal.theta(n) produces the wrong shape.')
+        else:
+            theta = None
         
-        supptheta, suppx, suppinfo = self.method.supplement(self._info,size,
-                                                              copy.deepcopy(self.__x),
-                                                              copy.deepcopy(thetadraw),
-                                                              cal)
-        if not self.__options['thetareps']:
-            nc, c, r = _matrixmatching(self.__theta, supptheta)
+        if theta is not None:
+            supptheta, suppinfo = self.method.supplementtheta(self._info, size, theta,
+                                                                cal, argstemp)
+            suppx = None
         else:
-            nc = np.array(range(0,supptheta.shape[0])).astype('int')
-        if nc.shape[0] < 0.5:
-            print('Was not able to assign any new values because everything ' +
-                  'was a replication of emu.__theta.')
-            self.__supptheta = None
-        else:
-            if nc.shape[0] < supptheta.shape[0]:
-                print('Had to remove replications versus emu.__theta.')
-                supptheta = supptheta[nc,:]
-            self.__supptheta = supptheta
+            suppx, suppinfo = self.method.supplementx(self._info, size, x, cal, argstemp)
+            supptheta = None
+        
+        if suppx is not None and (not self.__options['xreps']):
+            ncx, cx, rx = _matrixmatching(self.__x, suppx)
+        elif suppx is not None:
+            cx = np.empty()
+            ncx = np.array(range(0,suppx.shape[0])).astype('int')
+        
+        if supptheta is not None and (not self.__options['thetareps']):
+            nctheta, ctheta, rtheta = _matrixmatching(self.__theta, supptheta)
+        elif supptheta is not None:
+            ctheta = np.empty()
+            nctheta = np.array(range(0,supptheta.shape[0])).astype('int')
+        
+        
+        if supptheta is None:
+            if ncx.shape[0] < 0.5:
+                print('Was not able to assign any new values because everything ' +
+                      'was a replication of emu.__theta.')
+                self.__suppx = None
+            else:
+                if ncx.shape[0] < suppx.shape[0]:
+                    print('Had to remove replications versus xs.')
+                    suppx = suppx[nctheta,:]
+                self.__suppx = copy.copy(suppx)
+        
+        if suppx is None:
+            if nctheta.shape[0] < 0.5:
+                print('Was not able to assign any new values because everything ' +
+                      'was a replication of emu.__theta.')
+                self.__supptheta = None
+            else:
+                if nctheta.shape[0] < supptheta.shape[0]:
+                    print('Had to remove replications versus thetas.')
+                    supptheta = supptheta[nctheta,:]
+                self.__supptheta = copy.copy(supptheta)
         
         if self.__supptheta is not None and self.__suppx is None:
-            return copy.deepcopy(self.__supptheta), suppinfo
+            return copy.copy(self.__supptheta), suppinfo
         elif self.__suppx is not None and self.__supptheta is None:
-            return copy.deepcopy(self.__suppx), suppinfo
-        elif self.__supptheta is not None and self.__suppx is not None:
-            return copy.deepcopy(self.__suppx), copy.deepcopy(self.__supptheta), suppinfo
+            return copy.copy(self.__suppx), suppinfo
         else:
-            raise ValueError('Nothing to return.')
+            raise ValueError('Something went wrong...')
         
     
     def update(self,theta=None, f=None,  x=None, args=None, options=None):
@@ -354,13 +394,13 @@ class emulator(object):
         -------
         """
         if theta is not None:
-            theta = copy.deepcopy(theta)
+            theta = copy.copy(theta)
         if f is not None:
-            f = copy.deepcopy(f)
+            f = copy.copy(f)
         if x is not None:
-            x = copy.deepcopy(x)
+            x = copy.copy(x)
         if options is not None:
-            self.__optionsset(copy.deepcopy(options))
+            self.__optionsset(copy.copy(options))
         if args is not None:
             self._args = {**self._args, **copy.deepcopy(args)} #properly merge the arguments
         if f is not None and theta is None and x is None:
@@ -672,7 +712,7 @@ class prediction(object):
         That is, if this returns A = predict.covhalf(.)[k], than A.T @ A = predict.cov(.)[k]
         """
         pfstr = 'predict' #prefix string
-        opstr = 'covhalf' #operation string
+        opstr = 'covxhalf' #operation string
         if (pfstr + opstr) in dir(self.emu.method):
             if args is None:
                 args = self.emu.args

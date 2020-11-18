@@ -131,6 +131,9 @@ def predict(predinfo, fitinfo, x, theta,  args=None):
     infos = fitinfo['emulist']
     predvecs = np.zeros((theta.shape[0], len(infos)))
     predvars = np.zeros((theta.shape[0], len(infos)))
+    if predvecs.ndim < 1.5:
+        predvecs = predvecs.reshape((1,-1))
+        predvars = predvars.reshape((1,-1))
     if x is not None:
         matchingmatrix = np.ones((x.shape[0], fitinfo['x'].shape[0]))
         for k in range(0,x[0].shape[0]):
@@ -149,6 +152,8 @@ def predict(predinfo, fitinfo, x, theta,  args=None):
             rsave[k] = __covmat(theta, fitinfo['theta'], infos[k]['hypcov'])
         r = (1-infos[k]['nug']) * np.squeeze(rsave[infos[k]['hypind']])
         rVh = r @ infos[k]['Vh']
+        if rVh.ndim < 1.5:
+            rVh = rVh.reshape((1,-1))
         predvecs[:, k] = r @ infos[k]['pw']
         predvars[:, k] = infos[k]['sig2'] * (1 - np.sum(rVh ** 2, 1))
     predinfo['mean'] = np.full((x.shape[0], theta.shape[0]),np.nan)
@@ -175,22 +180,21 @@ This [emulationadditionalfuncsinfo] automatically filled by docinfo.py when runn
 ##############################################################################
 ##############################################################################
 """
-
-
-def supplement(fitinfo, size, x=None, theta=None, cal=None):
+def supplementtheta(fitinfo, size, theta, cal, args):
     r"""
-    Finds supplement theta and x given the dictionary fitinfo.
-    This is automatically filled 
+    Finds supplement theta given the dictionary fitinfo.
+    This [emulationsupplementthetadocstring] is automatically filled by docinfo.py when running 
+    updatedocs.py
 
     Parameters
     ----------
     fitinfo : dict
         An arbitary dictionary where you placed all your important fitting information from the 
         fit function above.
-    x : array
-        An array of x values where you want to predict.
+    size : integer
+        The number of thetas the user wants.
     theta : array
-        An array of theta values where you want to predict.
+        An array of theta values where you want to predict.  This will not always be provided.
     cal : instance of emulator class
         An emulator class instance as defined in calibration.  This will not always be provided.
     args : dict
@@ -200,22 +204,21 @@ def supplement(fitinfo, size, x=None, theta=None, cal=None):
     ----------
     Note that we should have theta.shape[0] * x.shape[0] < size
     theta : array
-        An array of theta values where you should sample.
-    x : array
-        An array of x values where you should sample.
+        An array of theta values that should be sampled should sample.
     info : array
-        An an optional info dictionary you can pass back to the user.
+        An an optional info dictionary that can pass back to the user.
     """
+    if theta is None: 
+        raise ValueError('this method is designed to take in the theta values.')
     
-    ntheta = size
     infos = copy.copy(fitinfo['emulist'])
     thetaold = copy.copy(fitinfo['theta'])
     norig = thetaold.shape[0]
     varpca = copy.copy(fitinfo['pcstdvar'])
     
     thetaposs = copy.copy(theta)
-    if thetaposs.shape[0] > 10 * ntheta:
-        thetac = np.random.choice(thetaposs.shape[0], 10 * ntheta, replace=False)
+    if thetaposs.shape[0] > 10 * size:
+        thetac = np.random.choice(thetaposs.shape[0], 10 * size, replace=False)
         thetaposs = thetaposs[thetac,:]
     
     rsave = np.array(np.ones(len(infos)), dtype=object)
@@ -232,7 +235,7 @@ def supplement(fitinfo, size, x=None, theta=None, cal=None):
             R[k] = __covmat(thetaold, thetaold, infos[k]['hypcov'])
             R[k] = (1-infos[k]['nug']) * R[k] + np.eye(R[k].shape[0]) * infos[k]['nug']
     critsave = np.zeros(thetaposs.shape[0])
-    for j in range(0,ntheta):
+    for j in range(0,4*size):
         crit = 0*crit
         if thetaposs.shape[0] < 1.5:
             thetaold = np.vstack((thetaold, thetaposs))
@@ -259,9 +262,56 @@ def supplement(fitinfo, size, x=None, theta=None, cal=None):
         crit = np.delete(crit, jstar)
         varpca = np.vstack((varpca,0*varpca[0, :]))
     
+    for k in range(0, len(infos)):
+        if infos[k]['hypind'] == k:
+            rsave[k] = (1-infos[k]['nug']) * __covmat(theta, thetaold, infos[k]['hypcov'])
+            R[k] = __covmat(thetaold, thetaold, infos[k]['hypcov'])
+            R[k] = (1-infos[k]['nug']) * R[k] + np.eye(R[k].shape[0]) * infos[k]['nug']
+    
+    # eliminant some values and see what happens
+    epsilon = fitinfo['epsilon']
+    pcw = copy.copy(fitinfo['pcw'])
+    pct = copy.copy(fitinfo['pct'] / pcw)
+    
+    G = np.array(np.ones(len(infos)), dtype=object)
+    D = np.array(np.ones(len(infos)), dtype=object)
+    for k in range(0, len(infos)):
+        kind =infos[k]['hypind'] 
+        R00 = R[kind][:norig, :][:, :norig]
+        R0N = R[kind][:norig, :][:, norig:]
+        RNN = R[kind][norig:, :][:, norig:]
+        RA0 = rsave[kind][:, :norig]
+        RAN = rsave[kind][:, norig:]
+        Q = RA0 @ np.linalg.solve(R00, R0N) - RAN
+        V = RNN - R0N.T @ np.linalg.solve(R00, R0N)
+        D[k], H  = np.linalg.eigh(V)
+        D[k] = np.minimum(D[k],0)
+        G[k] = np.sum((Q @ H) ** 2,0)
+    xorder = []
+    wherenotmof = list(range(0,pct.shape[0]))
+    for i  in range(0,pct.shape[0]):
+        H = pct[wherenotmof,:].T @ pct[wherenotmof,:]
+        pcstdvar = np.inf
+        kstar = None
+        numx = fitinfo['pct'].shape[0]
+        
+        pcstdvarprop = np.zeros((len(wherenotmof), pcw.shape[0]))
+        totcrit = np.zeros(len(wherenotmof))
+        for j in range(0,len(wherenotmof)):
+            Hu = H - np.outer(pct[j,:], pct[j,:])
+            Qmat = np.diag(epsilon / pcw ** 2) + Hu
+            term3 = np.diag(Hu) - np.sum(Hu * spla.solve(Qmat,Hu),0)
+            pcstdvarprop = np.abs(1 - (pcw ** 2 /epsilon +1) * term3)
+            for k in range(0, len(infos)):
+                totcrit[j] += weightma[k] * np.mean(G[k] / (D[k] + pcstdvarprop[k]))
+        xindstar = wherenotmof[np.argmax(totcrit)]
+        xorder.append(xindstar)
+        wherenotmof.remove(xindstar)
+    
     info ={}
     info['crit'] = critsave
-    return thetaold[norig:,:], x, info
+    info['orderedx'] = fitinfo['x'][xorder,:]
+    return thetaold[norig:(norig+size),:], info
 
 """
 ##############################################################################
@@ -278,6 +328,7 @@ def __standardizef(fitinfo, offset=None, scale=None):
     f = fitinfo['f']
     mof = fitinfo['mof']
     mofrows = fitinfo['mofrows']
+    epsilon = 10 ** (-4)
     if (offset is not None) and (scale is not None):
         if offset.shape[0] == f.shape[1] and scale.shape[0] == f.shape[1]:
             if np.any(np.nanmean(np.abs(f-offset)/scale,1) > 4):
@@ -305,9 +356,8 @@ def __standardizef(fitinfo, offset=None, scale=None):
                 a[::2] = 1
                 a[1::2] = -1
                 fs[np.where(mof[:, k])[0], k] = a
-        for iters in range(0,20):
+        for iters in range(0,4):
             U, S, _ = np.linalg.svd(fs.T, full_matrices=False)
-            epsilon = 10 ** (-3)
             Sp = S ** 2 - epsilon
             Up = U[:, Sp > 0]
             Sp = np.sqrt(Sp[Sp > 0])
@@ -319,7 +369,8 @@ def __standardizef(fitinfo, offset=None, scale=None):
                 Amat = epsilon * np.diag(1 / (Sp ** 2)) + H
                 J = Up[wherenotmof,:].T @ fs[rv,wherenotmof]
                 fs[rv,wheremof] = (Up[wheremof,:] * ((Sp / np.sqrt(epsilon)) ** 2)) @ (J -\
-                    H @ (np.linalg.solve(Amat, J)))
+                    H @ (spla.solve(Amat, J,assume_a='pos')))
+    fitinfo['epsilon'] = epsilon
     # Assigning new values to the dictionary
     fitinfo['offset'] = offset
     fitinfo['scale'] = scale
@@ -330,12 +381,12 @@ def __standardizef(fitinfo, offset=None, scale=None):
 def __PCs(fitinfo, pct=None, pcw=None, extravar=None):
     "Creates BLANK."
     # Extracting from input dictionary
-    epsilon = 10 ** (-4)
     f = fitinfo['f']
     fs = fitinfo['fs']
     mof = fitinfo['mof']
     mofrows = fitinfo['mofrows']
     theta = fitinfo['theta']
+    epsilon = fitinfo['epsilon']
     PCAskip = False
     if (pct is not None) and (pcw is not None) and (extravar is not None):
         if pct.shape[0] == fs.shape[1] and extravar.shape[0] == fs.shape[1]:
@@ -351,7 +402,6 @@ def __PCs(fitinfo, pct=None, pcw=None, extravar=None):
             pct = None
             pcw = None
             extravar = None
-        
     if pct is None or pcw is None or extravar is None:
         U, S, _ = np.linalg.svd(fs.T, full_matrices=False)
         Sp = S ** 2 - epsilon
@@ -365,11 +415,13 @@ def __PCs(fitinfo, pct=None, pcw=None, extravar=None):
             rv = mofrows[j]
             wherenotmof = np.where(mof[rv,:] < 0.5)[0]
             H = pct[wherenotmof,:].T @ pct[wherenotmof,:]
+            Hp = np.diag(pcw ** 2 + epsilon) @ H
             Amat =  np.diag(epsilon / (pcw ** 2)) + H
             J = pct[wherenotmof,:].T @ fs[rv,wherenotmof]
             pc[rv,:] = (pcw ** 2 /epsilon + 1) * (J - H @ np.linalg.solve(Amat, J))
-            pcstdvar[rv, :] = 1-np.abs((np.diag(H) -  np.sum(H * np.linalg.solve(Amat, H.T),0)) *\
-                (pcw ** 2 / epsilon + 1))
+            Qmat = np.diag(epsilon / pcw ** 2) + H
+            term3 = np.diag(H) - np.sum(H * spla.solve(Qmat,H,assume_a='pos'),0)
+            pcstdvar[rv, :] = np.abs(1 - (pcw ** 2 /epsilon +1) * term3)
     fitinfo['pcw'] = pcw
     fitinfo['pct'] = pct * pcw
     fitinfo['extravar'] = extravar

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Header here."""
 import numpy as np
-
+import scipy.optimize as spo
 
 def plumleepostsampler(thetastart, logpostfunc, numsamp, tarESS):
     """
@@ -21,10 +21,31 @@ def plumleepostsampler(thetastart, logpostfunc, numsamp, tarESS):
     -------
     theta : matrix of sampled paramter values
     """
+
+    logpost = logpostfunc(thetastart)
+    post = np.exp(logpost)
+    post = post/np.sum(post)
+    size = np.minimum(50, np.sum(post>10 ** (-6)))
+    startingv = np.random.choice(range(0, thetastart.shape[0]),
+                                 size=size,
+                                 p=post, replace=False)
+    startingv = np.unique(startingv)
+    thetaop = thetastart[startingv,:]
     
-    
+    thetac = np.mean(thetastart,0)
+    thetas = np.std(thetastart,0)
+    bounds = spo.Bounds(-10*np.ones(thetastart.shape[1]), 10*np.ones(thetastart.shape[1]))
+    def neglogpostfunc(thetap):
+        theta = thetac + thetas * thetap
+        return (-logpostfunc(theta))
+    for k in range(0,startingv.shape[0]):
+        theta0 = (np.squeeze(thetaop[k,:]) - thetac) / thetas
+        opval = spo.minimize(neglogpostfunc, theta0, method='L-BFGS-B',
+                             bounds = bounds)
+        thetaop[k,:] = thetac + thetas * opval.x
+    thetastart = np.vstack((thetastart,thetaop))
     numchain = 50
-    maxiters = 10
+    maxiters = 30
     keepgoing = True
     while keepgoing:
         logpost = logpostfunc(thetastart)
@@ -42,8 +63,8 @@ def plumleepostsampler(thetastart, logpostfunc, numsamp, tarESS):
         else:
             keepgoing = False
     rho = 0.5
-    jitter = 0.01
-    numsamppc = np.minimum(200,np.maximum(25,np.ceil(numsamp/numchain))).astype('int')
+    jitter = 0.000001
+    numsamppc = np.minimum(5000,np.maximum(1000,np.ceil(numsamp/numchain))).astype('int')
     for iters in range(0,maxiters):
         covmat0 = np.cov(thetasave.T)
         Wc,Vc = np.linalg.eigh(covmat0)
@@ -66,22 +87,23 @@ def plumleepostsampler(thetastart, logpostfunc, numsamp, tarESS):
                     thetac[l,:] = 1*thetap[l,:]
                     logpostc[l] = 1*logpostp[l]
                 thetasave[l, k,:] = 1*thetac[l,:]
-        W = np.mean(np.var(thetasave,1),0)
         mut = np.mean(np.mean(thetasave,1),0)
-        B = np.zeros(W.shape)
-        autocorr = np.zeros(W.shape)
+        B = np.zeros(mut.shape)
+        autocorr = np.zeros(mut.shape)
+        W = np.zeros(mut.shape)
         for l in range(0,numchain):
             muv = np.mean(thetasave[l,:,:],0)
             varc = np.var(thetasave[l,:,:],0)
-            autocorr += np.mean((thetasave[l,0:(numsamppc-1),:] - muv.T)*(thetasave[l,1:,:] - muv.T),0)
+            autocorr +=1/numchain * np.mean((thetasave[l,0:(numsamppc-1),:] - muv.T)*(thetasave[l,1:,:] - muv.T),0)
+            W += 1/numchain * np.mean((thetasave[l,0:(numsamppc-1),:] - muv.T) ** 2,0)
             B += numsamppc/(numchain-1) *((muv-mut) **2)
-        varplus = (numsamppc-1)/(numsamppc)*W + 1/numsamppc * B
-        rhohat = (1-(W-autocorr/numchain)/varplus)
+        varplus = W + 1/numsamppc * B
+        rhohat = (1-(W-autocorr)/varplus)
         ESS = numchain * numsamppc * (1 -np.abs(rhohat))
         thetasave = np.reshape(thetasave,(-1,thetac.shape[1]))
         accr = numtimes / numsamppc
         if iters > 0.5:
-            if accr > 0.1 and (np.mean(ESS) > tarESS or numsamppc >= 200):
+            if accr > 0.1 and (np.mean(ESS) > tarESS):
                 break
             if (accr < 0.23):
                 rho = rho*np.max((np.exp((np.log(accr+0.01)-np.log(0.26))*2),0.25))

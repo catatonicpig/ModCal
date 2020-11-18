@@ -90,25 +90,34 @@ This [emulationadditionalfuncsinfo] automatically filled by docinfo.py when runn
 [emulationsupplementdocstring]
     r"""
     Finds supplement theta and x given the dictionary fitinfo.
-    This [emulationsupplementdocstring] is automatically filled by docinfo.py when running updatedocs.py
+    This [emulationsupplementdocstring] is automatically filled by docinfo.py when running 
+    updatedocs.py
 
     Parameters
     ----------
     fitinfo : dict
         An arbitary dictionary where you placed all your important fitting information from the 
         fit function above.
+    size : integer
+        The number of things the user wants.  It can reflect either the number of xs, thetas or 
+        both depending on the call.  The general interpreter is 
+        if x is None: numoftheta = size
+        elif theta is None: numberofx = size
+        else: numberofxandtheta = size
     x : array
-        An array of x values where you want to predict.
+        An array of x values where you want to predict.  Will be None if the user is not interested.
     theta : array
-        An array of theta values where you want to predict.
+        An array of theta values where you want to predict. Will be None if the user is not
+        interested.
     cal : instance of emulator class
-        An emulator class instance as defined in calibration.  This will not always be provided.
+        An emulator class instance as defined in calibration.  This will not always be provided,
+        only if the user provides it.
     args : dict
         A dictionary containing options passed to you.
         
     Returns
     ----------
-    Note that we should have theta.shape[0] * x.shape[0] < size
+    Note that we should have theta.shape[0] * x.shape[0] < size, otherwise it might be trimmed.
     theta : array
         An array of theta values where you should sample.
     x : array
