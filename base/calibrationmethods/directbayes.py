@@ -237,7 +237,7 @@ def loglik(fitinfo, emu, theta, y, x, args):
     for k in range(0, emumean.shape[1]):
         m0 = emumean[:,k]
         S0 = np.squeeze(emucovhalf[:,k,:])
-        obsvaradj = np.squeeze(obsvar + 0.01*np.squeeze( np.sum(S0 ** 2,0)))
+        obsvaradj = np.squeeze(obsvar + 0.0001*np.squeeze( np.sum(S0 ** 2,0)))
         stndresid = (np.squeeze(y) - m0) / np.sqrt(obsvaradj)
         term1 = np.sum(stndresid ** 2)
         #loglik[k] = - 0.5 * term1
@@ -254,6 +254,6 @@ def loglik(fitinfo, emu, theta, y, x, args):
             term2 = np.sum((J3 ** 2) / W)
             term3 = np.sum(np.log(W))
         residsq = term1 - term2
-        loglik[k] += -0.5 * (m0.shape[0]+5) * np.log(residsq+5) - 0.5 * term3
+        loglik[k] += -0.5 * (m0.shape[0]+0.1) * np.log(residsq+0.1) - 0.5 * term3
     
     return loglik
