@@ -168,7 +168,7 @@ class emulator(object):
         self.method.fit(self._info, x, theta, f, args = argstemp)
 
 
-    def predict(self, x=None, theta=None, args=None):
+    def predict(self, x=None, theta=None, args={}):
         r"""
         Fits an emulator or surrogate.
         
@@ -197,7 +197,7 @@ class emulator(object):
             info = {}
             info['mean'] = self.__ptf(x, theta)
             info['var'] = 0 *  info['mean'] 
-            info['covxhalf'] = 0 *  info['mean'][:,:,None]
+            info['covxhalf'] = 0 *  np.stack((info['mean'],info['mean']), 2)
             return prediction(info, self)
         if args is not None:
             argstemp = {**self._args, **copy.deepcopy(args)} #properly merge the arguments
@@ -672,6 +672,18 @@ class prediction(object):
             return copy.deepcopy(np.mean(self._info['rnd'], 0))
         else:
             raise ValueError(self.__methodnotfoundstr(pfstr, opstr))
+    
+    def mean_gradtheta(self, args = None):
+        r"""
+        Returns the gradient of the mean at theta and x  with respect to theta 
+        when building the prediction.
+        """
+        pfstr = 'predict' #prefix string
+        opstr = 'mean_gradtheta' #operation string
+        if opstr in self._info.keys():
+            return self._info[opstr]
+        else:
+            raise ValueError(self.__methodnotfoundstr(pfstr, opstr))
 
     def var(self, args = None):
         r"""
@@ -740,6 +752,19 @@ class prediction(object):
                     covxhalf[k,:,:] = (V @ (np.sqrt(np.abs(W)) * V.T))
             self._info['covxhalf'] = covxhalf
             return copy.deepcopy(self._info[opstr])
+        else:
+            raise ValueError(self.__methodnotfoundstr(pfstr, opstr))
+            
+    
+    def covxhalf_gradtheta(self, args = None):
+        r"""
+        Returns the sqrt of the covariance matrix at theta and x in when building the prediction.
+        That is, if this returns A = predict.covhalf(.)[k], than A.T @ A = predict.cov(.)[k]
+        """
+        pfstr = 'predict' #prefix string
+        opstr = 'covxhalf_gradtheta' #operation string
+        if opstr in self._info.keys():
+            return self._info[opstr]
         else:
             raise ValueError(self.__methodnotfoundstr(pfstr, opstr))
 

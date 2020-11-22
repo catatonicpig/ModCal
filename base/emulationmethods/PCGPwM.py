@@ -102,7 +102,7 @@ This [emulationpredictinfo] automatically filled by docinfo.py when running upda
 ##############################################################################
 ##############################################################################
 """
-def predict(predinfo, fitinfo, x, theta,  args=None):
+def predict(predinfo, fitinfo, x, theta, args={}):
     r"""
     Finds prediction at theta and x given the dictionary fitinfo.
     This [emulationpredictdocstring] automatically filled by docinfo.py when running updatedocs.py
@@ -128,9 +128,17 @@ def predict(predinfo, fitinfo, x, theta,  args=None):
     args : dict
         A dictionary containing options passed to you.
     """
+    return_grad = False
+    if 'return_grad' in args.keys() and args['return_grad'] is True:
+        return_grad = True
+    
     infos = fitinfo['emulist']
     predvecs = np.zeros((theta.shape[0], len(infos)))
     predvars = np.zeros((theta.shape[0], len(infos)))
+    if return_grad:
+        predvecs_gradtheta = np.zeros((theta.shape[0], len(infos), theta.shape[1]))
+        predvars_gradtheta = np.zeros((theta.shape[0], len(infos), theta.shape[1]))
+        drsave = np.array(np.ones(len(infos)), dtype=object)
     if predvecs.ndim < 1.5:
         predvecs = predvecs.reshape((1,-1))
         predvars = predvars.reshape((1,-1))
@@ -149,24 +157,49 @@ def predict(predinfo, fitinfo, x, theta,  args=None):
     rsave = np.array(np.ones(len(infos)), dtype=object)
     for k in range(0, len(infos)):
         if infos[k]['hypind'] == k:
-            rsave[k] = __covmat(theta, fitinfo['theta'], infos[k]['hypcov'])
+            if return_grad:
+                rsave[k], drsave[k] = __covmat(theta, fitinfo['theta'], infos[k]['hypcov'],
+                                               return_gradx1=True)
+            else:
+                rsave[k] = __covmat(theta, fitinfo['theta'], infos[k]['hypcov'])
         r = (1-infos[k]['nug']) * np.squeeze(rsave[infos[k]['hypind']])
+        if return_grad:
+            dr = (1-infos[k]['nug']) * np.squeeze(drsave[infos[k]['hypind']])
         rVh = r @ infos[k]['Vh']
         if rVh.ndim < 1.5:
             rVh = rVh.reshape((1,-1))
         predvecs[:, k] = r @ infos[k]['pw']
-        predvars[:, k] = infos[k]['sig2'] * (1 - np.sum(rVh ** 2, 1))
+        if return_grad:
+            if dr.ndim == 2:
+                drVh = dr.T @ infos[k]['Vh']
+                predvecs_gradtheta[:, k, :] = dr.T @ infos[k]['pw']
+                predvars_gradtheta[:, k, :] = -infos[k]['sig2'] *2*np.sum(rVh * drVh, 1)
+            else:
+                drVh = np.squeeze(dr.transpose(0,2,1) @ infos[k]['Vh'])
+                predvecs_gradtheta[:, k,:] = np.squeeze(dr.transpose(0,2,1) @ infos[k]['pw'])
+                predvars_gradtheta[:, k, :] = -infos[k]['sig2'] * 2 *np.sum(rVh * drVh.transpose(1,0,2),2).T
+        predvars[:, k] = infos[k]['sig2'] * np.abs(1 - np.sum(rVh ** 2, 1))
     predinfo['mean'] = np.full((x.shape[0], theta.shape[0]),np.nan)
     predinfo['var'] = np.full((x.shape[0], theta.shape[0]),np.nan)
-    predinfo['mean'][xnewind,:] = ((predvecs @ fitinfo['pct'][xind,:].T)*fitinfo['scale'][xind] +\
+    pctscale =  (fitinfo['pct'].T * fitinfo['scale']).T
+    predinfo['mean'][xnewind,:] = ((predvecs @ pctscale[xind,:].T) +\
         fitinfo['offset'][xind]).T
-    predinfo['var'][xnewind,:] = ((fitinfo['extravar'][xind] + predvars @ (fitinfo['pct'][xind,:] ** 2).T) *\
-        (fitinfo['scale'][xind] ** 2)).T
-    CH = (np.sqrt(np.abs(predvars))[:,:,np.newaxis] *
-                             (fitinfo['pct'][xind,:].T)[np.newaxis,:,:])
-    predinfo['covxhalf'] = np.full((theta.shape[0],CH.shape[1],x.shape[0]), np.nan)
+    predinfo['var'][xnewind,:] = ((fitinfo['extravar'][xind] + predvars @ (pctscale[xind,:] ** 2).T)).T
+    CH = (np.sqrt(predvars)[:,:,np.newaxis] *
+                             (pctscale[xind,:].T)[np.newaxis,:,:])
+    predinfo['covxhalf'] = np.full((theta.shape[0], CH.shape[1], x.shape[0]), np.nan)
     predinfo['covxhalf'][:,:,xnewind] = CH
-    predinfo['covxhalf'] = predinfo['covxhalf'].transpose((1,0,2))
+    predinfo['covxhalf'] = predinfo['covxhalf'].transpose((2,0,1))
+    if return_grad:
+        predinfo['mean_gradtheta'] = np.full((x.shape[0], theta.shape[0], theta.shape[1]),np.nan)
+        predinfo['mean_gradtheta'][xnewind, : ,:] = ((predvecs_gradtheta.transpose(0,2,1) @
+                                                     pctscale[xind,:].T)).transpose((2,0,1))
+        dsqrtpredvars = 0.5 * (predvars_gradtheta.transpose(2, 0, 1) /np.sqrt(predvars)).transpose(1, 2, 0)
+        CH_grad = (dsqrtpredvars.transpose(2,0,1)[:,:,:,np.newaxis] *
+                                 (pctscale[xind,:].T)[np.newaxis,:,:])
+        predinfo['covxhalf_gradtheta'] = np.full((theta.shape[1], theta.shape[0], CH.shape[1],  x.shape[0]), np.nan)
+        predinfo['covxhalf_gradtheta'][:,:,:,xnewind] = CH_grad
+        predinfo['covxhalf_gradtheta'] = predinfo['covxhalf_gradtheta'].transpose((2,1,3,0))
     return
 
 """
@@ -313,6 +346,7 @@ def supplementtheta(fitinfo, size, theta, cal, args):
     info['orderedx'] = fitinfo['x'][xorder,:]
     return thetaold[norig:(norig+size),:], info
 
+
 """
 ##############################################################################
 ##############################################################################
@@ -430,7 +464,7 @@ def __PCs(fitinfo, pct=None, pcw=None, extravar=None):
     fitinfo['PCAskip'] = PCAskip
     return
 
-def __fitGP1d(theta, g, gvar=None, hypstarts=None, hypinds=None,prevsubmodel=None):
+def __fitGP1d(theta, g, gvar=None, hypstarts=None, hypinds=None, prevsubmodel=None):
     """Return a fitted model from the emulator model using smart method."""
     if prevsubmodel is None:
         subinfo = {}
@@ -523,29 +557,42 @@ def __fitGP1d(theta, g, gvar=None, hypstarts=None, hypinds=None,prevsubmodel=Non
         subinfo['pw'] = subinfo['Rinv'] @ g
     return subinfo
 
-def __covmat(x1, x2, gammav, returndir=False):
+def __covmat(x1, x2, gammav, return_gradhyp=False, return_gradx1=False):
     """Return the covariance between x1 and x2 given parameter gammav."""
-    x1 = 1*x1.reshape(1, gammav.shape[0]-1) if x1.ndim < 1.5 else x1
-    x2 = 1*x2.reshape(1, gammav.shape[0]-1) if x2.ndim < 1.5 else x2
+    x1 = copy.copy(x1)
+    x2 = copy.copy(x2)
+    x1 = x1.reshape(1, gammav.shape[0]-1) if x1.ndim < 1.5 else x1
+    x2 = x2.reshape(1, gammav.shape[0]-1) if x2.ndim < 1.5 else x2
     V = np.zeros([x1.shape[0], x2.shape[0]])
     R = np.ones([x1.shape[0], x2.shape[0]])
     x1 = x1/np.exp(gammav[:-1])
     x2 = x2/np.exp(gammav[:-1])
-    if returndir:
+    if return_gradhyp:
         dR = np.zeros([x1.shape[0], x2.shape[0], gammav.shape[0]])
+    elif return_gradx1:
+        dR = np.zeros([x1.shape[0], x2.shape[0], x1.shape[1]])
     for k in range(0, gammav.shape[0]-1):
-        S = np.abs(np.subtract.outer(x1[:, k], x2[:, k]))
+        if return_gradx1:
+            S = np.subtract.outer(x1[:, k], x2[:, k])
+            Sign = -np.sign(S)
+            S = np.abs(S)
+        else:
+            S = np.abs(np.subtract.outer(x1[:, k], x2[:, k]))
         R *= (1 + S)
         V -= S
-        if returndir:
+        if return_gradhyp:
             dR[:, :, k] = (S ** 2) / (1 + S)
+        if return_gradx1:
+            dR[:, :, k] = (S * Sign) / (1 + S) / np.exp(gammav[k])
     R *= np.exp(V)
     RT = R * 1/(1+np.exp(gammav[-1])) + np.exp(gammav[-1])/(1+np.exp(gammav[-1]))
-    if returndir:
+    if return_gradhyp:
         dR = R[:, :, None] * dR * 1/(1+np.exp(gammav[-1]))
         dR[:, :, -1] = np.exp(gammav[-1]) / ((1+np.exp(gammav[-1])) ** 2) *\
             (1-R)
-    if returndir:
+    elif return_gradx1:
+        dR = R[:, :, None] * dR * 1/(1+np.exp(gammav[-1]))
+    if return_gradhyp or return_gradx1:
         return RT, dR
     else:
         return RT
