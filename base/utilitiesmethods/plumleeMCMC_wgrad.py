@@ -3,7 +3,7 @@
 import numpy as np
 import scipy.optimize as spo
 
-def plumleepostsampler(thetastart, logpostfunc, numsamp, tarESS):
+def plumleepostsampler_wgrad(thetastart, logpostfunc, numsamp, tarESS):
     """
     Return draws from the post.
 
@@ -21,8 +21,12 @@ def plumleepostsampler(thetastart, logpostfunc, numsamp, tarESS):
     -------
     theta : matrix of sampled paramter values
     """
-
-    logpost = logpostfunc(thetastart)
+    
+    def logpostfuncnew(thetaph):
+        logpost, _ = logpostfunc(thetaph)
+        return logpost
+    
+    logpost = logpostfuncnew(thetastart)
     logpost = logpost - np.max(logpost)
     logpost -= np.log(np.sum(np.exp(logpost)))
     post = np.exp(logpost)
@@ -34,29 +38,34 @@ def plumleepostsampler(thetastart, logpostfunc, numsamp, tarESS):
     startingv = np.unique(startingv)
     thetaop = thetastart[startingv,:]
     
+    
+    
     thetac = np.mean(thetastart,0)
     thetas = np.std(thetastart,0)
     for k in range(0,startingv.shape[0]):
-        LB,UB = test1dboundarys(thetaop[k,:], logpostfunc)
+        print(thetaop[k,:])
+        LB,UB = test1dboundarys(thetaop[k,:], logpostfuncnew)
         thetas = np.maximum(thetas, 4*(UB-LB))
         thetastart = np.vstack((thetastart,LB))
         thetastart = np.vstack((thetastart,UB))
     bounds = spo.Bounds(-10*np.ones(thetastart.shape[1]), 10*np.ones(thetastart.shape[1]))
-    def neglogpostfunc(thetap):
+    def neglogpostfunc2(thetap):
         theta = thetac + thetas * thetap
-        return (-logpostfunc(theta))
+        logpost, _ = logpostfunc(theta)
+        return -logpost
     for k in range(0,startingv.shape[0]):
         theta0 = (np.squeeze(thetaop[k,:]) - thetac) / thetas
-        opval = spo.minimize(neglogpostfunc, theta0, method='L-BFGS-B',
+        opval = spo.minimize(neglogpostfunc2, theta0, method='L-BFGS-B',
                               bounds = bounds)
         thetaop[k,:] = thetac + thetas * opval.x
+        
     #test backward and forward
     thetastart = np.vstack((thetastart,thetaop))
     numchain = 100
     maxiters = 30
     keepgoing = True
     while keepgoing:
-        logpost = logpostfunc(thetastart)
+        logpost = logpostfuncnew(thetastart)
         logpost = logpost - np.max(logpost)
         logpost -= np.log(np.sum(np.exp(logpost)))
         post = np.exp(logpost)
@@ -71,33 +80,36 @@ def plumleepostsampler(thetastart, logpostfunc, numsamp, tarESS):
         else:
             keepgoing = False
     rho = 0.5
-    rhoadj = 1
     numsamppc = np.minimum(1000,np.maximum(25,np.ceil(numsamp/numchain))).astype('int')
     for iters in range(0,maxiters):
         covmat0 = np.cov(thetasave.T)
         Wc, Vc = np.linalg.eigh(covmat0)
-        rho = rho * rhoadj
         if iters < 2:
             Wc = Wc + (10 ** (-8))
         else:
             Vc = Vc[:,Wc> 10 **(-20) * np.max(Wc)]
             Wc = Wc[Wc> 10 **(-20) * np.max(Wc)]
         hc = (Vc @ np.diag(np.sqrt(Wc)) @ Vc.T)
+        hc2 = (Vc @ np.diag(Wc) @ Vc.T)
+        hc2i = (Vc @ np.diag(1 / Wc) @ Vc.T)
+        hc2hi = (Vc @ np.diag(1 / np.sqrt(Wc)) @ Vc.T)
         thetac = thetasave[np.random.choice(range(0,thetasave.shape[0]),size = numchain),:]
-        logpostc = logpostfunc(thetac) 
+        fval, dfval = logpostfunc(thetac) 
         
         thetasave = np.zeros((numchain,numsamppc,thetac.shape[1]))
         numtimes = 0
+    
         for k in range(0,numsamppc):
-            thetap = 1*thetac
+            thetap = thetac + rho ** 2 * (dfval @ hc2) +  np.sqrt(2) * rho * (np.random.normal(0,1,thetac.shape) @ hc)
+            fvalp, dfvalp = logpostfunc(thetap)
+            qxpxk = -1 / (4 * (rho ** 2)) * np.sum( ((thetap - thetac - rho ** 2 * (dfval @ hc2)) @ hc2hi) ** 2, 1)
+            qxkxp = -1 / (4 * (rho ** 2)) * np.sum( ((thetac - thetap - rho ** 2 * (dfvalp @ hc2)) @ hc2hi) ** 2, 1)
             for l in range(0,numchain):
-                thetap[l,:] = thetac[l,:] +rho * (np.random.normal(0,1,thetac.shape[1]) @ hc)
-            logpostp = logpostfunc(thetap) 
-            for l in range(0,numchain):
-                if np.log(np.random.uniform()) < (logpostp[l]-logpostc[l]):
+                if np.log(np.random.uniform()) < (fvalp[l]-fval[l] + qxkxp[l] - qxpxk[l]):
                     numtimes = numtimes+(1/numchain)
                     thetac[l,:] = 1*thetap[l,:]
-                    logpostc[l] = 1*logpostp[l]
+                    fval[l] = 1*fvalp[l]
+                    dfval[l] = 1*dfvalp[l]
                 thetasave[l, k,:] = 1*thetac[l,:]
         mut = np.mean(np.mean(thetasave,1),0)
         B = np.zeros(mut.shape)
@@ -119,23 +131,25 @@ def plumleepostsampler(thetastart, logpostfunc, numsamp, tarESS):
         print('ESS')
         print(ESS)
         print(numsamppc)
-        if  iters > 2.5 and accr > 0.1 and accr < 0.4 and (np.mean(ESS) > tarESS):
+        if  iters > 2.5 and accr > 0.4 and accr < 0.6 and (np.mean(ESS) > tarESS):
             break
-        if numsamppc < 100:
-            numsamppc = numsamppc * 2
         if iters > 0.5:
-            if (accr < 0.23):
-                rho = rho*np.max((np.exp((np.log(accr+0.01)-np.log(0.26))*2),0.25))
-            elif (accr > 0.28):
-                rho = rho/np.max((np.exp((np.log(1.01-accr)-np.log(0.76))),0.25))
-        if accr < 0.3*numsamppc and accr > 0.2 and np.mean(ESS) < tarESS and numsamppc < 250:
+            if (accr < 0.45):
+                rho = rho*np.max((np.exp((np.log(accr+0.01)-np.log(0.5))*2),0.75))
+            elif (accr > 0.55):
+                rho = rho/np.max((np.exp((np.log(1.01-accr)-np.log(0.5))),0.75))
+        if accr < 0.6 and accr > 0.4 and np.mean(ESS) < tarESS and numsamppc < 250:
             numsamppc = (np.array(numsamppc*np.min((tarESS/np.mean(ESS),4)))).astype('int')
-        elif accr < 0.3*numsamppc and accr > 0.2 and numsamppc > 250:
+        elif accr < 0.6 and accr > 0.4 and numsamppc > 250:
             break
+        print('update')
+        print(np.max((np.exp((np.log(1.01-accr)-np.log(0.5))),0.5)))
+        print('rho')
+        print(rho)
     return thetasave[np.random.choice(range(0,thetasave.shape[0]),size = numsamp),:]
 
-def test1dboundarys(theta0, logpostfunc):
-    L0 = logpostfunc(theta0)
+def test1dboundarys(theta0, logpostfunchere):
+    L0 = logpostfunchere(theta0)
     thetaminsave = np.zeros(theta0.shape)
     thetamaxsave = np.zeros(theta0.shape)
     for k in range(0,theta0.shape[0]):
@@ -146,7 +160,7 @@ def test1dboundarys(theta0, logpostfunc):
         while keepgoing:
             thetaadj = 1 * theta0
             thetaadj[k] += eps
-            L1 = logpostfunc(thetaadj)
+            L1 = logpostfunchere(thetaadj)
             if (L0-L1) < 4:
                 eps = eps * 2
                 notfarenough += 1
@@ -162,7 +176,7 @@ def test1dboundarys(theta0, logpostfunc):
         while keepgoing:
             thetaadj = 1 * theta0
             thetaadj[k] -= eps
-            L1 = logpostfunc(thetaadj)
+            L1 = logpostfunchere(thetaadj)
             if (L0-L1) < 4:
                 eps = eps * 2
                 notfarenough += 1

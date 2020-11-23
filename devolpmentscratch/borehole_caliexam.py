@@ -50,8 +50,8 @@ f = (borehole_model(x, thetacompexp).T ).T
 y = np.squeeze(borehole_true(x)) + sps.norm.rvs(0,np.sqrt(yvar))
 emu = emulator(x, thetacompexp, f, method = 'PCGPwM')  # this builds an emulator 
 
-cal = calibrator( emu, y, x, thetaprior, yvar, method = 'directbayes')
-
+cal = calibrator( emu, y, x, thetaprior, yvar, method = 'directbayes_wgrad')
+asdasd
 thetatrial = thetaprior.rnd(10)
 xtrial = x[:3]
 emu2 = emulator(passthroughfunc = borehole_model)

@@ -1,9 +1,8 @@
 """Header here."""
 import numpy as np
 import scipy.stats as sps
-from base.utilities import postsampler
+from base.utilities import postsampler, postsampler_wgrad
 import copy
-from base.utilitiesmethods.nuts import nuts6
 
 """
 ##############################################################################
@@ -49,47 +48,23 @@ def fit(fitinfo, emu, x, y,  args=None):
         raise ValueError('Must provide yvar in this software.')
     
     thetaprior = fitinfo['thetaprior']
-    def logpostfull(theta, return_grad = False):
-        logpost = thetaprior.lpdf(theta)
+    
+    def logpostfull(theta):
+        logpost =thetaprior.lpdf(theta)
         if theta.ndim > 1.5:
             inds = np.where(np.isfinite(logpost))[0]
-            loglikinds, dloglikinds = loglik_grad(fitinfo, emu, theta[inds], y, x, args)
-            logpost[inds] += loglikinds
-            #dlogpost[inds] += dloglikinds
+            loglikinds, _ = loglik_grad(fitinfo, emu, theta[inds], y, x, args)
+            logpost += loglikinds
         else:
             if np.isfinite(logpost):
-                loglikinds, dloglikinds = loglik_grad(fitinfo, emu, theta, y, x, args)
-                logpost += loglikinds
-                #dlogpost += dloglikinds
-        #if return_grad:
-        #    return logpost#, dlogpost
-        #else:
+                loglik, _ = loglik_grad(fitinfo, emu, theta, y, x, args)
+                logpost += loglik
         return logpost
-    # thetatest = thetaprior.rnd(10)
-    # logpost, dlogpost = logpostfull(thetatest, return_grad = True)
-    # for k in range(0,thetatest.shape[1]):
-    #     thetaadj = copy.copy(thetatest)
-    #     thetaadj[:,k] += 10 ** (-4)
-    #     thetaadj[0,k] = thetatest[0,k]
-    #     logpostadj, dlogpostadj = logpostfull(thetaadj, return_grad = True)
-    #     print((logpostadj - logpost) * 10 ** (4))
-    #     print(dlogpost[:,k])
     
-    theta = thetaprior.rnd(500)
-    theta = postsampler(theta, logpostfull)
-    
-    mtheta = np.mean(theta,0)
-    covmat0 = np.cov(theta.T)
-    Wc, Vc = np.linalg.eigh(covmat0)
-    
-    AdjMatInv = (1/np.sqrt(Wc) * Vc.T)
-    AdjMat = Vc  * np.sqrt(Wc)
-    def logpostfull1d(thetain, return_grad = True):
-        #theta = np.reshape(theta,(1,-1))
-        theta = mtheta + AdjMat @ thetain 
+    def logpostfull_wgrad(theta, return_grad = True):
         logpost = thetaprior.lpdf(theta)
         if return_grad:
-            dlogpost =  thetaprior.lpdf_grad(theta) @ AdjMat
+            dlogpost =  thetaprior.lpdf_grad(theta)
         if theta.ndim > 1.5:
             inds = np.where(np.isfinite(logpost))[0]
             loglikinds, dloglikinds = loglik_grad(fitinfo, emu, theta[inds], y, x, args)
@@ -99,18 +74,19 @@ def fit(fitinfo, emu, x, y,  args=None):
             if np.isfinite(logpost):
                 loglikinds, dloglikinds = loglik_grad(fitinfo, emu, theta, y, x, args)
                 logpost += loglikinds
-                dlogpost +=np.squeeze(dloglikinds) @ AdjMat
+                dlogpost +=np.squeeze(dloglikinds)
         if return_grad:
             return logpost, dlogpost
         else:
             return logpost
-    
-    theta0 = AdjMatInv @ (np.squeeze(thetaprior.rnd(1)) - mtheta)
-    samples, lnprob, epsilon  = nuts6(logpostfull1d,1000,1000, theta0)
+    theta = thetaprior.rnd(500)
+    theta = postsampler_wgrad(theta, logpostfull_wgrad)
+    mtheta = np.mean(theta,0)
+    covmat0 = np.cov(theta.T)
     print(mtheta)
     print(np.sqrt(np.diag(covmat0)))
-    print(AdjMat.shape)
-    theta = (AdjMat @ samples.T).T + mtheta
+    theta = thetaprior.rnd(500)
+    theta = postsampler(theta, logpostfull)
     mtheta = np.mean(theta,0)
     covmat0 = np.cov(theta.T)
     print(mtheta)
