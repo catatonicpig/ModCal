@@ -32,7 +32,7 @@ class thetaprior:
 x = sps.uniform.rvs(0,1,[50,3])
 x[:,2] = x[:,2] > 0.5
 yt = np.squeeze(borehole_true(x))
-yvar = (10 ** (-2)) * np.ones(yt.shape)
+yvar = (10 ** (-4)) * np.ones(yt.shape)
 thetacompexp = (thetaprior.rnd(30))
 f = (borehole_model(x, thetacompexp).T ).T
 def emulation_test_borehole():
@@ -46,28 +46,27 @@ def emulation_test_borehole():
     cal = calibrator( emu, y, x, thetaprior, yvar, method = 'directbayes')
     print(np.round(np.quantile(cal.theta.rnd(1000), (0.01, 0.99), axis = 0),3))
     print(time.time()-t)
-# asdada
-# thetatrial = thetaprior.rnd(10)
-# xtrial = x[:3]
-# emu2 = emulator(passthroughfunc = borehole_model)
-# g = emu2.predict(x,thetacompexp).mean()
-# thetatrial = thetaprior.rnd(1000)
-# cal2 = calibrator( emu2, y, x, thetaprior, yvar, method = 'directbayes')
+    thetatrial = thetaprior.rnd(10)
+    xtrial = x[:3]
+    emu2 = emulator(passthroughfunc = borehole_model)
+    g = emu2.predict(x,thetacompexp).mean()
+    thetatrial = thetaprior.rnd(1000)
+    cal2 = calibrator( emu2, y, x, thetaprior, yvar, method = 'directbayes')
+    
+    print(np.round(np.quantile(cal2.theta.rnd(10000), (0.01, 0.99), axis = 0),3))
+    cal = calibrator( emu, y, x, thetaprior, yvar, method = 'directbayes_wgrad')
+    print(np.round(np.quantile(cal.theta.rnd(10000), (0.01, 0.99), axis = 0),3))
+    for k in range(0,5):
+        thetanew, info = emu.supplement(size = 10, cal = cal)
+        fadd = (borehole_model(x, thetanew).T).T
+        emu.update(f = fadd)
+        cal.fit()
+        print(np.round(np.quantile(cal.theta.rnd(10000), (0.01, 0.99), axis = 0),3))
 
-# print(np.round(np.quantile(cal2.theta.rnd(10000), (0.01, 0.99), axis = 0),3))
-# cal = calibrator( emu, y, x, thetaprior, yvar, method = 'directbayes_wgrad')
-# print(np.round(np.quantile(cal.theta.rnd(10000), (0.01, 0.99), axis = 0),3))
-# for k in range(0,5):
-#     thetanew, info = emu.supplement(size = 10, cal = cal)
-#     fadd = (borehole_model(x, thetanew).T).T
-#     emu.update(f = fadd)
-#     cal.fit()
-#     print(np.round(np.quantile(cal.theta.rnd(10000), (0.01, 0.99), axis = 0),3))
-
-
-lp = LineProfiler()
-lp_wrapper = lp(emulation_test_borehole)    
-lp.add_function(fit1)
-lp.add_function(sampler1)
-lp_wrapper()
+emulation_test_borehole()
+# lp = LineProfiler()
+# lp_wrapper = lp(emulation_test_borehole)    
+# lp.add_function(fit1)
+# lp.add_function(sampler1)
+# lp_wrapper()
 #lp.print_stats()

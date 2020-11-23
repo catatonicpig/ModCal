@@ -89,7 +89,7 @@ def plumleepostsampler_wgrad(thetastart, logpostfunc, numsamp, tarESS):
                     meantest = alpha/(alpha+beta)
                     if meantest - 3*stdtest > 0.25:
                         keeptryingwithgrad = False
-                        print('gave up on optimizing with grad, maybe it is approximate..')
+                        #print('gave up on optimizing with grad, maybe it is approximate..')
                 #opval = spo.minimize(neglogpostf_nograd, theta0,method='L-BFGS-B',
                 #                 bounds = bounds, options={'maxiter': 2,'maxfun':100})
     if keeptryingwithgrad or logpostf_grad is None:
