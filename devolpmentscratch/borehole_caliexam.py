@@ -22,12 +22,20 @@ class thetaprior:
             return np.squeeze(np.sum(sps.norm.logpdf(theta, 1, 0.5)))
     def lpdf_grad(theta):
         f_base = thetaprior.lpdf(theta)
-        grad = np.zeros((theta.shape[0], theta.shape[1]))
-        for k in range(0,theta.shape[1]):
-            thetaprop = copy.copy(theta)
-            thetaprop[:,k] += 10 ** (-5)
-            f_base2 = thetaprior.lpdf(thetaprop)
-            grad[:,k] = 10 ** (5) * (f_base2 - f_base)
+        if theta.ndim > 1.5:
+            grad = np.zeros((theta.shape[0], theta.shape[1]))
+            for k in range(0,theta.shape[1]):
+                thetaprop = copy.copy(theta)
+                thetaprop[:,k] += 10 ** (-5)
+                f_base2 = thetaprior.lpdf(thetaprop)
+                grad[:,k] = 10 ** (5) * (f_base2 - f_base)
+        else:
+            grad = np.zeros(theta.shape[0])
+            for k in range(0,theta.shape[0]):
+                thetaprop = copy.copy(theta)
+                thetaprop[k] += 10 ** (-5)
+                f_base2 = thetaprior.lpdf(thetaprop)
+                grad[k] = 10 ** (5) * (f_base2 - f_base)
         return grad
     def rnd(n):
         return np.vstack((sps.norm.rvs(1, 0.5, size=(n,4))))
@@ -41,6 +49,10 @@ f = (borehole_model(x, thetacompexp).T ).T
 
 y = np.squeeze(borehole_true(x)) + sps.norm.rvs(0,np.sqrt(yvar))
 emu = emulator(x, thetacompexp, f, method = 'PCGPwM')  # this builds an emulator 
+
+cal = calibrator( emu, y, x, thetaprior, yvar, method = 'directbayes_wgrad')
+adas
+
 thetatrial = thetaprior.rnd(10)
 xtrial = x[:3]
 emu2 = emulator(passthroughfunc = borehole_model)

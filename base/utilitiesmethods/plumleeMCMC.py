@@ -23,6 +23,8 @@ def plumleepostsampler(thetastart, logpostfunc, numsamp, tarESS):
     """
 
     logpost = logpostfunc(thetastart)
+    logpost = logpost - np.max(logpost)
+    logpost -= np.log(np.sum(np.exp(logpost)))
     post = np.exp(logpost)
     post = post/np.sum(post)
     size = np.minimum(50, np.sum(post>10 ** (-6)))
