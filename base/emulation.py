@@ -719,10 +719,10 @@ class prediction(object):
                 return self._info['covxhalf'] @ self._info['covxhalf'].T
             else:
                 am = self._info['covxhalf'].shape
-                covx = np.ones((am[2],am[1],am[2]))
+                covx = np.ones((am[0],am[1],am[0]))
                 for k in range(0, self._info['covxhalf'].shape[1]):
                     A = self._info['covxhalf'][:,k,:]
-                    covx[:,k,:] = A.T @ A
+                    covx[:,k,:] = A @ A.T
             self._info['covx'] = covx
             return copy.deepcopy(self._info[opstr])
         else:

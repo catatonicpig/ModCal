@@ -149,7 +149,7 @@ def plumleepostsampler_wgrad(thetastart, logpostfunc, numsamp, tarESS):
                 qadj = -(2 * np.sum( term1 * term2, 1) + np.sum(term2 ** 2, 1))
             else:
                 fvalp = logpostf(thetap)
-                qadj = 0 * fvalp
+                qadj = np.zeros(fvalp.shape)
             swaprnd = np.log(np.random.uniform(size = fval.shape[0]))
             whereswap = np.where(swaprnd < (fvalp-fval + qadj))[0]
             if whereswap.shape[0] > 0:
@@ -185,4 +185,6 @@ def plumleepostsampler_wgrad(thetastart, logpostfunc, numsamp, tarESS):
             numsamppc = (np.array(numsamppc*np.min((tarESS/np.mean(ESS),4)))).astype('int')
         elif accr < taracc*1.55 and accr > taracc*0.66 and numsamppc > 250:
             break
+        print(iters)
+        print(accr)
     return thetasave[np.random.choice(range(0,thetasave.shape[0]),size = numsamp),:]
