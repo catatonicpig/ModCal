@@ -173,11 +173,11 @@ def predict(predinfo, fitinfo, x, theta, args={}):
             if dr.ndim == 2:
                 drVh = dr.T @ infos[k]['Vh']
                 predvecs_gradtheta[:, k, :] = dr.T @ infos[k]['pw']
-                predvars_gradtheta[:, k, :] = -infos[k]['sig2'] *2*np.sum(rVh * drVh, 1)
+                #predvars_gradtheta[:, k, :] = -infos[k]['sig2'] *2*np.sum(rVh * drVh, 1)
             else:
                 drVh = np.squeeze(dr.transpose(0,2,1) @ infos[k]['Vh'])
                 predvecs_gradtheta[:, k,:] = np.squeeze(dr.transpose(0,2,1) @ infos[k]['pw'])
-                predvars_gradtheta[:, k, :] = -infos[k]['sig2'] * 2 *np.sum(rVh * drVh.transpose(1,0,2),2).T
+                #predvars_gradtheta[:, k, :] = -infos[k]['sig2'] * 2 *np.sum(rVh * drVh.transpose(1,0,2),2).T
         predvars[:, k] = infos[k]['sig2'] * np.abs(1 - np.sum(rVh ** 2, 1))
     predinfo['mean'] = np.full((x.shape[0], theta.shape[0]),np.nan)
     predinfo['var'] = np.full((x.shape[0], theta.shape[0]),np.nan)
@@ -195,11 +195,11 @@ def predict(predinfo, fitinfo, x, theta, args={}):
         predinfo['mean_gradtheta'][xnewind, : ,:] = ((predvecs_gradtheta.transpose(0,2,1) @
                                                      pctscale[xind,:].T)).transpose((2,0,1))
         dsqrtpredvars = 0.5 * (predvars_gradtheta.transpose(2, 0, 1) /np.sqrt(predvars)).transpose(1, 2, 0)
-        CH_grad = (dsqrtpredvars.transpose(2,0,1)[:,:,:,np.newaxis] *
-                                 (pctscale[xind,:].T)[np.newaxis,:,:])
-        predinfo['covxhalf_gradtheta'] = np.full((theta.shape[1], theta.shape[0], CH.shape[1],  x.shape[0]), np.nan)
-        predinfo['covxhalf_gradtheta'][:,:,:,xnewind] = CH_grad
-        predinfo['covxhalf_gradtheta'] = predinfo['covxhalf_gradtheta'].transpose((2,1,3,0))
+        # CH_grad = (dsqrtpredvars.transpose(2,0,1)[:,:,:,np.newaxis] *
+        #                          (pctscale[xind,:].T)[np.newaxis,:,:])
+        # predinfo['covxhalf_gradtheta'] = np.full((theta.shape[1], theta.shape[0], CH.shape[1],  x.shape[0]), np.nan)
+        # predinfo['covxhalf_gradtheta'][:,:,:,xnewind] = CH_grad
+        # predinfo['covxhalf_gradtheta'] = predinfo['covxhalf_gradtheta'].transpose((2,1,3,0))
     return
 
 """

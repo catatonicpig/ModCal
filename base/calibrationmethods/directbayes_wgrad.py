@@ -1,7 +1,7 @@
 """Header here."""
 import numpy as np
 import scipy.stats as sps
-from base.utilities import postsampler, postsampler_wgrad
+from base.utilities import postsampler
 import copy
 
 """
@@ -46,66 +46,61 @@ def fit(fitinfo, emu, x, y,  args=None):
         obsvar = fitinfo['yvar']
     else:
         raise ValueError('Must provide yvar in this software.')
-    
     thetaprior = fitinfo['thetaprior']
+    theta = thetaprior.rnd(500)
     
-    def logpostfull(theta):
-        logpost =thetaprior.lpdf(theta)
-        if theta.ndim > 1.5:
-            inds = np.where(np.isfinite(logpost))[0]
-            loglikinds, _ = loglik_grad(fitinfo, emu, theta[inds], y, x, args)
-            logpost += loglikinds
-        else:
-            if np.isfinite(logpost):
-                loglik, _ = loglik_grad(fitinfo, emu, theta, y, x, args)
-                logpost += loglik
-        return logpost
+    try: 
+        emupredict = emu.predict(x, theta, args={'return_grad': True})
+        emupredict.mean_gradtheta()
+        emureturn_grad = True
+    except:
+        emureturn_grad = False
+    if emureturn_grad and 'lpdf_grad' not in dir(thetaprior):
+        def lpdf_grad(theta):
+            f_base = thetaprior.lpdf(theta)
+            if theta.ndim > 1.5:
+                grad = np.zeros((theta.shape[0], theta.shape[1]))
+                for k in range(0,theta.shape[1]):
+                    thetaprop = copy.copy(theta)
+                    thetaprop[:,k] += 10 ** (-5)
+                    f_base2 = thetaprior.lpdf(thetaprop)
+                    grad[:,k] = 10 ** (5) * (f_base2 - f_base)
+            else:
+                grad = np.zeros(theta.shape[0])
+                for k in range(0,theta.shape[0]):
+                    thetaprop = copy.copy(theta)
+                    thetaprop[k] += 10 ** (-5)
+                    f_base2 = thetaprior.lpdf(thetaprop)
+                    grad[k] = 10 ** (5) * (f_base2 - f_base)
+            return grad
+        thetaprior.lpdf_grad = lpdf_grad
     
     def logpostfull_wgrad(theta, return_grad = True):
         logpost = thetaprior.lpdf(theta)
-        if return_grad:
+        if emureturn_grad and return_grad:
             dlogpost =  thetaprior.lpdf_grad(theta)
-        if theta.ndim > 1.5:
+        if logpost.ndim > 0.5 and logpost.shape[0] > 1.5:
             inds = np.where(np.isfinite(logpost))[0]
-            loglikinds, dloglikinds = loglik_grad(fitinfo, emu, theta[inds], y, x, args)
-            logpost[inds] += loglikinds
-            dlogpost[inds] += dloglikinds
+            if emureturn_grad and return_grad:
+                loglikinds, dloglikinds = loglik_gradapprox(fitinfo, emu, theta[inds], y, x, args)
+                logpost[inds] += loglikinds
+                dlogpost[inds] += dloglikinds
+            else:
+                logpost[inds] += loglik(fitinfo, emu, theta[inds], y, x, args)
         else:
             if np.isfinite(logpost):
-                loglikinds, dloglikinds = loglik_grad(fitinfo, emu, theta, y, x, args)
-                logpost += loglikinds
-                dlogpost +=np.squeeze(dloglikinds)
-        if return_grad:
+                if emureturn_grad and return_grad:
+                    loglikinds, dloglikinds = loglik_gradapprox(fitinfo, emu, theta, y, x, args)
+                    logpost += loglikinds
+                    dlogpost +=np.squeeze(dloglikinds)
+                else:
+                    logpost += loglik(fitinfo, emu, theta, y, x, args)
+        if emureturn_grad and return_grad:
             return logpost, dlogpost
         else:
             return logpost
-    theta = thetaprior.rnd(500)
-    theta = postsampler_wgrad(theta, logpostfull_wgrad)
-    mtheta = np.mean(theta,0)
-    covmat0 = np.cov(theta.T)
-    print(mtheta)
-    print(np.sqrt(np.diag(covmat0)))
-    theta = thetaprior.rnd(500)
-    theta = postsampler(theta, logpostfull)
-    mtheta = np.mean(theta,0)
-    covmat0 = np.cov(theta.T)
-    print(mtheta)
-    print(np.sqrt(np.diag(covmat0)))
-    try:
-        import matplotlib.pyplot as plt
-    except ImportError:
-        import pylab as plt
-    plt.subplot(1,3,1)
-    plt.plot( samples[:, 0],'.')
-    plt.plot( samples[:, 1],'.')
-    plt.plot( samples[:, 2],'.')
-    asdasda
-    
-    theta = thetaprior.rnd(2500)
-    numsamp = 10000
-    tarESS = np.max((100, 10 * theta.shape[1]))
-    theta = postsampler(theta, logpostfull)
-    Lm = np.max(logpostfull(theta))
+    theta = thetaprior.rnd(1000)
+    theta = postsampler(theta, logpostfull_wgrad)
     fitinfo['thetarnd'] = theta
     fitinfo['y'] = y
     fitinfo['x'] = x
@@ -222,43 +217,83 @@ This [endfunctionsflag] is automatically filled by docinfo.py when running updat
 ##############################################################################
 ##############################################################################
 """
-# def approxhess(fitinfo, emu, theta, y, x, args):
-#     r"""
-#     This is a optional docstring for an internal function.
-#     """
+
+
+def loglik(fitinfo, emu, theta, y, x, args):
+    r"""
+    This is a optional docstring for an internal function.
+    """
     
-#     if 'yvar' in fitinfo.keys():
-#         obsvar = np.squeeze(fitinfo['yvar'])
-#     else:
-#         raise ValueError('Must provide yvar in this software.')
-#     #y = np.squeeze(y)
-#     p = theta.shape[1]
     
-#     thetastd = np.std(theta,0)
-#     L0 = loglik(fitinfo, emu, theta, y, x, args)
-#     theta0 = theta[np.argmin(L0)]
-#     emumean = emu.predict(x, theta0).mean()
-#     emucovhalf = emu.predict(x, theta0).covxhalf()
+    if 'yvar' in fitinfo.keys():
+        obsvar = np.squeeze(fitinfo['yvar'])
+    else:
+        raise ValueError('Must provide yvar in this software.')
+    #y = np.squeeze(y)
+    emupredict = emu.predict(x, theta)
+    emumean = emupredict.mean()
+    emucovxhalf = emupredict.covxhalf()
+    loglik = np.zeros(emumean.shape[1])
+    for k in range(0, emumean.shape[1]):
+        m0 = emumean[:,k]
+        S0 = np.squeeze(emucovxhalf[:,k,:])
+        stndresid = (np.squeeze(y) - m0) / np.sqrt(obsvar)
+        term1 = np.sum(stndresid ** 2)
+        J = (S0.T / np.sqrt(obsvar)).T
+        if J.ndim < 1.5:
+            J = J[:,None].T
+        J2 =  J.T @ stndresid
+        W, V = np.linalg.eigh(np.eye(J.shape[1]) + J.T @ J)
+        J3 = np.squeeze(V) @ np.diag(1/W) @ np.squeeze(V).T @ np.squeeze(J2)
+        term2 = np.sum(J3 * J2)
+        residsq = term1 - term2
+        loglik[k] = -0.5 * (m0.shape[0]+0.1) * np.log(residsq+0.1) - 0.5 * np.sum(np.log(W))
+    return loglik
+
+
+def loglik_gradapprox(fitinfo, emu, theta, y, x, args):
+    r"""
+    This is a optional docstring for an internal function.
+    """
     
-#     fdir = np.zeros((emumean.shape[0], theta.shape[1]))
-#     obsvaradj = obsvar + 1 * np.sum(emucovhalf ** 2,0)
-#     for p in range(0,theta.shape[1]):
-#         thetadj = copy.copy(theta0)
-#         thetadj[p] += 10 ** (-4) * thetastd[p]
-#         emumeanadj1 = emu.predict(x, thetadj).mean()
-#         thetadj[p] -= 2*10 **(-4) * thetastd[p]
-#         emumeanadj2 = emu.predict(x, thetadj).mean()
-#         fdir[:,p] = np.squeeze((emumeanadj1-emumeanadj2) * (10 ** (4)) / 2)
-#     fdiradj = (fdir.T / np.sqrt(obsvaradj)).T
-#     D, W, _ = np.linalg.svd(fdir.T)
-#     W = W ** 2
-#     print(W)
-#     Amat = np.diag(np.sqrt(10**(-12) + W[:3])) @ D[:,:3].T
-#     bvec = - Amat @ theta0
-#     Cmat = D[:,:3] @ np.diag(1/np.sqrt(10**(-12) +W[:3]))
-#     dvec = Cmat @ Amat @ theta0
     
-#     return Amat, bvec, Cmat, dvec
+    if 'yvar' in fitinfo.keys():
+        obsvar = np.squeeze(fitinfo['yvar'])
+    else:
+        raise ValueError('Must provide yvar in this software.')
+    #y = np.squeeze(y)
+    emupredict = emu.predict(x, theta, args={'return_grad': True})
+    emumean = emupredict.mean()
+    emucovxhalf = emupredict.covxhalf()
+    emumean_grad = emupredict.mean_gradtheta()
+    loglik = np.zeros(emumean.shape[1])
+    dloglik = np.zeros((emumean.shape[1],emu._info['theta'].shape[1]))
+    dterm1 = np.zeros(emu._info['theta'].shape[1])
+    dterm2 = np.zeros(emu._info['theta'].shape[1])
+    for k in range(0, emumean.shape[1]):
+        m0 = emumean[:,k]
+        dm0 = np.squeeze(emumean_grad[:, k, :])
+        S0 = np.squeeze(emucovxhalf[:,k,:])
+        
+        stndresid = (np.squeeze(y) - m0) / np.sqrt(obsvar)
+        term1 = np.sum(stndresid ** 2)
+        stndresid_grad = - (dm0.T / np.sqrt(obsvar)).T
+        dterm1 = 2 * np.sum(stndresid * stndresid_grad.T, 1)
+        J = (S0.T / np.sqrt(obsvar)).T
+        if J.ndim < 1.5:
+            J = J[:,None].T
+        J2 =  J.T @ stndresid
+        W, V = np.linalg.eigh(np.eye(J.shape[1]) + J.T @ J)
+        J3 = np.squeeze(V) @ np.diag(1/W) @ np.squeeze(V).T @ np.squeeze(J2)
+        term2 = np.sum(J3 * J2)
+        for l in range(0,stndresid_grad.shape[1]):
+            dJ2 = J.T @ np.squeeze(stndresid_grad[:,l])
+            dterm2[l] = 2*np.sum(dJ2 * J3)
+        term3 = np.sum(np.log(W))
+        residsq = term1 - term2
+        loglik[k] = -0.5 * (m0.shape[0]+0.1) * np.log(residsq+0.1) - 0.5 * term3
+        dloglik[k, :] = -0.5 * (m0.shape[0]+0.1) * (dterm1-dterm2) / (residsq+0.1)
+    return loglik, dloglik
 
 
 def loglik_grad(fitinfo, emu, theta, y, x, args):
@@ -296,16 +331,16 @@ def loglik_grad(fitinfo, emu, theta, y, x, args):
             J = J[:,None].T
         J2 =  J.T @ stndresid
         W, V = np.linalg.eigh(np.eye(J.shape[1]) + J.T @ J)
-        J3 = np.squeeze(V) @ np.diag(1/W) @ np.squeeze(V).T @ np.squeeze(J2)
+        J3 = V @ np.diag(1/W) @ V.T @ J2
         term2 = np.sum(J3 * J2)
         for l in range(0,stndresid_grad.shape[1]):
-            dJ = (np.squeeze(emucovxhalf_grad[:,k,:,l]) @ np.diag(1/ np.sqrt(obsvar)))
-            dJ2 = J.T @ np.squeeze(stndresid_grad[:,l]) + dJ @ stndresid
+            dJ = (emucovxhalf_grad[:,k,:,l] @ np.diag(1/ np.sqrt(obsvar)))
+            dJ2 = J.T @ stndresid_grad[:,l] + dJ @ stndresid
             exmat = (np.squeeze(emucovxhalf_grad[:,k,:,l]) @ np.diag(1/ np.sqrt(obsvar))) @ J
             exmat = (exmat + exmat.T)
-            dJ3 = np.squeeze(V) @ np.diag(1/W) @ np.squeeze(V).T @ (dJ2 - exmat @ J3)
+            dJ3 = V @ np.diag(1/W) @ V.T @ (dJ2 - exmat @ J3)
             dterm2[l] = np.sum(J2 * dJ3) + np.sum(dJ2 * J3)
-        V2 =  1/obsvar * (((np.squeeze(V) * (1/W)) @ np.squeeze(V).T) @ S0.T)
+        V2 =  1/obsvar * (((V * (1/W)) @ V.T) @ S0.T)
         for l in range(0,stndresid_grad.shape[1]):
             V3 = np.squeeze(emucovxhalf_grad[:,k,:,l])
             dterm3[l] = 2 * np.sum(V2 * V3)

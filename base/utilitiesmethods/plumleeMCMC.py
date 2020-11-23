@@ -128,9 +128,9 @@ def plumleepostsampler(thetastart, logpostfunc, numsamp, tarESS):
                 rho = rho*np.max((np.exp((np.log(accr+0.01)-np.log(0.26))*2),0.25))
             elif (accr > 0.28):
                 rho = rho/np.max((np.exp((np.log(1.01-accr)-np.log(0.76))),0.25))
-        if accr < 0.3*numsamppc and accr > 0.2 and np.mean(ESS) < tarESS and numsamppc < 250:
+        if accr < 0.3 and accr > 0.2 and np.mean(ESS) < tarESS and numsamppc < 250:
             numsamppc = (np.array(numsamppc*np.min((tarESS/np.mean(ESS),4)))).astype('int')
-        elif accr < 0.3*numsamppc and accr > 0.2 and numsamppc > 250:
+        elif accr < 0.3 and accr > 0.2 and numsamppc > 250:
             break
     return thetasave[np.random.choice(range(0,thetasave.shape[0]),size = numsamp),:]
 

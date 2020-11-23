@@ -18,7 +18,7 @@ def borehole_model(x, theta):
     x_stacked = np.tile(x.astype(float), (n, 1))
 
     f = borehole_vec(x_stacked, theta_stacked).reshape((n, p))
-    return f
+    return f.T
 
 
 def borehole_true(x):
@@ -43,7 +43,7 @@ def borehole_vec(x, theta):
     f = (numer / (np.log(r/rw) * (1 + denom1 + denom2))).reshape(-1)
 
     f[x[:, -1] == 1] = f[x[:, -1].astype(bool)] ** (1.5)
-    return f
+    return f.T
 
 
 def tstd2theta(tstd, hard=True):
