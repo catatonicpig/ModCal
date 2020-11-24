@@ -497,8 +497,8 @@ class emulator(object):
         if (f is not None) and (theta is not None) and (x is not None):
                 raise ValueError('Simultaneously adding new theta and x at once is currently'+
                                  'not supported.  Please supply either theta OR x.')
-        
-        self.fit()
+        if self.__options['autofit']:
+            self.fit()
         return
     
     

@@ -61,7 +61,8 @@ def tstd2theta(tstd, hard=True):
 
 def xstd2x(xstd):
     """Given standardized x in [0, 1]^2 x {0, 1}, return non-standardized x."""
-    assert xstd.ndim == 2
+    if xstd.ndim < 1.5:
+        xstd = xstd[:,None].T
     (rws, Hls, labels) = np.split(xstd, xstd.shape[1], axis=1)
 
     rw = rws * (np.log(0.5) - np.log(0.05)) + np.log(0.05)
