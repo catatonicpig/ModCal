@@ -52,10 +52,9 @@ def emulation_test_borehole():
     g = emu2.predict(x,thetacompexp).mean()
     thetatrial = thetaprior.rnd(1000)
     cal2 = calibrator( emu2, y, x, thetaprior, yvar, method = 'directbayes')
-    
-    print(np.round(np.quantile(cal2.theta.rnd(10000), (0.01, 0.99), axis = 0),3))
+        print(np.round(np.quantile(cal.theta.rnd(10000), (0.01, 0.99), axis = 0),3))
     cal = calibrator( emu, y, x, thetaprior, yvar, method = 'directbayes_wgrad')
-    print(np.round(np.quantile(cal.theta.rnd(10000), (0.01, 0.99), axis = 0),3))
+        print(np.round(np.quantile(cal.theta.rnd(10000), (0.01, 0.99), axis = 0),3))
     for k in range(0,5):
         thetanew, info = emu.supplement(size = 10, cal = cal)
         fadd = (borehole_model(x, thetanew).T).T

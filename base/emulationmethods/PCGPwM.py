@@ -57,7 +57,7 @@ def fit(fitinfo, x, theta, f, args):
     else:
         __standardizef(fitinfo)
         
-    if False and ('pct' in fitinfo.keys()) and ('pcw' in fitinfo.keys()) and\
+    if ('pct' in fitinfo.keys()) and ('pcw' in fitinfo.keys()) and\
         ('extravar' in fitinfo.keys()):
         __PCs(fitinfo,fitinfo['pct'],fitinfo['pcti'],fitinfo['pcw'],fitinfo['extravar'])
     else:

@@ -47,8 +47,6 @@ def fit(fitinfo, emu, x, y,  args=None):
     else:
         raise ValueError('Must provide yvar in this software.')
     thetaprior = fitinfo['thetaprior']
-    theta = thetaprior.rnd(500)
-    
     try: 
         emupredict = emu.predict(x, theta, args={'return_grad': True})
         emupredict.mean_gradtheta()
@@ -99,7 +97,10 @@ def fit(fitinfo, emu, x, y,  args=None):
             return logpost, dlogpost
         else:
             return logpost
-    theta = thetaprior.rnd(1000)
+    if 'thetarnd' in fitinfo:
+        theta = np.vstack((fitinfo['thetarnd'],thetaprior.rnd(1000)))
+    else:
+        theta = thetaprior.rnd(6000)
     theta = postsampler(theta, logpostfull_wgrad)
     fitinfo['thetarnd'] = theta
     fitinfo['y'] = y

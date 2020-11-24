@@ -90,16 +90,15 @@ def plumleepostsampler_wgrad(thetastart, logpostfunc, numsamp, tarESS):
                     if meantest - 3*stdtest > 0.25:
                         keeptryingwithgrad = False
                         #print('gave up on optimizing with grad, maybe it is approximate..')
-                #opval = spo.minimize(neglogpostf_nograd, theta0,method='L-BFGS-B',
-                #                 bounds = bounds, options={'maxiter': 2,'maxfun':100})
-    if keeptryingwithgrad or logpostf_grad is None:
-        thetastart = np.vstack((thetastart,thetaop))
-    
+                opval = spo.minimize(neglogpostf_nograd, theta0,method='L-BFGS-B',
+                                 bounds = bounds, options={'maxiter': 4,'maxfun':100})
+    #if keeptryingwithgrad or logpostf_grad is None:
+    thetastart = np.vstack((thetastart,thetaop))
     numchain = 25
     maxiters = 30
     keepgoing = True
     while keepgoing:
-        logpost = logpostf_nograd(thetastart)
+        logpost = logpostf_nograd(thetastart)/4
         logpost = logpost - np.max(logpost)
         logpost -= np.log(np.sum(np.exp(logpost)))
         post = np.exp(logpost)
@@ -135,6 +134,7 @@ def plumleepostsampler_wgrad(thetastart, logpostfunc, numsamp, tarESS):
         else:
             fval = logpostf_nograd(thetac)
         thetasave = np.zeros((numchain,numsamppc,thetac.shape[1]))
+        Lsave = np.zeros((numchain,numsamppc))
         numtimes = 0
         for k in range(0,numsamppc):
             rvalo = np.random.normal(0,1,thetac.shape)
@@ -159,6 +159,7 @@ def plumleepostsampler_wgrad(thetastart, logpostfunc, numsamp, tarESS):
                 if logpostf_grad is not None:
                     dfval[whereswap,:] = 1*dfvalp[whereswap,:]
             thetasave[:, k,:] = 1*thetac
+            Lsave[:,k] = 1*fval
         mut = np.mean(np.mean(thetasave,1),0)
         B = np.zeros(mut.shape)
         autocorr = np.zeros(mut.shape)
@@ -173,6 +174,13 @@ def plumleepostsampler_wgrad(thetastart, logpostfunc, numsamp, tarESS):
         rhohat = (1-(W-autocorr)/varplus)
         ESS = numchain * numsamppc * (1 -np.abs(rhohat))
         thetasave = np.reshape(thetasave,(-1,thetac.shape[1]))
+        Lsave = np.squeeze(np.reshape(Lsave,(-1,1)))
+        Lsave = Lsave - np.max(Lsave)
+        Lsave -= np.log(np.sum(np.exp(Lsave)))
+        post = np.exp(Lsave)
+        post = post/np.sum(post)
+        startingv = np.random.choice(np.arange(0, Lsave.shape[0]),size=Lsave.shape[0],p=post)
+        thetasave = thetasave[startingv,:]
         accr = numtimes / numsamppc
         if  iters > 2.5 and accr > taracc*0.66 and accr < taracc*1.55 and (np.mean(ESS) > tarESS):
             break

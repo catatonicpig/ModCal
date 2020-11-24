@@ -48,7 +48,6 @@ def fit(fitinfo, emu, x, y,  args=None):
         raise ValueError('Must provide yvar in this software.')
     
     thetaprior = fitinfo['thetaprior']
-    theta = thetaprior.rnd(2500)
     def logpostfull(theta):
         logpost =thetaprior.lpdf(theta)
         if theta.ndim > 1.5:
@@ -59,9 +58,12 @@ def fit(fitinfo, emu, x, y,  args=None):
                 logpost += loglik(fitinfo, emu, theta, y, x, args)
         return logpost
     numsamp = 10000
-    tarESS = np.max((100, 10 * theta.shape[1]))
+    tarESS = np.max((100, 10 * thetaprior.rnd(2).shape[1]))
+    if 'thetarnd' in fitinfo:
+        theta = fitinfo['thetarnd']
+    else:
+        theta = thetaprior.rnd(6000)
     theta = postsampler(theta, logpostfull)
-    Lm = np.max(logpostfull(theta))
     fitinfo['thetarnd'] = theta
     fitinfo['y'] = y
     fitinfo['x'] = x
@@ -178,7 +180,7 @@ This [endfunctionsflag] is automatically filled by docinfo.py when running updat
 ##############################################################################
 ##############################################################################
 """
-def loglik(fitinfo, emu, theta, y, x, args):
+def loglik(fitinfo, emu, theta, y, x, args ={}):
     r"""
     This is a optional docstring for an internal function.
     """
@@ -209,5 +211,4 @@ def loglik(fitinfo, emu, theta, y, x, args):
         term3 = np.sum(np.log(np.abs(W)))
         residsq = term1 - term2
         loglik[k] += -0.5 * residsq - 0.5 * term3
-    
     return loglik
