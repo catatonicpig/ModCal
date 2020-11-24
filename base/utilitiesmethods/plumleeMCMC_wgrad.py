@@ -179,8 +179,11 @@ def plumleepostsampler_wgrad(thetastart, logpostfunc, numsamp, tarESS):
             W += 1/numchain * np.mean((thetasave[l,0:(numsamppc-1),:] - muv.T) ** 2,0)
             B += numsamppc/(numchain-1) *((muv-mut) **2)
         varplus = W + 1/numsamppc * B
-        rhohat = (1-(W-autocorr)/varplus)
-        ESS = numchain * numsamppc * (1 -np.abs(rhohat))
+        if np.any(varplus < 10 ** (-10)):
+            raise ValueError('Sampler failed to move at all.')
+        else:
+            rhohat = (1-(W-autocorr)/varplus)
+        ESS = 1 + numchain * numsamppc * (1 -np.abs(rhohat))
         thetasave = np.reshape(thetasave,(-1,thetac.shape[1]))
         accr = numtimes / numsamppc
         if  iters > 2.5 and accr > taracc*0.66 and accr < taracc*1.55 and (np.mean(ESS) > tarESS):

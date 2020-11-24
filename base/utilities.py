@@ -22,8 +22,8 @@ def postsampler(thetastart, logpostfunc, options=None):
     """
 
     if options is None:
-        numsamp = 1000
-        tarESS = np.max((200, 10 * thetastart.shape[1]))
+        numsamp = 2000
+        tarESS = np.max((400, 10 * thetastart.shape[1]))
         def postsamplefunc(thetastart, logpostfunc):
             return plumleepostsampler_wgrad(thetastart, logpostfunc, numsamp, tarESS)
     else:

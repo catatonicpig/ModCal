@@ -35,7 +35,7 @@ emu.fit()
 emu2 = emulator(passthroughfunc = borehole_model)
 cal2 = calibrator( emu2, y, x, thetaprior, yvar, method = 'directbayes')
 print(np.round(np.quantile(cal2.theta.rnd(10000), (0.01, 0.99), axis = 0),3))
-cal = calibrator( emu, y, x, thetaprior, yvar, method = 'directbayes_wgrad')
+cal = calibrator( emu, y, x, thetaprior, yvar, method = 'directbayes')
 print(np.round(np.quantile(cal.theta.rnd(10000), (0.01, 0.99), axis = 0),3))
 
 
@@ -69,30 +69,69 @@ def matrixmatching(mat1, mat2):
     return nc, c, r
 
 
-thetaqueue = np.zeros(0)
-
-dosupp = False
-numperbatch = 100
+thetaidqueue = np.zeros(0)
+xidqueue = np.zeros(0)
+pending = np.full(f.shape, False)
+complete = np.full(f.shape, True)
+thetaspending = np.full(f.shape[0], False)
+numperbatch = 60
 for k in range(0,10):
-    if thetaqueue.shape[0] < numperbatch:
-        thetanew, info = emu.supplement(size = 10, cal = cal, overwrite=True)
-        thetatot = np.vstack((thetatot,thetanew))
+    thetachoices = cal.theta(200)
+    choicescost = np.ones(thetachoices.shape[0])
+    print('Percentage Cancelled: %0.2f ( %d / %d)' % (100*np.round(np.mean(1-pending-complete),4),
+                                                    np.sum(1-pending-complete),
+                                                    np.prod(pending.shape)))
+    print('Percentage Pending: %0.2f ( %d / %d)' % (100*np.round(np.mean(pending),4),
+                                                    np.sum(pending),
+                                                    np.prod(pending.shape)))
+    print('Percentage Complete: %0.2f ( %d / %d)' % (100*np.round(np.mean(complete),4),
+                                                    np.sum(complete),
+                                                    np.prod(pending.shape)))
+    if np.sum(pending) > 0:
+        thetaspending = np.where(np.any(pending,0))[0]
+        thetachoices = np.vstack((thetatot[thetaspending,:], thetachoices))
+        choicescost = np.append((np.sum(pending[:,thetaspending],0)/x.shape[0]) ** 4, choicescost)
+        
+    thetanew, info = emu.supplement(size = 15, thetachoices = thetachoices, 
+                                    choicescost = choicescost,
+                                    removereps = False,
+                                    cal = cal, overwrite=True)
+    if np.sum(pending) > 0:
+        nctheta, _, _ = matrixmatching(thetatot, thetanew)
+        ncthetaold, _, _ = matrixmatching(thetanew,thetatot)
+        pending[:, ncthetaold] = False #obviation
+        for k in ncthetaold:
+            queue2delete = np.where(thetaidqueue == k)[0]
+            if queue2delete.shape[0] > 0.5:
+                thetaidqueue = np.delete(thetaidqueue,queue2delete,0)
+                xidqueue = np.delete(xidqueue,queue2delete,0)
+        thetanew = thetanew[nctheta,:]
+    if thetanew.shape[0] > 0.5:
+        pending = np.hstack((pending,np.full((x.shape[0],thetanew.shape[0]),True)))
+        complete = np.hstack((complete,np.full((x.shape[0],thetanew.shape[0]),False)))
         f = np.hstack((f,np.full((x.shape[0],thetanew.shape[0]),np.nan)))
-        thetanewqueue = np.tile(thetanew, (x.shape[0],1))
-        xnewqueue = np.repeat(x, thetanew.shape[0], axis =0)
-        if thetaqueue.shape[0] == 0:
-            thetaqueue = thetanewqueue
-            xqueue = xnewqueue
+        thetaidnewqueue = np.tile(np.arange(thetatot.shape[0],thetatot.shape[0]+
+                                            thetanew.shape[0]), (x.shape[0]))
+        thetatot = np.vstack((thetatot,thetanew))
+        xidnewqueue = np.repeat(np.arange(0,x.shape[0]), thetanew.shape[0], axis =0)
+        if thetaidqueue.shape[0] == 0:
+            thetaidqueue = thetaidnewqueue
+            xidqueue = xidnewqueue
         else:
-            thetaqueue = np.vstack(thetaqueue,thetanewqueue)
-            xqueue = np.vstack(xqueue,xnewqueue)
+            thetaidqueue = np.append(thetaidqueue,thetaidnewqueue)
+            xidqueue = np.append(xidqueue,xidnewqueue)
+    queueshuffle = np.random.choice(range(0,thetaidqueue.shape[0]),
+                                    size=thetaidqueue.shape[0],replace=False)
+    xidqueue = xidqueue[queueshuffle]
+    thetaidqueue = thetaidqueue[queueshuffle]
+    for l in range(0,numperbatch):
+        f[xidqueue[l], thetaidqueue[l]] = borehole_model(x[xidqueue[l],:],
+                                                         thetatot[thetaidqueue[l],:])
+        pending[xidqueue[l], thetaidqueue[l]] = False
+        complete[xidqueue[l], thetaidqueue[l]] = True
+    thetaidqueue = np.delete(thetaidqueue,range(0,numperbatch),0)
+    xidqueue = np.delete(xidqueue,range(0,numperbatch),0)
     
-    for l in range(0, numperbatch):
-        _, cx, _ = matrixmatching(xqueue[l,:], x)
-        _, ctheta, _ = matrixmatching(thetaqueue[l,:], thetatot)
-        f[cx, ctheta] = borehole_model(xqueue[l,:], thetaqueue[l,:])
-    thetaqueue = np.delete(thetaqueue,range(0,numperbatch),0)
-    xqueue = np.delete(xqueue,range(0,numperbatch),0)
-    emu.update(thetatot, f)
+    emu.update(theta = thetatot, f=f)
     cal.fit()
     print(np.round(np.quantile(cal.theta.rnd(10000), (0.01, 0.99), axis = 0),3))

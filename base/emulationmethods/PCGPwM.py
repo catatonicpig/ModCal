@@ -212,7 +212,7 @@ This [emulationadditionalfuncsinfo] automatically filled by docinfo.py when runn
 ##############################################################################
 ##############################################################################
 """
-def supplementtheta(fitinfo, size, theta, cal, args):
+def supplementtheta(fitinfo, size, theta, thetachoices, choicecosts, cal, args):
     r"""
     Finds supplement theta given the dictionary fitinfo.
     This [emulationsupplementthetadocstring] is automatically filled by docinfo.py when running 
@@ -226,7 +226,11 @@ def supplementtheta(fitinfo, size, theta, cal, args):
     size : integer
         The number of thetas the user wants.
     theta : array
-        An array of theta values where you want to predict.  This will not always be provided.
+        An array of theta values where you want to predict.
+    thetachoices : array
+        An array of to choice between.
+    choicecosts : array
+        The cost of each choice given to you.
     cal : instance of emulator class
         An emulator class instance as defined in calibration.  This will not always be provided.
     args : dict
@@ -247,12 +251,9 @@ def supplementtheta(fitinfo, size, theta, cal, args):
     thetaold = copy.copy(fitinfo['theta'])
     norig = thetaold.shape[0]
     varpca = copy.copy(fitinfo['pcstdvar'])
+    mof = copy.copy(fitinfo['mof'])
     
-    thetaposs = copy.copy(theta)
-    if thetaposs.shape[0] > 30 * size:
-        thetac = np.random.choice(thetaposs.shape[0], 30 * size, replace=False)
-        thetaposs = thetaposs[thetac,:]
-    
+    thetaposs = thetachoices
     rsave = np.array(np.ones(len(infos)), dtype=object)
     rposssave = np.array(np.ones(len(infos)), dtype=object)
     rnewsave = np.array(np.ones(len(infos)), dtype=object)
@@ -273,13 +274,16 @@ def supplementtheta(fitinfo, size, theta, cal, args):
             thetaold = np.vstack((thetaold, thetaposs))
             break
         for k in range(0, len(infos)):
+            #if mof is not None:
+                #print(varpca[:, k])
+                #print(np.sum(mof,1))
             Rh = R[infos[k]['hypind']] + np.diag(varpca[:, k])
             p = rnewsave[infos[k]['hypind']]
             q = rposssave[infos[k]['hypind']] @ np.linalg.solve(Rh,rsave[infos[k]['hypind']].T)
             r = rposssave[infos[k]['hypind']].T * np.linalg.solve(Rh,rposssave[infos[k]['hypind']].T)
             crit += weightma[k] * np.mean((p-q) ** 2,1) / (1 - np.sum(r,0))
-        jstar = np.argmax(crit)
-        critsave[j] = crit[jstar]
+        jstar = np.argmax(crit / choicecosts)
+        critsave[j] = crit[jstar] / choicecosts[jstar]
         thetaold = np.vstack((thetaold, thetaposs[jstar]))
         thetaposs = np.delete(thetaposs, jstar, 0)
         for k in range(0, len(infos)):
@@ -292,8 +296,8 @@ def supplementtheta(fitinfo, size, theta, cal, args):
                 rsave[k] = np.hstack((rsave[k], rnewsave[k][jstar,:][:,None]))
                 rnewsave[k] = np.delete(rnewsave[k], jstar, 0)
         crit = np.delete(crit, jstar)
+        choicecosts = np.delete(choicecosts, jstar)
         varpca = np.vstack((varpca,0*varpca[0, :]))
-    
     for k in range(0, len(infos)):
         if infos[k]['hypind'] == k:
             rsave[k] = (1-infos[k]['nug']) * __covmat(theta, thetaold, infos[k]['hypcov'])

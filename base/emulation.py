@@ -237,7 +237,8 @@ class emulator(object):
         self.method.predict(info, self._info, x, theta, args)
         return prediction(info, self)
     
-    def supplement(self, size, theta=None, x=None, cal=None, args=None, overwrite=False):
+    def supplement(self, size,  x=None, xchoices=None,  theta=None, thetachoices=None, choicescost=None,
+                   cal=None, args=None, overwrite=False, removereps = None):
         r"""
         Chooses a new theta to be investigated.
         
@@ -251,12 +252,20 @@ class emulator(object):
             it will return at most size of those. If only x is supplied, it will return at most
             size of those. If  both x and theta are supplied, then size will be less than 
             the product of the number of returned theta and the number of x.
-        theta : optional array of float
-            An array of parameters where you would like to predict. A user must provide either x, 
-            theta or both or another object like cal.
         x : optional array of float
             An array of parameters where you would like to predict. A user must provide either x, 
             theta or both or another object like cal.
+        xchoices : optional array of float
+            An  array of inputs where you would like to select from.  If not provided, we
+            will use a subset of x.
+        theta : optional array of float
+            An array of parameters where you would like to predict. A user must provide either x, 
+            theta or both or another object like cal.
+        thetachoices : optional array of float
+            An  array of parameters where you would like to select from.  If not provided, we
+            will use a subset of theta.
+        choicescost : optional array of values
+            An array of positive cost of each element in choice
         cal : optional calibrator object
             A calibrator object that contains information about calibration. A user must provide 
             either x, theta or both or another object like cal.
@@ -266,6 +275,8 @@ class emulator(object):
         overwrite : boolean
             Do you want to replace existing supplement?  If False, and one exists, it will return 
             without doing anything.
+        removereps : boolean
+            Do you want to remove any replications existing supplement? Will default to options.
         Returns
         -------
         theta, info : If returning supplemented thetas
@@ -277,6 +288,12 @@ class emulator(object):
             argstemp = {**self._args, **copy.deepcopy(args)} #properly merge the arguments
         else:
             argstemp = copy.copy(self._args)
+        
+        if removereps is None:
+            if x is not None:
+                removereps = not self.__options['xreps']
+            if theta is not None:
+                removereps = not self.__options['thetareps']
         
         if size < 0.5:
             if size == 0:
@@ -290,13 +307,12 @@ class emulator(object):
         if cal is not None:
             try:
                 if theta is None:
-                    theta = cal.theta(1000)
+                    theta = cal.theta(2000)
             except:
-                raise ValueError('cal.theta(1000) failed.')
+                raise ValueError('cal.theta(5000) failed.')
         
         if x is not None and theta is not None:
             raise ValueError('You must either provide either x or (theta or cal).')
-        
         
         if x is not None and self.__suppx is not None and (not overwrite):
             raise ValueError('You must either evaulate the stuff in emu._emulator__suppx  or select'
@@ -307,6 +323,32 @@ class emulator(object):
                 raise ValueError('x has the wrong shape, it does not match emu._emulator__x.')
         else:
             x = None
+        
+        if xchoices is not None:
+            raise ValueError('selection of x is not yet supported.')
+            
+        
+        
+        if thetachoices is not None and theta is None:
+            raise ValueError('You must provide theta (or a cal) if you give thetachoices.')
+        if theta is not None and thetachoices is None:
+            if theta.shape[0] > 30 * size:
+                thetachoices = theta[np.random.choice(theta.shape[0], 30 * size, replace=False),:]
+            else:
+                thetachoices = copy.copy(thetachoices)
+        
+        if choicescost is None and thetachoices is not None:
+            choicescost = np.ones(thetachoices.shape[0])
+        elif choicescost is None and xchoices is not None:
+            choicescost = np.ones(xchoices.shape[0])
+        elif thetachoices is not None and thetachoices.shape[0] != choicescost.shape[0]:
+            raise ValueError('choicecost is not the right shape.')
+        elif xchoices is not None and xchoices.shape[0] != choicescost.shape[0]:
+            raise ValueError('choicecost is not the right shape.')
+        
+        
+        if thetachoices.shape[1] != theta.shape[1]:
+            raise ValueError('Your demensions of choices and predictions are not aligning.')
         
         if theta is not None and self.__supptheta is not None and (not overwrite):
             raise ValueError('You must either evaulate the stuff in emu._emulator__supptheta or select'
@@ -322,37 +364,28 @@ class emulator(object):
         else:
             theta = None
         
-        if theta is not None:
-            supptheta, suppinfo = self.method.supplementtheta(self._info, size, theta,
-                                                                cal, argstemp)
+        if thetachoices is not None:
+            supptheta, suppinfo = self.method.supplementtheta(self._info, copy.copy(size),
+                                                              copy.copy(theta),
+                                                              copy.copy(thetachoices),
+                                                              copy.copy(choicescost),
+                                                              copy.copy(cal),
+                                                              argstemp)
             suppx = None
-        else:
-            suppx, suppinfo = self.method.supplementx(self._info, size, x, cal, argstemp)
+        elif xchoices is not None:
+            supptheta, suppinfo = self.method.supplementx(self._info, copy.copy(size),
+                                                              copy.copy(x),
+                                                              copy.copy(xchoices),
+                                                              copy.copy(choicescost),
+                                                              copy.copy(cal),
+                                                              argstemp)
             supptheta = None
         
-        if suppx is not None and (not self.__options['xreps']):
-            ncx, cx, rx = _matrixmatching(self.__x, suppx)
-        elif suppx is not None:
-            cx = np.empty()
-            ncx = np.array(range(0,suppx.shape[0])).astype('int')
-        
-        if supptheta is not None and (not self.__options['thetareps']):
+        if supptheta is not None and removereps:
             nctheta, ctheta, rtheta = _matrixmatching(self.__theta, supptheta)
         elif supptheta is not None:
-            ctheta = np.empty()
+            ctheta = np.zeros(0)
             nctheta = np.array(range(0,supptheta.shape[0])).astype('int')
-        
-        
-        if supptheta is None:
-            if ncx.shape[0] < 0.5:
-                print('Was not able to assign any new values because everything ' +
-                      'was a replication of emu.__theta.')
-                self.__suppx = None
-            else:
-                if ncx.shape[0] < suppx.shape[0]:
-                    print('Had to remove replications versus xs.')
-                    suppx = suppx[nctheta,:]
-                self.__suppx = copy.copy(suppx)
         
         if suppx is None:
             if nctheta.shape[0] < 0.5:
@@ -367,8 +400,6 @@ class emulator(object):
         
         if self.__supptheta is not None and self.__suppx is None:
             return copy.copy(self.__supptheta), suppinfo
-        elif self.__suppx is not None and self.__supptheta is None:
-            return copy.copy(self.__suppx), suppinfo
         else:
             raise ValueError('Something went wrong...')
         
