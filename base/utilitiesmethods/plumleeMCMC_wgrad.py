@@ -95,7 +95,7 @@ def plumleepostsampler_wgrad(thetastart, logpostfunc, numsamp, tarESS):
     if keeptryingwithgrad or logpostf_grad is None:
         thetastart = np.vstack((thetastart,thetaop))
     
-    numchain = 50
+    numchain = 25
     maxiters = 30
     keepgoing = True
     while keepgoing:
@@ -119,7 +119,7 @@ def plumleepostsampler_wgrad(thetastart, logpostfunc, numsamp, tarESS):
     else:
         rho = 2 / thetastart.shape[1] ** (1/6)
         taracc = 0.60
-    numsamppc = np.minimum(1000,np.maximum(10,np.ceil(numsamp/numchain))).astype('int')
+    numsamppc = np.minimum(1000,np.maximum(50,np.ceil(numsamp/numchain))).astype('int')
     for iters in range(0,maxiters):
         covmat0 = np.cov(thetasave.T)
         Wc, Vc = np.linalg.eigh(covmat0)
@@ -185,6 +185,4 @@ def plumleepostsampler_wgrad(thetastart, logpostfunc, numsamp, tarESS):
             numsamppc = (np.array(numsamppc*np.min((tarESS/np.mean(ESS),4)))).astype('int')
         elif accr < taracc*1.55 and accr > taracc*0.66 and numsamppc > 250:
             break
-        print(iters)
-        print(accr)
     return thetasave[np.random.choice(range(0,thetasave.shape[0]),size = numsamp),:]

@@ -180,7 +180,7 @@ class calibrator(object):
         """
         if args is None:
             args = self.args
-        if args is x:
+        if x is None:
             x = self.x
         info = {}
         self.method.predict(info, self.info, self.emu, x, args)

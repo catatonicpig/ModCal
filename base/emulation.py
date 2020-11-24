@@ -456,7 +456,7 @@ class emulator(object):
             if f.shape[0] != self.__f.shape[0]:
                 raise ValueError('Row of f are different than those provided originally,' +
                                  'please provide x to allow for alignment')
-            if self.__options['reps']:
+            if self.__options['thetareps']:
                     self.__theta = np.vstack((self.__theta, theta))
                     self.__f = np.hstack((self.__f,f))
             else:
@@ -464,9 +464,9 @@ class emulator(object):
                 self.__f[:, r] = f[:,c]
                 if nc.shape[0] > 0.5:
                     f = f[:,nc]
-                    theta = theta[:,nc]
+                    theta = theta[nc,:]
                     nc, c, r = _matrixmatching(self.__supptheta, theta)
-                    self.__f = np.hstack((self.__f, f[c,:]))
+                    self.__f = np.hstack((self.__f, f[:,c]))
                     self.__theta = np.vstack((self.__theta, theta[c,:]))
                     self.__supptheta = np.delete(self.__supptheta, r, axis = 0)
                 if nc.shape[0] > 0.5:
@@ -485,7 +485,7 @@ class emulator(object):
             if f.shape[1] != self.__f.shape[1]:
                 raise ValueError('Rows of f are different than those provided originally,' +
                                  'please provide theta to allow for alignment')
-            if options['reps']:
+            if options['xreps']:
                 self.__x = np.vstack((self.__x, x))
                 self.__f = np.vstack((self.__f,f))
             else:

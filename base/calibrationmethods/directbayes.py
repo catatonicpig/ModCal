@@ -192,6 +192,8 @@ def loglik(fitinfo, emu, theta, y, x, args):
     emumean = emupredict.mean()
     emucovhalf = emupredict.covxhalf()
     loglik = np.zeros(emumean.shape[1])
+    if '_info' in dir(emu) and 'extravar' in emu._info:
+        obsvar = obsvar + emu._info['extravar']
     for k in range(0, emumean.shape[1]):
         m0 = emumean[:,k]
         S0 = np.squeeze(emucovhalf[:,k,:])
@@ -203,9 +205,9 @@ def loglik(fitinfo, emu, theta, y, x, args):
         J2 =  J.T @ stndresid
         W, V = np.linalg.eigh(np.eye(J.shape[1]) + J.T @ J)
         J3 = np.squeeze(V).T @ np.squeeze(J2)
-        term2 = np.sum((J3 ** 2) / W)
-        term3 = np.sum(np.log(W))
+        term2 = np.sum((J3 ** 2) / np.abs(W))
+        term3 = np.sum(np.log(np.abs(W)))
         residsq = term1 - term2
-        loglik[k] += -0.5 * (m0.shape[0]+0.1) * np.log(residsq+0.1) - 0.5 * term3
+        loglik[k] += -0.5 * residsq - 0.5 * term3
     
     return loglik
