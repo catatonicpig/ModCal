@@ -97,10 +97,11 @@ def fit(fitinfo, emu, x, y,  args=None):
             return logpost, dlogpost
         else:
             return logpost
+    theta = thetaprior.rnd(1000)
     if 'thetarnd' in fitinfo:
-        theta = np.vstack((fitinfo['thetarnd'],thetaprior.rnd(1000)))
-    else:
-        theta = thetaprior.rnd(6000)
+        theta = np.vstack((fitinfo['thetarnd'],theta))
+    if '_emulator__theta' in dir(emu):
+        theta = np.vstack((theta,copy.copy(emu._emulator__theta)))
     theta = postsampler(theta, logpostfull_wgrad)
     fitinfo['thetarnd'] = theta
     fitinfo['y'] = y

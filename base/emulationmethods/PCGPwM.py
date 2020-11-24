@@ -57,7 +57,7 @@ def fit(fitinfo, x, theta, f, args):
     else:
         __standardizef(fitinfo)
         
-    if ('pct' in fitinfo.keys()) and ('pcw' in fitinfo.keys()) and\
+    if False and ('pct' in fitinfo.keys()) and ('pcw' in fitinfo.keys()) and\
         ('extravar' in fitinfo.keys()):
         __PCs(fitinfo,fitinfo['pct'],fitinfo['pcti'],fitinfo['pcw'],fitinfo['extravar'])
     else:
@@ -376,7 +376,7 @@ def __standardizef(fitinfo, offset=None, scale=None):
         for k in range(0, f.shape[1]):
             offset[k] = np.nanmean(f[:, k])
             scale[k] = np.nanstd(f[:, k])
-        #scale = 0.99* scale + 0.01*np.mean(scale)
+        scale = 0.9999* scale + 0.0001*np.mean(scale)
     # Initializing values
     fs = np.zeros(f.shape)
     if mof is None:
