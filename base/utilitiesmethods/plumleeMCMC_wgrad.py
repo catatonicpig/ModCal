@@ -94,7 +94,7 @@ def plumleepostsampler_wgrad(thetastart, logpostfunc, numsamp, tarESS):
                                  bounds = bounds, options={'maxiter': 4,'maxfun':100})
     #if keeptryingwithgrad or logpostf_grad is None:
     thetastart = np.vstack((thetastart,thetaop))
-    numchain = 25
+    numchain = 30
     maxiters = 30
     keepgoing = True
     while keepgoing:
@@ -118,7 +118,7 @@ def plumleepostsampler_wgrad(thetastart, logpostfunc, numsamp, tarESS):
     else:
         rho = 2 / thetastart.shape[1] ** (1/6)
         taracc = 0.60
-    numsamppc = np.minimum(1000,np.maximum(50,np.ceil(numsamp/numchain))).astype('int')
+    numsamppc = np.minimum(1000,np.maximum(40,np.ceil(numsamp/numchain))).astype('int')
     for iters in range(0,maxiters):
         covmat0 = np.cov(thetasave.T)
         Wc, Vc = np.linalg.eigh(covmat0)
@@ -128,6 +128,14 @@ def plumleepostsampler_wgrad(thetastart, logpostfunc, numsamp, tarESS):
             Vc = Vc[:,Wc> 10 **(-20) * np.max(Wc)]
             Wc = Wc[Wc> 10 **(-20) * np.max(Wc)]
         hc = (Vc @ np.diag(np.sqrt(Wc)) @ Vc.T)
+        if iters > 0.5:
+            Lsave = np.squeeze(np.reshape(Lsave,(-1,1)))
+            Lsave = Lsave - np.max(Lsave)
+            Lsave -= np.log(np.sum(np.exp(Lsave)))
+            post = np.exp(Lsave)
+            post = post/np.sum(post)
+            startingv = np.random.choice(np.arange(0, Lsave.shape[0]),size=Lsave.shape[0],p=post)
+            thetasave = thetasave[startingv,:]
         thetac = thetasave[np.random.choice(range(0,thetasave.shape[0]),size = numchain),:]
         if logpostf_grad is not None:
             fval, dfval = logpostf(thetac)
@@ -174,13 +182,6 @@ def plumleepostsampler_wgrad(thetastart, logpostfunc, numsamp, tarESS):
         rhohat = (1-(W-autocorr)/varplus)
         ESS = numchain * numsamppc * (1 -np.abs(rhohat))
         thetasave = np.reshape(thetasave,(-1,thetac.shape[1]))
-        Lsave = np.squeeze(np.reshape(Lsave,(-1,1)))
-        Lsave = Lsave - np.max(Lsave)
-        Lsave -= np.log(np.sum(np.exp(Lsave)))
-        post = np.exp(Lsave)
-        post = post/np.sum(post)
-        startingv = np.random.choice(np.arange(0, Lsave.shape[0]),size=Lsave.shape[0],p=post)
-        thetasave = thetasave[startingv,:]
         accr = numtimes / numsamppc
         if  iters > 2.5 and accr > taracc*0.66 and accr < taracc*1.55 and (np.mean(ESS) > tarESS):
             break
