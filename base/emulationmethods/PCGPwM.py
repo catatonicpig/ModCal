@@ -365,7 +365,7 @@ def __standardizef(fitinfo, offset=None, scale=None):
     f = fitinfo['f']
     mof = fitinfo['mof']
     mofrows = fitinfo['mofrows']
-    epsilon = 10 ** (-8)
+    epsilon = 10 ** (-2)
     if (offset is not None) and (scale is not None):
         if offset.shape[0] == f.shape[1] and scale.shape[0] == f.shape[1]:
             if np.any(np.nanmean(np.abs(f-offset)/scale,1) > 4):
@@ -393,7 +393,7 @@ def __standardizef(fitinfo, offset=None, scale=None):
                 a[::2] = 1
                 a[1::2] = -1
                 fs[np.where(mof[:, k])[0], k] = a
-        for iters in range(0,2):
+        for iters in range(0,40):
             U, S, _ = np.linalg.svd(fs.T, full_matrices=False)
             Sp = S ** 2 - epsilon
             Up = U[:, Sp > 0]
@@ -481,12 +481,12 @@ def __fitGP1d(theta, g, gvar=None, hypstarts=None, hypinds=None, prevsubmodel=No
     """Return a fitted model from the emulator model using smart method."""
     if prevsubmodel is None:
         subinfo = {}
-        subinfo['hypregmean'] = np.append(0 + np.log(theta.shape[1]) + np.log(np.std(theta, 0)), (0, -10))
+        subinfo['hypregmean'] = np.append(-0.25 + np.log(theta.shape[1]) + np.log(np.std(theta, 0)), (0, -10))
         subinfo['hypregLB'] = np.append(-4 + np.log(np.std(theta, 0)), (-12, -20))
         subinfo['hypregUB'] = np.append(3 + np.log(np.std(theta, 0)), (2, 0))
-        subinfo['hypregstd'] = (subinfo['hypregUB'] - subinfo['hypregLB']) / 8
-        subinfo['hypregstd'][-2] = 1
-        subinfo['hypregstd'][-1] = 1
+        subinfo['hypregstd'] = (subinfo['hypregUB'] - subinfo['hypregLB']) / 4
+        subinfo['hypregstd'][-2] = 2
+        subinfo['hypregstd'][-1] = 2
         subinfo['hyp'] = 1*subinfo['hypregmean']
         if theta.shape[0] > 100:
             nhyptrain = np.max(np.min((20*theta.shape[1], theta.shape[0])))
@@ -507,15 +507,31 @@ def __fitGP1d(theta, g, gvar=None, hypstarts=None, hypinds=None, prevsubmodel=No
                     subinfo['hyp'] = hypstarts[k, :]
                     L0 = 1* L1
                     hypind0 = hypinds[k]
-        opval = spo.minimize(__negloglik,
-                             1*subinfo['hyp'], args=(subinfo), method='L-BFGS-B',
-                             options={'gtol': 0.5 / (subinfo['hypregUB'] -
-                                                      subinfo['hypregLB'])},
-                             jac=__negloglikgrad,
-                             bounds=spo.Bounds(subinfo['hypregLB'],
-                                               subinfo['hypregUB']))
-        if hypind0 > -0.5 and 2 * (L0-opval.fun) < \
-            (subinfo['hyp'].shape[0] + 3 * np.sqrt(subinfo['hyp'].shape[0])):
+       
+        if hypind0 > -0.5 and hypstarts.ndim > 1:
+            dL = __negloglikgrad(subinfo['hyp'], subinfo)
+            scalL = np.std(hypstarts,0) * hypstarts.shape[0] / (1+hypstarts.shape[0]) +\
+                1 / (1+hypstarts.shape[0]) * subinfo['hypregstd']
+            if np.sum((dL * scalL) ** 2) < 1.2 * (subinfo['hyp'].shape[0] +
+                                            4*np.sqrt(subinfo['hyp'].shape[0])):
+                skipop = True
+            else:
+                skipop = False
+        else:
+            skipop = False
+        if (not skipop):
+            opval = spo.minimize(__negloglik,
+                                 1*subinfo['hyp'], args=(subinfo), method='L-BFGS-B',
+                                 options={'gtol': 0.1 / (subinfo['hypregUB'] -
+                                                          subinfo['hypregLB'])},
+                                 jac=__negloglikgrad,
+                                 bounds=spo.Bounds(subinfo['hypregLB'],
+                                                   subinfo['hypregUB']))
+            likdiff = (L0-opval.fun)
+        else:
+            likdiff = 0
+        if hypind0 > -0.5 and (2 * likdiff) < \
+            1.2 * (subinfo['hyp'].shape[0] + 4 * np.sqrt(subinfo['hyp'].shape[0])):
             subinfo['hypcov'] = subinfo['hyp'][:-1]
             subinfo['hypind'] = hypind0
             subinfo['nug'] = np.exp(subinfo['hyp'][-1])/(1+np.exp(subinfo['hyp'][-1]))

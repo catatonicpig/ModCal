@@ -404,7 +404,7 @@ class emulator(object):
             raise ValueError('Something went wrong...')
         
     
-    def update(self,theta=None, f=None,  x=None, args=None, options=None):
+    def update(self,x=None, theta=None, f=None,   args=None, options=None):
         r"""
         Chooses a new theta to be investigated.
         
@@ -413,15 +413,15 @@ class emulator(object):
 
         Parameters
         ----------
+        x : optional array of float
+            xs you would like to append. Defaults to emu.__x.
+            Will attempt to resolve if using all x and emu.__x.
         f : new f values
             A 2d array of responses at (theta, emu.__supptheta and/or emu.__theta)
             and (x, emu.__x).
         theta : optional array of float
             thetas you would like to append. Defaults to emu.__supptheta.
             Will attempt to resolve if using all theta and supptheta.
-        x : optional array of float
-            xs you would like to append. Defaults to emu.__x.
-            Will attempt to resolve if using all x and emu.__x.
         args : optional dict
             A dictionary containing options you would like to pass to
             [method].update(f,theta,x,args). 
@@ -476,7 +476,7 @@ class emulator(object):
                 print('you have change the number of theta, but not provided a new f...')
             else:
                 self.__theta = theta
-        
+                
         if (f is not None) and (theta is not None) and (x is None):
             if theta.shape[0] != f.shape[1]:
                 raise ValueError('number of rows between theta and columns in f do not align.')
@@ -493,7 +493,7 @@ class emulator(object):
             else:
                 nc, c, r = _matrixmatching(self.__theta, theta)
                 self.__f[:, r] = f[:,c]
-                if nc.shape[0] > 0.5:
+                if nc.shape[0] > 0.5 and self.__supptheta is not None:
                     f = f[:,nc]
                     theta = theta[nc,:]
                     nc, c, r = _matrixmatching(self.__supptheta, theta)
@@ -503,8 +503,8 @@ class emulator(object):
                 if nc.shape[0] > 0.5:
                     f = f[:, nc]
                     theta = theta[nc, :]
-                    self.__f = np.hstack(self.__f,f[:,c])
-                    self.__theta = np.vstack(self.__f,theta[c,:])
+                    self.__f = np.hstack((self.__f,f))
+                    self.__theta = np.vstack((self.__theta,theta))
         
         if (f is not None) and (theta is None) and (x is not None):
             if x.shape[0] != f.shape[1]:
@@ -524,7 +524,6 @@ class emulator(object):
                 self.__f[r, :] = f[c, :]
                 if nc.shape[0] > 0.5:
                     self.__f = np.vstack(self.__f, f[c,:])
-        
         if (f is not None) and (theta is not None) and (x is not None):
                 raise ValueError('Simultaneously adding new theta and x at once is currently'+
                                  'not supported.  Please supply either theta OR x.')
@@ -581,17 +580,17 @@ class emulator(object):
                     self.__options['xrmnan'] = 0
                 else:
                     self.__options['xrmnan'] =  1 + (10** (-12))
-            elif options['xrmnan'] is str and options['xrmnan']=='any':
+            elif isinstance(options['xrmnan'],str) and options['xrmnan']=='any':
                     self.__options['xrmnan'] = 0
-            elif options['xrmnan'] is str and options['xrmnan']=='some':
+            elif isinstance(options['xrmnan'],str) and options['xrmnan']=='some':
                     self.__options['xrmnan'] = 0.2
-            elif options['xrmnan'] is str and options['xrmnan']=='most':
+            elif isinstance(options['xrmnan'],str) and options['xrmnan']=='most':
                     self.__options['xrmnan'] = 0.5
-            elif options['xrmnan'] is str and options['xrmnan']=='alot':
+            elif isinstance(options['xrmnan'],str) and options['xrmnan']=='alot':
                     self.__options['xrmnan'] = 0.8
-            elif options['xrmnan'] is str and options['xrmnan']=='all':
+            elif isinstance(options['xrmnan'],str) and options['xrmnan']=='all':
                     self.__options['xrmnan'] = 1- (10** (-12))
-            elif options['xrmnan'] is str and options['xrmnan']=='never':
+            elif isinstance(options['xrmnan'],str) and  options['xrmnan']=='never':
                     self.__options['xrmnan'] = 1 + (10** (-12))
             elif np.isfinite(options['xrmnan']) and options['xrmnan']>=0\
                 and options['xrmnan']<=1:
