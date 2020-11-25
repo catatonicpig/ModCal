@@ -580,17 +580,17 @@ class emulator(object):
                     self.__options['xrmnan'] = 0
                 else:
                     self.__options['xrmnan'] =  1 + (10** (-12))
-            elif options['xrmnan'] is str and options['xrmnan']=='any':
+            elif isinstance(options['xrmnan'],str) and options['xrmnan']=='any':
                     self.__options['xrmnan'] = 0
-            elif options['xrmnan'] is str and options['xrmnan']=='some':
+            elif isinstance(options['xrmnan'],str) and options['xrmnan']=='some':
                     self.__options['xrmnan'] = 0.2
-            elif options['xrmnan'] is str and options['xrmnan']=='most':
+            elif isinstance(options['xrmnan'],str) and options['xrmnan']=='most':
                     self.__options['xrmnan'] = 0.5
-            elif options['xrmnan'] is str and options['xrmnan']=='alot':
+            elif isinstance(options['xrmnan'],str) and options['xrmnan']=='alot':
                     self.__options['xrmnan'] = 0.8
-            elif options['xrmnan'] is str and options['xrmnan']=='all':
+            elif isinstance(options['xrmnan'],str) and options['xrmnan']=='all':
                     self.__options['xrmnan'] = 1- (10** (-12))
-            elif options['xrmnan'] is str and options['xrmnan']=='never':
+            elif isinstance(options['xrmnan'],str) and  options['xrmnan']=='never':
                     self.__options['xrmnan'] = 1 + (10** (-12))
             elif np.isfinite(options['xrmnan']) and options['xrmnan']>=0\
                 and options['xrmnan']<=1:

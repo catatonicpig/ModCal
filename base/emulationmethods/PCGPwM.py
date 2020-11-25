@@ -481,7 +481,7 @@ def __fitGP1d(theta, g, gvar=None, hypstarts=None, hypinds=None, prevsubmodel=No
     """Return a fitted model from the emulator model using smart method."""
     if prevsubmodel is None:
         subinfo = {}
-        subinfo['hypregmean'] = np.append(0.25 + np.log(theta.shape[1]) + np.log(np.std(theta, 0)), (0, -10))
+        subinfo['hypregmean'] = np.append(-0.25 + np.log(theta.shape[1]) + np.log(np.std(theta, 0)), (0, -10))
         subinfo['hypregLB'] = np.append(-4 + np.log(np.std(theta, 0)), (-12, -20))
         subinfo['hypregUB'] = np.append(3 + np.log(np.std(theta, 0)), (2, 0))
         subinfo['hypregstd'] = (subinfo['hypregUB'] - subinfo['hypregLB']) / 4
@@ -507,9 +507,19 @@ def __fitGP1d(theta, g, gvar=None, hypstarts=None, hypinds=None, prevsubmodel=No
                     subinfo['hyp'] = hypstarts[k, :]
                     L0 = 1* L1
                     hypind0 = hypinds[k]
-        dL = __negloglikgrad(subinfo['hyp'], subinfo)
-        if (np.sqrt(np.sum((dL/ (subinfo['hypregUB'] -subinfo['hypregLB'])) ** 2)) >
-            0.5*subinfo['hyp'].shape[0]) or hypind0 < -0.5:
+       
+        if hypind0 > -0.5 and hypstarts.ndim > 1:
+            dL = __negloglikgrad(subinfo['hyp'], subinfo)
+            scalL = np.std(hypstarts,0) * hypstarts.shape[0] / (1+hypstarts.shape[0]) +\
+                1 / (1+hypstarts.shape[0]) * subinfo['hypregstd']
+            if np.sum((dL * scalL) ** 2) < 1.2 * (subinfo['hyp'].shape[0] +
+                                            4*np.sqrt(subinfo['hyp'].shape[0])):
+                skipop = True
+            else:
+                skipop = False
+        else:
+            skipop = False
+        if (not skipop):
             opval = spo.minimize(__negloglik,
                                  1*subinfo['hyp'], args=(subinfo), method='L-BFGS-B',
                                  options={'gtol': 0.1 / (subinfo['hypregUB'] -
@@ -521,7 +531,7 @@ def __fitGP1d(theta, g, gvar=None, hypstarts=None, hypinds=None, prevsubmodel=No
         else:
             likdiff = 0
         if hypind0 > -0.5 and (2 * likdiff) < \
-            (subinfo['hyp'].shape[0] + 4 * np.sqrt(subinfo['hyp'].shape[0])):
+            1.2 * (subinfo['hyp'].shape[0] + 4 * np.sqrt(subinfo['hyp'].shape[0])):
             subinfo['hypcov'] = subinfo['hyp'][:-1]
             subinfo['hypind'] = hypind0
             subinfo['nug'] = np.exp(subinfo['hyp'][-1])/(1+np.exp(subinfo['hyp'][-1]))

@@ -30,7 +30,7 @@ yvar = (10 ** (-2)) * np.ones(yt.shape)
 thetatot = (thetaprior.rnd(15))
 f = (borehole_model(x, thetatot).T ).T
 y = yt + sps.norm.rvs(0,np.sqrt(yvar))
-emu = emulator(x, thetatot, f, method = 'PCGPwM')
+emu = emulator(x, thetatot, f, method = 'PCGPwM', options = {'xrmnan': 'all'})
 emu.fit()
 emu2 = emulator(passthroughfunc = borehole_model)
 cal2 = calibrator( emu2, y, x, thetaprior, yvar, method = 'directbayes')
@@ -96,20 +96,23 @@ for k in range(0,20):
             thetachoices = np.vstack((thetatot[thetaspending,:], thetachoices))
             choicescost = np.append((np.sum(pending[:,thetaspending],0)/x.shape[0]) ** 4, choicescost)
             
-        thetanew, info = emu.supplement(size = numnewtheta, thetachoices = thetachoices, 
+        thetaneworig, info = emu.supplement(size = numnewtheta, thetachoices = thetachoices, 
                                         choicescost = choicescost,
                                         removereps = False,
                                         cal = cal, overwrite=True)
         if np.sum(pending) > 0:
-            nctheta, _, _ = matrixmatching(thetatot, thetanew)
-            ncthetaold, _, _ = matrixmatching(thetanew,thetatot)
+            nctheta, _, _ = matrixmatching(thetatot, thetaneworig)
+            ncthetaold, _, _ = matrixmatching(thetaneworig,thetatot)
             pending[:, ncthetaold] = False #obviation
             for k in ncthetaold:
                 queue2delete = np.where(thetaidqueue == k)[0]
                 if queue2delete.shape[0] > 0.5:
                     thetaidqueue = np.delete(thetaidqueue,queue2delete,0)
                     xidqueue = np.delete(xidqueue,queue2delete,0)
-            thetanew = thetanew[nctheta,:]
+            thetanew = thetaneworig[nctheta,:]
+        else:
+            thetanew = thetaneworig
+        
         if thetanew.shape[0] > 0.5:
             pending = np.hstack((pending,np.full((x.shape[0],thetanew.shape[0]),True)))
             complete = np.hstack((complete,np.full((x.shape[0],thetanew.shape[0]),False)))
@@ -124,12 +127,20 @@ for k in range(0,20):
             else:
                 thetaidqueue = np.append(thetaidqueue,thetaidnewqueue)
                 xidqueue = np.append(xidqueue,xidnewqueue)
+        c,nc,r = matrixmatching(thetaneworig,thetatot)
+        cx,ncx,rx = matrixmatching(info['orderedx'],x)
+        priorityscore = np.zeros(thetaidqueue.shape)
+        ncx = np.random.choice(np.arange(0,x.shape[0]),
+                                     size=x.shape[0],replace=False)
+        for l in range(0,nc.shape[0]):
+            priorityscore[thetaidqueue == nc[l]] += l
+        for l in range(0,ncx.shape[0]):
+            priorityscore[xidqueue == ncx[l]] += thetatot.shape[0] * l
         if np.sum(pending) > 600:
              keepadding = False
-    queueshuffle = np.random.choice(range(0,thetaidqueue.shape[0]),
-                                    size=thetaidqueue.shape[0],replace=False)
-    xidqueue = xidqueue[queueshuffle]
-    thetaidqueue = thetaidqueue[queueshuffle]
+    queuerearr = np.argsort(priorityscore)
+    xidqueue = xidqueue[queuerearr]
+    thetaidqueue = thetaidqueue[queuerearr]
     for l in range(0,np.minimum(xidqueue.shape[0],numperbatch)):
         f[xidqueue[l], thetaidqueue[l]] = borehole_model(x[xidqueue[l],:],
                                                          thetatot[thetaidqueue[l],:])
