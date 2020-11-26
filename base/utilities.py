@@ -5,7 +5,7 @@ from base.utilitiesmethods.plumleeMCMC import plumleepostsampler
 from base.utilitiesmethods.plumleeMCMC_wgrad import plumleepostsampler_wgrad
 from base.utilitiesmethods.metropolis_hasting import metropolis_hasting
 
-def postsampler(thetastart, logpostfunc, options=None):
+def postsampler(thetastart, logpostfunc, options= {}):
     """
     Return draws from the posterior.
 
@@ -21,15 +21,19 @@ def postsampler(thetastart, logpostfunc, options=None):
     -------
     theta : matrix of sampled paramter values
     """
-
-    if options is None:
-        numsamp = 2000
-        #tarESS = np.max((400, 10 * thetastart.shape[1]))
-        def postsamplefunc(thetastart, logpostfunc):
-            return metropolis_hasting(thetastart, logpostfunc)
-            #return plumleepostsampler_wgrad(thetastart, logpostfunc, numsamp, tarESS)
-        
-        #Changing this part, but I guess we will modify that part later?
+    if 'method' in options.keys():
+        method = options['method']
     else:
-        print('options are not yet avaiable for this function')
+        method = 'default'
+    if 'numsamp' in options.keys():
+        numsamp = options['numsamp']
+    else:
+        numsamp = 2000
+    
+    def postsamplefunc(thetastart, logpostfunc):
+        if method is 'plumlee':
+            tarESS = np.max((400, 10 * thetastart.shape[1]))
+            return plumleepostsampler_wgrad(thetastart, logpostfunc, numsamp, tarESS)
+        else:
+            return metropolis_hasting(thetastart, logpostfunc)
     return postsamplefunc(thetastart, logpostfunc)

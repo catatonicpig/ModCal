@@ -102,7 +102,7 @@ def fit(fitinfo, emu, x, y,  args=None):
         theta = np.vstack((fitinfo['thetarnd'],theta))
     if '_emulator__theta' in dir(emu):
         theta = np.vstack((theta,copy.copy(emu._emulator__theta)))
-    theta = postsampler(theta, logpostfull_wgrad)
+    theta = postsampler(theta, logpostfull_wgrad, options={'method': 'plumlee'})
     ladj = logpostfull_wgrad(theta, return_grad = False)
     mladj = np.max(ladj)
     fitinfo['lpdfapproxnorm'] = np.log(np.mean(np.exp(ladj - mladj))) + mladj
