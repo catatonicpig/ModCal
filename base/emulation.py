@@ -531,7 +531,46 @@ class emulator(object):
             self.fit()
         return
     
-    
+    def remove(self, x=None, theta=None, cal=None, options=None):
+        r"""
+        Removes either an x or theta value, and the corresponding f values.
+        
+        It can either come from the method or is automatted to use fit and
+        predict from the method to complete the operation.
+
+        Parameters
+        ----------
+        x : optional array of float
+            xs you would like to append. Defaults to emu.__x.
+            Will attempt to resolve if using all x and emu.__x.
+        theta : optional array of float
+            thetas you would like to append. Defaults to emu.__supptheta.
+            Will attempt to resolve if using all theta and supptheta.
+        cal : optional calibrator object
+            A calibrator object that contains information about removal. A user must provide 
+            either x, theta or both or another object like cal.
+
+        Returns
+        -------
+        """
+        if cal is not None:
+            totalseen = np.where(np.mean(np.logical_not(np.isfinite(self.__f)),0)
+                                 < self.__options['thetarmnan'])[0]
+            lpdfexisting = cal.theta.lpdf(self.__theta[totalseen,:])
+            thetasort = np.argsort(lpdfexisting)
+            numcutoff = np.minimum(-500, lpdfexisting[thetasort[max(lpdfexisting.shape[0]-
+                                                          10*self.__theta.shape[1],0)]])
+            if any(lpdfexisting < numcutoff):
+                rmtheta = totalseen[np.where(lpdfexisting < numcutoff)[0]]
+                theta = self.__theta[rmtheta,:]
+                print('removing %d thetas' % rmtheta.shape[0])
+        if (theta is not None):
+            nc, c, r = _matrixmatching(theta, self.__theta)
+            self.__theta = self.__theta[nc,:]
+            self.__f = self.__f[:,nc]
+            if self.__options['autofit']:
+                self.fit()
+        return
     def __optionsset(self, options=None):
         options = copy.deepcopy(options)
         options =  {k.lower(): v for k, v in options.items()} #options will always be lowercase

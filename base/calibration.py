@@ -360,7 +360,7 @@ class thetadist(object):
         if (pfstr + opstr) in dir(self.cal.method):
             if args is None:
                 args = self.cal.args
-            return copy.deepcopy(self.cal.method.thetarnd(self.cal.info, s, args))
+            return copy.copy(self.cal.method.thetarnd(self.cal.info, s, args))
         elif (pfstr+opstr) in self.cal.info.keys():
             return self.cal.info['thetarnd'][
                         np.random.choice(self.cal.info['thetarnd'].shape[0], size=s), :]
@@ -371,4 +371,11 @@ class thetadist(object):
         r"""
         Returns a log pdf given theta.
         """
-        raise ValueError('lpdf functionality not in method')
+        pfstr = 'theta' #prefix string
+        opstr = 'lpdf' #operation string
+        if (pfstr + opstr) in dir(self.cal.method):
+            if args is None:
+                args = self.cal.args
+            return copy.copy(self.cal.method.thetalpdf(self.cal.info, theta, args))
+        else:
+            raise ValueError('lpdf functionality not in method')

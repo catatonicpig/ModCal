@@ -103,9 +103,13 @@ def fit(fitinfo, emu, x, y,  args=None):
     if '_emulator__theta' in dir(emu):
         theta = np.vstack((theta,copy.copy(emu._emulator__theta)))
     theta = postsampler(theta, logpostfull_wgrad)
+    ladj = logpostfull_wgrad(theta, return_grad = False)
+    mladj = np.max(ladj)
+    fitinfo['lpdfapproxnorm'] = np.log(np.mean(np.exp(ladj - mladj))) + mladj
     fitinfo['thetarnd'] = theta
     fitinfo['y'] = y
     fitinfo['x'] = x
+    fitinfo['emu'] = emu
     return
 
 
@@ -185,7 +189,7 @@ def predict(predinfo, fitinfo, emu, x, args=None):
             sps.norm.rvs(0,1,size=(Vmat.shape[1]))
         predinfo['rnd'][k,:] = meanfull[k, :]  + re
         predinfo['modelrnd'][k,:] = mus0
-
+        
     predinfo['mean'] = np.mean(meanfull, 0)
     varterm1 = np.var(meanfull, 0)
     predinfo['var'] = np.mean(varfull, 0) + varterm1
@@ -208,6 +212,23 @@ def thetarnd(fitinfo, s=100, args=None):
     Return s draws from the predictive distribution of theta.  Not required.
     """
     return fitinfo['thetarnd'][np.random.choice(fitinfo['thetarnd'].shape[0], size=s), :]
+
+
+def thetalpdf(fitinfo, theta, args=None):
+    """
+    Return logposterior draws from the predictive distribution of theta.  Not required.
+    """
+    emu = fitinfo['emu']
+    y = fitinfo['y']
+    x = fitinfo['x']
+    thetaprior = fitinfo['thetaprior']
+    logpost = thetaprior.lpdf(theta)
+    if logpost.ndim > 0.5 and logpost.shape[0] > 1.5:
+        inds = np.where(np.isfinite(logpost))[0]
+        logpost[inds] += loglik(fitinfo, emu, theta[inds], y, x, args)
+    elif np.isfinite(logpost):
+        logpost += loglik(fitinfo, emu, theta, y, x, args)
+    return (logpost-fitinfo['lpdfapproxnorm'])
 
 """
 This [endfunctionsflag] is automatically filled by docinfo.py when running updatedocs.py
