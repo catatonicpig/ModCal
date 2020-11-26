@@ -57,7 +57,14 @@ def plumleepostsampler_wgrad(thetastart, logpostfunc, numsamp, tarESS):
     thetaop = thetastart[startingv,:]
     
     thetac = np.mean(thetastart,0)
-    thetas = np.std(thetastart,0)
+    thetas = np.maximum(np.std(thetastart,0), 10 ** (-4) * np.std(thetastart))
+    
+    for k in range(0,startingv.shape[0]):
+        LB,UB = test1dboundarys(thetaop[k,:], logpostf_nograd, thetas)
+        thetas = np.maximum(thetas, 0.5 * (UB-LB))
+        thetastart = np.vstack((thetastart,LB))
+        thetastart = np.vstack((thetastart,UB))
+    
     def neglogpostf_nograd(thetap):
         theta = thetac + thetas * thetap
         return -logpostf_nograd(theta)
@@ -65,8 +72,12 @@ def plumleepostsampler_wgrad(thetastart, logpostfunc, numsamp, tarESS):
         def neglogpostf_grad(thetap):
             theta = thetac + thetas * thetap
             return -thetas * logpostf_grad(theta)
-        
-    bounds = spo.Bounds(-10*np.ones(thetastart.shape[1]), 10*np.ones(thetastart.shape[1]))
+    
+    boundL = np.maximum(-10*np.ones(thetastart.shape[1]), -5*np.min((thetastart-thetac)/thetas,0))
+    boundU = np.minimum(10*np.ones(thetastart.shape[1]), 5*np.max((thetastart-thetac)/thetas,0))
+    
+    bounds = spo.Bounds(boundL, boundU)
+    
     keeptryingwithgrad = True
     failureswithgrad = 0
     for k in range(0,startingv.shape[0]):
@@ -74,6 +85,7 @@ def plumleepostsampler_wgrad(thetastart, logpostfunc, numsamp, tarESS):
         if logpostf_grad is None:
             opval = spo.minimize(neglogpostf_nograd, theta0, method='L-BFGS-B',
                                  bounds = bounds, options={'maxiter': 4,'maxfun':100})
+            thetaop[k,:] = thetac + thetas * opval.x
         else:
             if keeptryingwithgrad:
                 opval = spo.minimize(neglogpostf_nograd, theta0,method='L-BFGS-B',
@@ -92,6 +104,7 @@ def plumleepostsampler_wgrad(thetastart, logpostfunc, numsamp, tarESS):
                         #print('gave up on optimizing with grad, maybe it is approximate..')
                 opval = spo.minimize(neglogpostf_nograd, theta0,method='L-BFGS-B',
                                  bounds = bounds, options={'maxiter': 4,'maxfun':100})
+                thetaop[k,:] = thetac + thetas * opval.x
     #if keeptryingwithgrad or logpostf_grad is None:
     thetastart = np.vstack((thetastart,thetaop))
     numchain = 30
@@ -99,8 +112,8 @@ def plumleepostsampler_wgrad(thetastart, logpostfunc, numsamp, tarESS):
     keepgoing = True
     while keepgoing:
         logpost = logpostf_nograd(thetastart)/4
-        logpost = logpost - np.max(logpost)
-        logpost -= np.log(np.sum(np.exp(logpost)))
+        mlogpost = np.max(logpost)
+        logpost -= (mlogpost + np.log(np.sum(np.exp(logpost-mlogpost))))
         post = np.exp(logpost)
         post = post/np.sum(post)
         if np.max(post) > 1/(thetastart.shape[1] +2)/2:
@@ -130,8 +143,8 @@ def plumleepostsampler_wgrad(thetastart, logpostfunc, numsamp, tarESS):
         hc = (Vc @ np.diag(np.sqrt(Wc)) @ Vc.T)
         if iters > 0.5:
             Lsave = np.squeeze(np.reshape(Lsave,(-1,1)))
-            Lsave = Lsave - np.max(Lsave)
-            Lsave -= np.log(np.sum(np.exp(Lsave)))
+            mLsave = np.max(Lsave)
+            Lsave -= mLsave + np.log(np.sum(np.exp(Lsave- mLsave)))
             post = np.exp(Lsave)
             post = post/np.sum(post)
             startingv = np.random.choice(np.arange(0, Lsave.shape[0]),size=Lsave.shape[0],p=post)
@@ -198,3 +211,43 @@ def plumleepostsampler_wgrad(thetastart, logpostfunc, numsamp, tarESS):
         elif accr < taracc*1.55 and accr > taracc*0.66 and numsamppc > 250:
             break
     return thetasave[np.random.choice(range(0,thetasave.shape[0]),size = numsamp),:]
+
+def test1dboundarys(theta0, logpostfunchere, thetas):
+    L0 = logpostfunchere(theta0)
+    thetaminsave = np.zeros(theta0.shape)
+    thetamaxsave = np.zeros(theta0.shape)
+    for k in range(0,theta0.shape[0]):
+        notfarenough = 0
+        farenough = 0
+        eps = 10 ** (-1) * thetas[k]
+        keepgoing = True
+        while keepgoing:
+            thetaadj = 1 * theta0
+            thetaadj[k] += eps
+            L1 = logpostfunchere(thetaadj)
+            if (L0-L1) < 5:
+                eps = eps * 2
+                notfarenough += 1
+                thetamaxsave[k] = 1 * thetaadj[k]
+            else:
+                eps = eps / 2
+                farenough += 1
+            if notfarenough > 1.5 and farenough > 1.5:
+                keepgoing = False
+        notfarenough = 0
+        farenough = 0
+        keepgoing = True
+        while keepgoing:
+            thetaadj = 1 * theta0
+            thetaadj[k] -= eps
+            L1 = logpostfunchere(thetaadj)
+            if (L0-L1) < 5:
+                eps = eps * 2
+                notfarenough += 1
+                thetaminsave[k] = 1 * thetaadj[k]
+            else:
+                eps = eps / 2
+                farenough += 1
+            if notfarenough > 1.5 and farenough > 1.5:
+                keepgoing = False
+    return thetaminsave, thetamaxsave

@@ -68,7 +68,7 @@ def fit(fitinfo, x, theta, f, args):
         fitinfo['lastup'] = np.sum(np.isfinite(f))
         emulist = [dict() for x in range(0, numpcs)]
         hypinds = np.zeros(numpcs)
-    if fitinfo['PCAskip']:
+    if False and fitinfo['PCAskip']:
         for pcanum in range(0, numpcs):
             __fitGP1d(theta, fitinfo['pc'][:, pcanum], fitinfo['pc'][:, pcanum],
                                         fitinfo['pcstdvar'][:, pcanum],
@@ -252,7 +252,6 @@ def supplementtheta(fitinfo, size, theta, thetachoices, choicecosts, cal, args):
     norig = thetaold.shape[0]
     varpca = copy.copy(fitinfo['pcstdvar'])
     mof = copy.copy(fitinfo['mof'])
-    
     thetaposs = thetachoices
     rsave = np.array(np.ones(len(infos)), dtype=object)
     rposssave = np.array(np.ones(len(infos)), dtype=object)
@@ -260,6 +259,7 @@ def supplementtheta(fitinfo, size, theta, thetachoices, choicecosts, cal, args):
     R = np.array(np.ones(len(infos)), dtype=object)
     crit = np.zeros(thetaposs.shape[0])
     weightma = np.mean(fitinfo['pct'] ** 2,0)
+    
     for k in range(0, len(infos)):
         if infos[k]['hypind'] == k:
             rsave[k] = (1-infos[k]['nug']) * __covmat(theta, thetaold, infos[k]['hypcov'])
@@ -274,14 +274,13 @@ def supplementtheta(fitinfo, size, theta, thetachoices, choicecosts, cal, args):
             thetaold = np.vstack((thetaold, thetaposs))
             break
         for k in range(0, len(infos)):
-            #if mof is not None:
-                #print(varpca[:, k])
-                #print(np.sum(mof,1))
-            Rh = R[infos[k]['hypind']] + np.diag(varpca[:, k])
-            p = rnewsave[infos[k]['hypind']]
-            q = rposssave[infos[k]['hypind']] @ np.linalg.solve(Rh,rsave[infos[k]['hypind']].T)
-            r = rposssave[infos[k]['hypind']].T * np.linalg.solve(Rh,rposssave[infos[k]['hypind']].T)
-            crit += weightma[k] * np.mean((p-q) ** 2,1) / (1 - np.sum(r,0))
+            if infos[k]['hypind'] == k: #this is to speed things up a bit...
+                Rh = R[infos[k]['hypind']] + np.diag(varpca[:, k])
+                p = rnewsave[infos[k]['hypind']]
+                term1 = np.linalg.solve(Rh,rposssave[infos[k]['hypind']].T)
+                q = rsave[infos[k]['hypind']] @ term1
+                r = rposssave[infos[k]['hypind']].T * term1
+                crit += weightma[k] * np.mean((p.T-q) ** 2,0) / np.abs(1 - np.sum(r,0))
         jstar = np.argmax(crit / choicecosts)
         critsave[j] = crit[jstar] / choicecosts[jstar]
         thetaold = np.vstack((thetaold, thetaposs[jstar]))
@@ -305,48 +304,8 @@ def supplementtheta(fitinfo, size, theta, thetachoices, choicecosts, cal, args):
             R[k] = (1-infos[k]['nug']) * R[k] + np.eye(R[k].shape[0]) * infos[k]['nug']
     
     # eliminant some values and see what happens
-    epsilon = fitinfo['epsilon']
-    pcw = copy.copy(fitinfo['pcw'])
-    pct = copy.copy(fitinfo['pct'] / pcw)
-    
-    G = np.array(np.ones(len(infos)), dtype=object)
-    D = np.array(np.ones(len(infos)), dtype=object)
-    for k in range(0, len(infos)):
-        kind =infos[k]['hypind'] 
-        R00 = R[kind][:norig, :][:, :norig]
-        R0N = R[kind][:norig, :][:, norig:]
-        RNN = R[kind][norig:, :][:, norig:]
-        RA0 = rsave[kind][:, :norig]
-        RAN = rsave[kind][:, norig:]
-        Q = RA0 @ np.linalg.solve(R00, R0N) - RAN
-        V = RNN - R0N.T @ np.linalg.solve(R00, R0N)
-        D[k], H  = np.linalg.eigh(V)
-        D[k] = np.minimum(D[k],0)
-        G[k] = np.sum((Q @ H) ** 2,0)
-    xorder = []
-    wherenotmof = list(range(0,pct.shape[0]))
-    for i  in range(0,pct.shape[0]):
-        H = pct[wherenotmof,:].T @ pct[wherenotmof,:]
-        pcstdvar = np.inf
-        kstar = None
-        numx = fitinfo['pct'].shape[0]
-        
-        pcstdvarprop = np.zeros((len(wherenotmof), pcw.shape[0]))
-        totcrit = np.zeros(len(wherenotmof))
-        for j in range(0,len(wherenotmof)):
-            Hu = H - np.outer(pct[j,:], pct[j,:])
-            Qmat = np.diag(epsilon / pcw ** 2) + Hu
-            term3 = np.diag(Hu) - np.sum(Hu * spla.solve(Qmat,Hu),0)
-            pcstdvarprop = np.abs(1 - (pcw ** 2 /epsilon +1) * term3)
-            for k in range(0, len(infos)):
-                totcrit[j] += weightma[k] * np.mean(G[k] / (D[k] + pcstdvarprop[k]))
-        xindstar = wherenotmof[np.argmax(totcrit)]
-        xorder.append(xindstar)
-        wherenotmof.remove(xindstar)
-    
     info ={}
     info['crit'] = critsave
-    info['orderedx'] = fitinfo['x'][xorder,:]
     return thetaold[norig:(norig+size),:], info
 
 
@@ -365,7 +324,7 @@ def __standardizef(fitinfo, offset=None, scale=None):
     f = fitinfo['f']
     mof = fitinfo['mof']
     mofrows = fitinfo['mofrows']
-    epsilon = 10 ** (-2)
+    epsilon = 10 ** (-8)
     if (offset is not None) and (scale is not None):
         if offset.shape[0] == f.shape[1] and scale.shape[0] == f.shape[1]:
             if np.any(np.nanmean(np.abs(f-offset)/scale,1) > 4):
@@ -380,7 +339,7 @@ def __standardizef(fitinfo, offset=None, scale=None):
         for k in range(0, f.shape[1]):
             offset[k] = np.nanmean(f[:, k])
             scale[k] = np.nanstd(f[:, k])
-        scale = 0.9999* scale + 0.0001*np.mean(scale)
+        #scale = 0.999* scale + 0.001*np.mean(scale)
     # Initializing values
     fs = np.zeros(f.shape)
     if mof is None:
@@ -471,9 +430,9 @@ def __PCs(fitinfo, pct=None, pcti=None, pcw=None, extravar=None):
         fitinfo['pcw'] = pcw
         fitinfo['pct'] = pct * pcw / np.sqrt(pc.shape[0])
         fitinfo['pcti'] = pct  * (np.sqrt(pc.shape[0])/ pcw)
-        fitinfo['extravar'] = extravar
+        fitinfo['extravar'] = extravar * (fitinfo['scale'] ** 2)
         fitinfo['pc'] = pc  * (np.sqrt(pc.shape[0]) / pcw)
-        fitinfo['pcstdvar'] = pcstdvar
+        fitinfo['pcstdvar'] = 1*pcstdvar
         fitinfo['PCAskip'] = PCAskip
     return
 
@@ -481,15 +440,15 @@ def __fitGP1d(theta, g, gvar=None, hypstarts=None, hypinds=None, prevsubmodel=No
     """Return a fitted model from the emulator model using smart method."""
     if prevsubmodel is None:
         subinfo = {}
-        subinfo['hypregmean'] = np.append(-0.25 + np.log(theta.shape[1]) + np.log(np.std(theta, 0)), (0, -10))
-        subinfo['hypregLB'] = np.append(-4 + np.log(np.std(theta, 0)), (-12, -20))
+        subinfo['hypregmean'] = np.append(-0.25 + np.log(theta.shape[1]) + np.log(np.std(theta, 0)), (-4, -12))
+        subinfo['hypregLB'] = np.append(-4 + np.log(np.std(theta, 0)), (-12, -24))
         subinfo['hypregUB'] = np.append(3 + np.log(np.std(theta, 0)), (2, 0))
-        subinfo['hypregstd'] = (subinfo['hypregUB'] - subinfo['hypregLB']) / 4
-        subinfo['hypregstd'][-2] = 2
-        subinfo['hypregstd'][-1] = 2
+        subinfo['hypregstd'] = (subinfo['hypregUB'] - subinfo['hypregLB']) / 8
+        subinfo['hypregstd'][-2] = 6
+        subinfo['hypregstd'][-1] = 4
         subinfo['hyp'] = 1*subinfo['hypregmean']
-        if theta.shape[0] > 100:
-            nhyptrain = np.max(np.min((20*theta.shape[1], theta.shape[0])))
+        nhyptrain = np.max(np.min((20*theta.shape[1], theta.shape[0])))
+        if theta.shape[0] > nhyptrain:
             thetac = np.random.choice(theta.shape[0], nhyptrain, replace=False)
         else:
             thetac = range(0,theta.shape[0])
@@ -544,7 +503,7 @@ def __fitGP1d(theta, g, gvar=None, hypstarts=None, hypinds=None, prevsubmodel=No
             fcenter = Vh.T @ g
             subinfo['Vh'] = Vh
             n = subinfo['R'].shape[0]
-            subinfo['sig2'] = (np.mean(fcenter ** 2)*n + 10)/(n+10)
+            subinfo['sig2'] = (np.mean(fcenter ** 2)*n + 1)/(n+1)
             subinfo['Rinv'] = V @ np.diag(1/W) @ V.T
         else:
             subinfo['hyp'] = opval.x[:]
@@ -559,7 +518,7 @@ def __fitGP1d(theta, g, gvar=None, hypstarts=None, hypinds=None, prevsubmodel=No
             W, V = np.linalg.eigh(subinfo['R'])
             Vh = V / np.sqrt(np.abs(W))
             fcenter = Vh.T @ g
-            subinfo['sig2'] = (np.mean(fcenter ** 2)*n + 10)/(n+10)
+            subinfo['sig2'] = (np.mean(fcenter ** 2)*n + 1)/(n+1)
             subinfo['Rinv'] = Vh  @ Vh.T
             subinfo['Vh'] = Vh
         subinfo['pw'] = subinfo['Rinv'] @ g
@@ -573,12 +532,10 @@ def __fitGP1d(theta, g, gvar=None, hypstarts=None, hypinds=None, prevsubmodel=No
         W, V = np.linalg.eigh(subinfo['R'])
         Vh = V / np.sqrt(np.abs(W))
         fcenter = Vh.T @ g
-        subinfo['sig2'] = (np.mean(fcenter ** 2)*n + 10)/(n+10)
+        subinfo['sig2'] = (np.mean(fcenter ** 2)*n + 1)/(n+1)
         subinfo['Rinv'] = V @ np.diag(1/W) @ V.T
         subinfo['Vh'] = Vh
         subinfo['pw'] = subinfo['Rinv'] @ g
-    L0 = __negloglik(subinfo['hyp'], subinfo)
-    dL0 = __negloglikgrad(subinfo['hyp'], subinfo)
     return subinfo
 
 def __covmat(x1, x2, gammav, return_gradhyp=False, return_gradx1=False):

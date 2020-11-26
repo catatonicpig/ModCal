@@ -74,7 +74,7 @@ xidqueue = np.zeros(0)
 pending = np.full(f.shape, False)
 complete = np.full(f.shape, True)
 thetaspending = np.full(f.shape[0], False)
-numperbatch = 60
+numperbatch = 120
 for k in range(0,20):
     print('Percentage Cancelled: %0.2f ( %d / %d)' % (100*np.round(np.mean(1-pending-complete),4),
                                                     np.sum(1-pending-complete),
@@ -94,8 +94,9 @@ for k in range(0,20):
         if np.sum(pending) > 0:
             thetaspending = np.where(np.any(pending,0))[0]
             thetachoices = np.vstack((thetatot[thetaspending,:], thetachoices))
-            choicescost = np.append((np.sum(pending[:,thetaspending],0)/x.shape[0]) ** 4, choicescost)
-            
+            v1 = (np.sum(pending[:,thetaspending],0)/x.shape[0]) ** 10
+            v1 = 10 ** (-2) + (1-10 ** (-2)) * (v1 > 0.999999)
+            choicescost = np.append(v1, choicescost)
         thetaneworig, info = emu.supplement(size = numnewtheta, thetachoices = thetachoices, 
                                         choicescost = choicescost,
                                         removereps = False,
@@ -104,6 +105,7 @@ for k in range(0,20):
             nctheta, _, _ = matrixmatching(thetatot, thetaneworig)
             ncthetaold, _, _ = matrixmatching(thetaneworig,thetatot)
             pending[:, ncthetaold] = False #obviation
+            nctr, _, _ = matrixmatching(thetaneworig,thetachoices)
             for k in ncthetaold:
                 queue2delete = np.where(thetaidqueue == k)[0]
                 if queue2delete.shape[0] > 0.5:
@@ -128,14 +130,18 @@ for k in range(0,20):
                 thetaidqueue = np.append(thetaidqueue,thetaidnewqueue)
                 xidqueue = np.append(xidqueue,xidnewqueue)
         c,nc,r = matrixmatching(thetaneworig,thetatot)
-        cx,ncx,rx = matrixmatching(info['orderedx'],x)
+        #cx,ncx,rx = matrixmatching(info['orderedx'],x)
         priorityscore = np.zeros(thetaidqueue.shape)
         ncx = np.random.choice(np.arange(0,x.shape[0]),
-                                     size=x.shape[0],replace=False)
+                                    size=x.shape[0],replace=False)
+        #nc = np.random.choice(np.arange(0,thetatot.shape[0]),
+        #                            size=thetatot.shape[0],replace=False)
         for l in range(0,nc.shape[0]):
             priorityscore[thetaidqueue == nc[l]] += l
         for l in range(0,ncx.shape[0]):
             priorityscore[xidqueue == ncx[l]] += thetatot.shape[0] * l
+        priorityscore = np.random.choice(np.arange(0,priorityscore.shape[0]),
+                                    size=priorityscore.shape[0],replace=False)
         if np.sum(pending) > 600:
              keepadding = False
     queuerearr = np.argsort(priorityscore)
@@ -151,4 +157,7 @@ for k in range(0,20):
     
     emu.update(theta = thetatot, f=f)
     cal.fit()
+    # emu.remove(cal = cal)
+    # cal.fit()
+    # emu.update(theta = thetatot, f=f)
     print(np.round(np.quantile(cal.theta.rnd(10000), (0.01, 0.99), axis = 0),3))
