@@ -84,17 +84,16 @@ plt.ylabel("time")
 plt.title("Computer model surrogates for different theta")
 plt.show()
 
-
-# Draw 50 random parameters from uniform prior
-#n2 = 300
-#theta_f = lhs(1, samples=n2)
-
-#theta_f = theta_f[(theta_f > 0.2) & (theta_f < 0.5)]
-#theta_f = theta_f.reshape(len(theta_f), 1)
-#theta_range = np.array([1, 30])
-#print(np.shape(theta_f))
-
-
+# emunf = emulator(X_std, theta_f, Y_model, method = 'PCGP_ozge', args = {'is_pca': False}) 
+# prednf = emulator_f.predict(X_std, theta_f)
+# pred_meannf = prednf.mean()
+# plt.scatter(X, Y, color = 'grey')
+# for i in range(np.shape(pred_meanf)[1]):
+#     plt.plot(X, pred_meanf[:, i])
+# plt.xlabel("height")
+# plt.ylabel("time")
+# plt.title("Computer model surrogates for different theta")
+# plt.show()
 
 ys = 1 - np.sum((Y_model - Y)**2, 0)/np.sum((Y - np.mean(Y))**2, 0)
 theta_f = theta[ys > 0.5]
@@ -109,6 +108,21 @@ Y_cls = np.zeros(len(theta))
 Y_cls[ys > 0.5] = 1
 
 emulator_f = emulator(X_std, theta_f, Y_model, method = 'PCGPwM')
+
+#### TO check if the new emulator works with a single dim
+import pdb
+pdb.set_trace()
+emuf = emulator(X_std, theta_f, Y_model, method = 'PCGP_ozge', args = {'is_pca': False}) 
+predf = emuf.predict(X_std, theta_f)
+pred_meanf = predf.mean()
+plt.scatter(X, Y, color = 'grey')
+for i in range(np.shape(pred_meanf)[1]):
+    plt.plot(X, pred_meanf[:, i])
+plt.xlabel("height")
+plt.ylabel("time")
+plt.title("Computer model surrogates for different theta")
+plt.show()
+
 
 pred_model = emulator_f.predict(X_std, theta_f)
 pred_mean = pred_model.mean()
@@ -143,29 +157,29 @@ print(np.shape(pred_mean_no_f))
 print(np.shape(pred_mean_f))
 
 
-# Fit a classifier
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import classification_report, confusion_matrix
-clf = RandomForestClassifier(n_estimators = 1000, random_state = 42)#
-clf.fit(theta, Y_cls)
-print(clf.score(theta, Y_cls))
-print(confusion_matrix(Y_cls, clf.predict(theta)))
+# # Fit a classifier
+# from sklearn.ensemble import RandomForestClassifier
+# from sklearn.metrics import classification_report, confusion_matrix
+# clf = RandomForestClassifier(n_estimators = 1000, random_state = 42)#
+# clf.fit(theta, Y_cls)
+# print(clf.score(theta, Y_cls))
+# print(confusion_matrix(Y_cls, clf.predict(theta)))
 
 
 
-class prior_balldrop:
-    """ This defines the class instance of priors provided to the method. """
-    def lpdf(theta):
-        return np.squeeze(sps.uniform.logpdf(theta, 0.1, 0.9))
+# class prior_balldrop:
+#     """ This defines the class instance of priors provided to the method. """
+#     def lpdf(theta):
+#         return np.squeeze(sps.uniform.logpdf(theta, 0.1, 0.9))
 
-    def rnd(n):
-        return np.vstack((sps.uniform.rvs(0.1, 0.9, size=n)))
+#     def rnd(n):
+#         return np.vstack((sps.uniform.rvs(0.1, 0.9, size=n)))
     
-import pdb
-pdb.set_trace()
-from base.calibration import calibrator    
-cal_f = calibrator(emulator_f, Y, X_std, thetaprior = prior_balldrop, 
-                    method = 'MLcal', yvar = obsvar, 
-                    args = {'clf_method': clf}) 
+# import pdb
+# pdb.set_trace()
+# from base.calibration import calibrator    
+# cal_f = calibrator(emulator_f, Y, X_std, thetaprior = prior_balldrop, 
+#                     method = 'MLcal', yvar = obsvar, 
+#                     args = {'clf_method': clf}) 
 
     
