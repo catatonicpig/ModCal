@@ -110,18 +110,18 @@ Y_cls[ys > 0.5] = 1
 emulator_f = emulator(X_std, theta_f, Y_model, method = 'PCGPwM')
 
 #### TO check if the new emulator works with a single dim
-import pdb
-pdb.set_trace()
-emuf = emulator(X_std, theta_f, Y_model, method = 'PCGP_ozge', args = {'is_pca': False}) 
-predf = emuf.predict(X_std, theta_f)
-pred_meanf = predf.mean()
-plt.scatter(X, Y, color = 'grey')
-for i in range(np.shape(pred_meanf)[1]):
-    plt.plot(X, pred_meanf[:, i])
-plt.xlabel("height")
-plt.ylabel("time")
-plt.title("Computer model surrogates for different theta")
-plt.show()
+# import pdb
+# pdb.set_trace()
+# emuf = emulator(X_std, theta_f, Y_model, method = 'PCGP_ozge', args = {'is_pca': False}) 
+# predf = emuf.predict(X_std, theta_f)
+# pred_meanf = predf.mean()
+# plt.scatter(X, Y, color = 'grey')
+# for i in range(np.shape(pred_meanf)[1]):
+#     plt.plot(X, pred_meanf[:, i])
+# plt.xlabel("height")
+# plt.ylabel("time")
+# plt.title("Computer model surrogates for different theta")
+# plt.show()
 
 
 pred_model = emulator_f.predict(X_std, theta_f)
@@ -157,29 +157,36 @@ print(np.shape(pred_mean_no_f))
 print(np.shape(pred_mean_f))
 
 
-# # Fit a classifier
-# from sklearn.ensemble import RandomForestClassifier
-# from sklearn.metrics import classification_report, confusion_matrix
-# clf = RandomForestClassifier(n_estimators = 1000, random_state = 42)#
-# clf.fit(theta, Y_cls)
-# print(clf.score(theta, Y_cls))
-# print(confusion_matrix(Y_cls, clf.predict(theta)))
+# Fit a classifier
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import classification_report, confusion_matrix
+clf = RandomForestClassifier(n_estimators = 100, random_state = 42)#
+clf.fit(theta, Y_cls)
+print(clf.score(theta, Y_cls))
+print(confusion_matrix(Y_cls, clf.predict(theta)))
 
 
+class prior_balldrop:
+    """ This defines the class instance of priors provided to the method. """
+    def lpdf(theta):
+        return np.squeeze(sps.uniform.logpdf(theta, 0.1, 0.9))
 
-# class prior_balldrop:
-#     """ This defines the class instance of priors provided to the method. """
-#     def lpdf(theta):
-#         return np.squeeze(sps.uniform.logpdf(theta, 0.1, 0.9))
-
-#     def rnd(n):
-#         return np.vstack((sps.uniform.rvs(0.1, 0.9, size=n)))
+    def rnd(n):
+        return np.vstack((sps.uniform.rvs(0.1, 0.9, size=n)))
     
-# import pdb
-# pdb.set_trace()
-# from base.calibration import calibrator    
-# cal_f = calibrator(emulator_f, Y, X_std, thetaprior = prior_balldrop, 
-#                     method = 'MLcal', yvar = obsvar, 
-#                     args = {'clf_method': clf}) 
 
+from base.calibration import calibrator   
+import pdb
+pdb.set_trace()
+cal_m_f = calibrator(emulator_f, Y.reshape(21), X_std, thetaprior = prior_balldrop, yvar = obsvar, method = 'directbayes')
+
+
+ 
+cal_f = calibrator(emulator_f, Y, X_std, thetaprior = prior_balldrop, 
+                    method = 'MLcal', yvar = obsvar, 
+                    args = {'clf_method': clf}) 
+
+cal_nf = calibrator(emulator_f, Y, X_std, thetaprior = prior_balldrop, 
+                    method = 'MLcal', yvar = obsvar, 
+                    args = {'clf_method': None}) 
     

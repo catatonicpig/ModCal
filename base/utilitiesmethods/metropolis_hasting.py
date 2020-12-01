@@ -1,9 +1,9 @@
 import numpy as np
 from scipy.stats import norm
 
-def metropolis_hasting(thetastart, logpostfunc):
+def metropolis_hasting(thetastart, logpostfunc, numsamp):
     # Initialize
-    n = 500
+    n = numsamp
     p = thetastart.shape[1]
     lposterior = np.zeros(2*n)
     theta = np.zeros((2*n, thetastart.shape[1]))

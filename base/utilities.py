@@ -35,5 +35,5 @@ def postsampler(thetastart, logpostfunc, options= {}):
             tarESS = np.max((400, 10 * thetastart.shape[1]))
             return plumleepostsampler_wgrad(thetastart, logpostfunc, numsamp, tarESS)
         else:
-            return metropolis_hasting(thetastart, logpostfunc)
+            return metropolis_hasting(thetastart, logpostfunc, numsamp)
     return postsamplefunc(thetastart, logpostfunc)

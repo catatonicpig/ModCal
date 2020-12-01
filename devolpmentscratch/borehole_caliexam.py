@@ -6,7 +6,7 @@ import sys
 import os
 import copy
 import time
-from line_profiler import LineProfiler
+#from line_profiler import LineProfiler
 from boreholetestfunction import borehole_model, borehole_true
 SCRIPT_DIR = os.path.dirname(os.path.realpath(
     os.path.join(os.getcwd(), os.path.expanduser(__file__))))
@@ -35,6 +35,9 @@ yt = np.squeeze(borehole_true(x))
 yvar = (10 ** (-4)) * np.ones(yt.shape)
 thetacompexp = (thetaprior.rnd(30))
 f = (borehole_model(x, thetacompexp).T ).T
+
+import pdb
+pdb.set_trace()
 def emulation_test_borehole():
     y = np.squeeze(borehole_true(x)) + sps.norm.rvs(0,np.sqrt(yvar))
     emu = emulator(x, thetacompexp, f, method = 'PCGPwM')  # this builds an emulator 
@@ -52,9 +55,9 @@ def emulation_test_borehole():
     g = emu2.predict(x,thetacompexp).mean()
     thetatrial = thetaprior.rnd(1000)
     cal2 = calibrator( emu2, y, x, thetaprior, yvar, method = 'directbayes')
-        print(np.round(np.quantile(cal.theta.rnd(10000), (0.01, 0.99), axis = 0),3))
+    print(np.round(np.quantile(cal.theta.rnd(10000), (0.01, 0.99), axis = 0),3))
     cal = calibrator( emu, y, x, thetaprior, yvar, method = 'directbayes_wgrad')
-        print(np.round(np.quantile(cal.theta.rnd(10000), (0.01, 0.99), axis = 0),3))
+    print(np.round(np.quantile(cal.theta.rnd(10000), (0.01, 0.99), axis = 0),3))
     for k in range(0,5):
         thetanew, info = emu.supplement(size = 10, cal = cal)
         fadd = (borehole_model(x, thetanew).T).T
