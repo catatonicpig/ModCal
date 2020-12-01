@@ -344,6 +344,8 @@ def __standardizef(fitinfo, offset=None, scale=None):
         for k in range(0, f.shape[1]):
             offset[k] = np.nanmean(f[:, k])
             scale[k] = np.nanstd(f[:, k])
+            if scale[k] == 0:
+                scale[k] = 0.0001
         #scale = 0.999* scale + 0.001*np.mean(scale)
     # Initializing values
     fs = np.zeros(f.shape)

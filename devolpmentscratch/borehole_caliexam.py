@@ -6,7 +6,7 @@ import sys
 import os
 import copy
 import time
-from line_profiler import LineProfiler
+#from line_profiler import LineProfiler
 from boreholetestfunction import borehole_model, borehole_true
 SCRIPT_DIR = os.path.dirname(os.path.realpath(
     os.path.join(os.getcwd(), os.path.expanduser(__file__))))
@@ -36,6 +36,9 @@ yt = np.squeeze(borehole_true(x))
 yvar = (10 ** (-4)) * np.ones(yt.shape)
 thetacompexp = (thetaprior.rnd(200))
 f = (borehole_model(x, thetacompexp).T ).T
+
+import pdb
+pdb.set_trace()
 def emulation_test_borehole():
     y = np.squeeze(borehole_true(x)) + sps.norm.rvs(0,np.sqrt(yvar))
     emu = emulator(x, thetacompexp, f, method = 'PCGPwM')  # this builds an emulator 

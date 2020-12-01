@@ -29,7 +29,7 @@ def plot_observed_data(description, func_eval, real_data, param_values, title = 
     Plots a list of profiles in the same figure. Each profile corresponds
     to a stochastic replica for the given instance.
     '''
-    plt.rcParams["font.size"] = "6"
+    plt.rcParams["font.size"] = "8"
     N = len(param_values)
     D = description.shape[1]
     T = len(np.unique(description[:,0]))
@@ -54,21 +54,37 @@ x = np.reshape(np.tile(range(164), 3), (492, 1))
 
 import pdb
 pdb.set_trace()
+
+# (No filter) Fit an emulator via 'PCGP_ozge'
 emulator_nofilter = emulator(x, param_values, func_eval.T, method = 'PCGP_ozge', args = {'is_pca': True}) 
 pred_model_nofilter = emulator_nofilter.predict(x, param_values)
 pred_mean = pred_model_nofilter.mean()
-plot_observed_data(description, pred_mean, real_data, param_values, title='Emulator mean (no filter)')
+plot_observed_data(description, pred_mean, real_data, param_values, title='PCGP Emulator mean (no filter)')
 
-# filter out the data and fit a new emulator with the filtered data
+# (No filter) Fit an emulator via 'PCGPwM'
+emulator_nofilter_2 = emulator(x, param_values, func_eval.T, method = 'PCGPwM') 
+pred_model_nofilter_2 = emulator_nofilter_2.predict(x, param_values)
+pred_mean_2 = pred_model_nofilter_2.mean()
+plot_observed_data(description, pred_mean_2.T, real_data, param_values, title='PCGPwM Emulator mean (no filter)')
+
+# Filter out the data and fit a new emulator with the filtered data 
 par_out = param_values[np.logical_or.reduce((func_eval[:, 130] <= 200, func_eval[:, 50] >= 1000, func_eval[:, 130] >= 1000)),:]
 par_in = param_values[np.logical_and.reduce((func_eval[:, 130] > 200, func_eval[:, 50] < 1000, func_eval[:, 130] < 1000)), :]
 func_eval_in = func_eval[np.logical_and.reduce((func_eval[:, 130] > 200, func_eval[:, 50] < 1000, func_eval[:, 130] < 1000)), :]
+
+# (Filter) Fit an emulator via 'PCGP_ozge'
 emulator_filter = emulator(x, par_in, func_eval_in.T, method = 'PCGP_ozge', args = {'is_pca': True}) 
 pred_model_filter = emulator_nofilter.predict(x, par_in)
 pred_mean_f = pred_model_filter.mean()
-plot_observed_data(description, pred_mean_f, real_data, par_in, title='Emulator mean (filtered)')
+plot_observed_data(description, pred_mean_f, real_data, par_in, title='PCGP Emulator mean (filtered)')
 
-# Run ML
+# (Filter) Fit an emulator via 'PCGPwM'
+emulator_filter_2 = emulator(x, par_in, func_eval_in.T, method = 'PCGPwM') 
+pred_model_filter_2 = emulator_filter_2.predict(x, par_in)
+pred_mean_f_2 = pred_model_filter_2.mean()
+plot_observed_data(description, pred_mean_f_2.T, real_data, par_in, title='PCGPwM Emulator mean (filtered)')
+
+# # Run ML
 y = np.zeros(len(pred_mean))
 y[np.logical_and.reduce((pred_mean[:, 130] > 200, pred_mean[:, 50] < 1000, pred_mean[:, 130] < 1000))] = 1
     
