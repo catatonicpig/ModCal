@@ -10,7 +10,7 @@ def metropolis_hasting(thetastart, logpostfunc, numsamp):
     lposterior[0] = logpostfunc(thetastart)
     theta[0, :] = thetastart
     n_acc = 0  
-    proposal_width = 0.01
+    proposal_width = 0.8
     
     for i in range(1, 2*n):
         # Suggest new theta
@@ -41,5 +41,5 @@ def metropolis_hasting(thetastart, logpostfunc, numsamp):
 
     theta = theta[(1*n):(2*n), :]
 
-    print('n_acc=', n_acc)
+    print('n_acc rate=', n_acc/n)
     return theta

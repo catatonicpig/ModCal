@@ -260,7 +260,10 @@ def loglik(fitinfo, emu, theta, y, x, args):
         obsvar = obsvar + emu._info['extravar']
     for k in range(0, emumean.shape[1]):
         m0 = emumean[:,k]
-        S0 = np.squeeze(emucovxhalf[:,k,:])
+        
+        #### MATT: This part does not work with single dimensional theta!!!
+        
+        S0 = np.squeeze(emucovxhalf[:,k,:]) # np.reshape(emucovxhalf[:,k,:], (emumean.shape[0], theta.shape[1])) # np.squeeze(emucovxhalf[:,k,:])
         stndresid = (np.squeeze(y) - m0) / np.sqrt(obsvar)
         term1 = np.sum(stndresid ** 2)
         J = (S0.T / np.sqrt(obsvar)).T
@@ -268,7 +271,7 @@ def loglik(fitinfo, emu, theta, y, x, args):
             J = J[:,None].T
         J2 =  J.T @ stndresid
         W, V = np.linalg.eigh(np.eye(J.shape[1]) + J.T @ J)
-        J3 = np.squeeze(V) @ np.diag(1/W) @ np.squeeze(V).T @ np.squeeze(J2)
+        J3 = V @ np.diag(1/W) @ V.T @ J2 # np.squeeze(V) @ np.diag(1/W) @ np.squeeze(V).T @ np.squeeze(J2)
         term2 = np.sum(J3 * J2)
         residsq = term1 - term2
         loglik[k] = -0.5 * residsq - 0.5 * np.sum(np.log(W))

@@ -42,7 +42,9 @@ def emulation_test_borehole():
     y = np.squeeze(borehole_true(x)) + sps.norm.rvs(0,np.sqrt(yvar))
     emu = emulator(x, thetacompexp, f, method = 'PCGPwM')  # this builds an emulator 
     t = time.time()
-    cal = calibrator( emu, y, x, thetaprior, yvar, method = 'directbayes_wgrad')
+    import pdb
+    pdb.set_trace()
+    cal = calibrator(emu, y, x, thetaprior, yvar, method = 'directbayes_wgrad')
     print(np.round(np.quantile(cal.theta.rnd(1000), (0.01, 0.99), axis = 0),3))
     print(time.time()-t)
     t = time.time()

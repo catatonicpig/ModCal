@@ -68,11 +68,11 @@ plt.show()
 current = os.path.abspath(os.getcwd())
 sys.path.append(os.path.normpath(os.path.join(os.path.dirname(current), '..')))
 from base.emulation import emulator
-
-emulator_no_f = emulator(X_std, theta, Y_model, method = 'PCGPwM')
+X_std2 = np.concatenate((X_std, X_std), axis = 1)
+emulator_no_f = emulator(X_std2, theta, Y_model, method = 'PCGPwM')
 
 #Predict
-pred_model = emulator_no_f.predict(X_std, theta)
+pred_model = emulator_no_f.predict(X_std2, theta)
 pred_mean = pred_model.mean()
 print(np.shape(pred_mean))
 
@@ -107,7 +107,7 @@ plt.show()
 Y_cls = np.zeros(len(theta))
 Y_cls[ys > 0.5] = 1
 
-emulator_f = emulator(X_std, theta_f, Y_model, method = 'PCGPwM')
+emulator_f = emulator(X_std2, theta_f, Y_model, method = 'PCGPwM')
 
 #### TO check if the new emulator works with a single dim
 # import pdb
@@ -124,7 +124,7 @@ emulator_f = emulator(X_std, theta_f, Y_model, method = 'PCGPwM')
 # plt.show()
 
 
-pred_model = emulator_f.predict(X_std, theta_f)
+pred_model = emulator_f.predict(X_std2, theta_f)
 pred_mean = pred_model.mean()
 print(np.shape(pred_mean))
 
@@ -149,9 +149,9 @@ Y_model_test = timedrop(X_std, theta_test, height_range, theta_range)
 print(np.shape(Y_model_test))
 
 #Predict
-p_no_f = emulator_no_f.predict(X_std, theta_test)
+p_no_f = emulator_no_f.predict(X_std2, theta_test)
 pred_mean_no_f = p_no_f.mean()
-p_f = emulator_f.predict(X_std, theta_test)
+p_f = emulator_f.predict(X_std2, theta_test)
 pred_mean_f = p_f.mean()
 print(np.shape(pred_mean_no_f))
 print(np.shape(pred_mean_f))
@@ -176,17 +176,15 @@ class prior_balldrop:
     
 
 from base.calibration import calibrator   
-import pdb
-pdb.set_trace()
-cal_m_f = calibrator(emulator_f, Y.reshape(21), X_std, thetaprior = prior_balldrop, yvar = obsvar, method = 'directbayes')
+# import pdb
+# pdb.set_trace()
+# cal_m_f = calibrator(emulator_f, Y.reshape(21), X_std2, thetaprior = prior_balldrop, yvar = obsvar, method = 'directbayes_wgrad')
 
+# cal_f = calibrator(emulator_f, Y, X_std, thetaprior = prior_balldrop, 
+#                     method = 'MLcal', yvar = obsvar, 
+#                     args = {'clf_method': clf}) 
 
- 
-cal_f = calibrator(emulator_f, Y, X_std, thetaprior = prior_balldrop, 
-                    method = 'MLcal', yvar = obsvar, 
-                    args = {'clf_method': clf}) 
-
-cal_nf = calibrator(emulator_f, Y, X_std, thetaprior = prior_balldrop, 
+cal_nf = calibrator(emulator_f, Y, X_std2, thetaprior = prior_balldrop, 
                     method = 'MLcal', yvar = obsvar, 
                     args = {'clf_method': None}) 
-    
+cal_nf.theta.rnd(100)    

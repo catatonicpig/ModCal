@@ -64,6 +64,7 @@ def fit(fitinfo, emu, x, y, args=None):
     def logpostfull(theta):
 
         logpost = thetaprior.lpdf(theta) 
+        print('theta', theta)
         print('prior', logpost)
         
         if np.isfinite(logpost):
@@ -147,7 +148,8 @@ def loglik(fitinfo, emulator, theta, y, x, args):
     CovMatEigInv = CovMatEigW @ np.diag(1/CovMatEigS) @ CovMatEigW.T
     
     #
-    loglikelihood = float(-1/2 * resid.T @ CovMatEigInv @ resid - 1/2 * np.sum(np.log(CovMatEigS)))
+    loglikelihood = float(-1/2 * resid.T @ CovMat @ resid)
+    #loglikelihood = float(-1/2 * resid.T @ CovMatEigInv @ resid - 1/2 * np.sum(np.log(CovMatEigS)))
 
     return loglikelihood
 
