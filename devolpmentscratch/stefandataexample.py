@@ -32,32 +32,34 @@ class thetaprior:
     """ This defines the class instance of priors provided to the methods. """
     def lpdf(theta):
         if theta.ndim > 1.5:
-            logprior = -8 * np.sum((theta - 0.6) ** 2, axis=1)
+            logprior = -50 * np.sum((theta - 0.6) ** 2, axis=1)
+            logprior += 0.5*np.log(2-np.sum(np.abs(theta - 0.5), axis=1))
             flag = np.sum(np.abs(theta - 0.5), axis=1) > 2
             logprior[flag] = -np.inf
             logprior = np.array(logprior,ndmin=1)
         else:
-            logprior = -8 * np.sum((theta - 0.6) ** 2)
+            logprior = -50 * np.sum((theta - 0.6) ** 2)
+            logprior += 0.5*np.log(2-np.sum(np.abs(theta - 0.5)))
             if np.sum(np.abs(theta - 0.5)) > 2:
                 logprior = -np.inf
             logprior = np.array(logprior,ndmin=1)
         return logprior
     def rnd(n):
         if n > 1:
-            rndval = np.vstack((sps.norm.rvs(0.6, 0.25, size=(n,13))))
+            rndval = np.vstack((sps.norm.rvs(0.6, 0.1, size=(n,13))))
             flag = np.sum(np.abs(rndval - 0.5), axis=1) > 2
             while np.any(flag):
-                rndval[flag,:] = np.vstack((sps.norm.rvs(0.6, 0.25, size=(np.sum(flag),13))))
+                rndval[flag,:] = np.vstack((sps.norm.rvs(0.6, 0.1, size=(np.sum(flag),13))))
                 flag = np.sum(np.abs(rndval - 0.5), axis=1) > 2
         else:
-            rndval = sps.norm.rvs(0.6, 0.25, size =13)
+            rndval = sps.norm.rvs(0.6, 0.1, size =13)
             while np.sum(np.abs(rndval - 0.5)) > 2:
-                rndval = np.vstack((sps.norm.rvs(0.6, 0.25,size = 13)))
+                rndval = np.vstack((sps.norm.rvs(0.6, 0.1,size = 13)))
         return np.array(rndval)
 
 x = inputeval
-f = feval[np.arange(0,800,32),:].T
-theta = thetaeval[np.arange(0,800,32),:]
+f = feval[np.arange(0,800,16),:].T
+theta = thetaeval[np.arange(0,800,16),:]
 emu = emulator(x = x, theta=theta, f=f, method = 'PCGPwM')  # this builds an emulator 
 
 y = np.zeros(f.shape[0])
@@ -93,71 +95,59 @@ def matrixmatching(mat1, mat2):
     return nc, c, r
 
 thetapost = cal.theta(1000)
-posstheta = np.where(cal.theta.lpdf(thetaeval) > -20)[0]
+posstheta = np.where(cal.theta.lpdf(thetaeval) > -250)[0]
 nc, c, r = matrixmatching(cal.emu._emulator__theta, thetaeval[posstheta,:])
 posstheta = posstheta[nc]
-lpdfexisting = cal.theta.lpdf(cal.emu._emulator__theta)
-thetaorder = np.argsort(lpdfexisting)
-numcutoff = np.minimum(-50, lpdfexisting[thetaorder[-20]])
-rmtheta = np.where(lpdfexisting < numcutoff)[0]
-emu.remove(theta = emu._emulator__theta[rmtheta,:])
 lpdfexisting = cal.theta.lpdf(cal.emu._emulator__theta)
 spread0 = np.quantile(thetapost,(0.95),0)-np.quantile(thetapost,(0.05),0)
 print(np.round(spread0,3))
 print(round(np.linalg.slogdet(np.cov(thetapost.T))[1],2))
 fpred = emu.predict(theta = thetaeval)
 print(np.nanmean(np.abs(fpred.mean()- feval.T)))
-for k in range(0,15):
-    numnewtheta = np.round(cal.emu._emulator__theta.shape[0]*0.2).astype('int')
+for k in range(0,4):
+    numnewtheta = np.round(cal.emu._emulator__theta.shape[0]*0.33).astype('int')
     print('choosing new %d thetas out of %d thetas...'% (numnewtheta,posstheta.shape[0]) )
     thetanew, _ = emu.supplement(size = numnewtheta, 
                                  thetachoices = thetaeval[posstheta,:],
                                  cal = cal,
                                  overwrite = True)
-    print('chose new %d thetas to add to %d thetas...'% (thetanew.shape[0],emu._emulator__theta.shape[0]) )
+    # print('chose new %d thetas to add to %d thetas...'% (thetanew.shape[0],emu._emulator__theta.shape[0]) )
     nc, c, r = matrixmatching(thetanew, thetaeval)
     print('number of failures: %d / %d' % (np.sum(np.isnan(feval[c,:].T)),np.prod(feval[c,:].shape)))
     emu.update(theta=thetaeval[c,:], f=feval[c,:].T)
-    print('updated the emulator...')
+    # print('updated the emulator...')
     cal = calibrator( emu, y, x, thetaprior, yvar, method = 'directbayes')
     print('calibrated the model...')
     thetapost = cal.theta(1000)
-    print(cal.emu._emulator__theta.shape)
+    # print(cal.emu._emulator__theta.shape)
     spread = (np.quantile(thetapost,(0.95),0)-np.quantile(thetapost,(0.05),0)) 
-    print(np.round(spread,3))
-    print(np.round(spread/spread0,2))
+    # print(np.round(spread,3))
+    # print(np.round(spread/spread0,2))
     print(round(np.linalg.slogdet(np.cov(thetapost.T))[1],2))
     fpred = emu.predict(theta = thetaeval)
     print(np.nanmean(np.abs(fpred.mean()- feval.T)))
-    posstheta = np.where(cal.theta.lpdf(thetaeval) > -20)[0]
+    posstheta = np.where(cal.theta.lpdf(thetaeval) > -250)[0]
     nc, c, r = matrixmatching(cal.emu._emulator__theta, thetaeval[posstheta,:])
     posstheta = posstheta[nc]
-    lpdfexisting = cal.theta.lpdf(cal.emu._emulator__theta)
-    thetaorder = np.argsort(lpdfexisting)
-    numcutoff = np.minimum(-500, lpdfexisting[thetaorder[np.maximum(-40,-thetaorder.shape[0])]])
-    if any(lpdfexisting < numcutoff):
-        rmtheta = np.where(lpdfexisting < numcutoff)[0]
-        print('removing %d thetas with values less than %0.1f' %
-              (rmtheta.shape[0],np.max(lpdfexisting[rmtheta])))
-        emu.remove(theta = emu._emulator__theta[rmtheta,:])
     if posstheta.shape[0] < 1.2*numnewtheta:
         print('could not find any more reasonable values')
         break
 indsstar= np.where(cal.theta.lpdf(thetaeval) > -20)[0]
 
-print(np.nanmean(feval[indsstar,:] ** 2,1))
-print(np.nanmean(feval ** 2))
+#print(np.nanmean(feval[indsstar,:] ** 2,1))
+#print(np.nanmean(feval ** 2))
 
 Lfull = np.nanmean(feval ** 2,1)
-
-
-
-Lfull = -1 / 2 * np.nansum(feval ** 2,1) - (2 ** 2)/2*np.sum(np.isnan(feval),1)
+Lfull = -1 / 2 * np.nansum(feval ** 2,1) - (1 ** 2)/2*np.sum(np.isnan(feval),1)
 mLfull = np.max(Lfull[np.isfinite(Lfull)])
 indfocus = np.where(np.logical_and(Lfull > np.max(Lfull) - 80, np.sum(np.isnan(feval),1) < 20))[0]
 
 plt.plot(Lfull[indfocus], cal.theta.lpdf(thetaeval[indfocus]),'.')
 plt.plot(Lfull[indfocus], Lfull[indfocus]-Lfull[indfocus[5]]+cal.theta.lpdf(thetaeval[indfocus])[5],'-')
+
+np.mean(np.isnan(feval[indsstar,:]))
+np.mean(np.isnan(feval))
+np.mean(np.isnan(feval[indsstar,:]),1)
 
 
 # import pandas as pd
