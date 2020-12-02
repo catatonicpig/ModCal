@@ -45,7 +45,7 @@ def plot_observed_data(description, func_eval, real_data, param_values, title = 
     fig.subplots_adjust(top=0.9) 
     plt.show()
     
-plot_observed_data(description, func_eval, real_data, param_values, title='Computer model output (no filter)')
+#plot_observed_data(description, func_eval, real_data, param_values, title='Computer model output (no filter)')
 
 
 
@@ -59,7 +59,7 @@ pdb.set_trace()
 emulator_nofilter = emulator(x, param_values, func_eval.T, method = 'PCGP_ozge', args = {'is_pca': True}) 
 pred_model_nofilter = emulator_nofilter.predict(x, param_values)
 pred_mean = pred_model_nofilter.mean()
-plot_observed_data(description, pred_mean, real_data, param_values, title='PCGP Emulator mean (no filter)')
+plot_observed_data(description, pred_mean.T, real_data, param_values, title='PCGP Emulator mean (no filter)')
 
 # (No filter) Fit an emulator via 'PCGPwM'
 emulator_nofilter_2 = emulator(x, param_values, func_eval.T, method = 'PCGPwM') 
@@ -71,6 +71,8 @@ plot_observed_data(description, pred_mean_2.T, real_data, param_values, title='P
 par_out = param_values[np.logical_or.reduce((func_eval[:, 130] <= 200, func_eval[:, 50] >= 1000, func_eval[:, 130] >= 1000)),:]
 par_in = param_values[np.logical_and.reduce((func_eval[:, 130] > 200, func_eval[:, 50] < 1000, func_eval[:, 130] < 1000)), :]
 func_eval_in = func_eval[np.logical_and.reduce((func_eval[:, 130] > 200, func_eval[:, 50] < 1000, func_eval[:, 130] < 1000)), :]
+par_in_test = param_values_test[np.logical_and.reduce((func_eval_test[:, 130] > 200, func_eval_test[:, 50] < 1000, func_eval_test[:, 130] < 1000)), :]
+func_eval_in_test = func_eval_test[np.logical_and.reduce((func_eval_test[:, 130] > 200, func_eval_test[:, 50] < 1000, func_eval_test[:, 130] < 1000)), :]
 
 # (Filter) Fit an emulator via 'PCGP_ozge'
 emulator_filter = emulator(x, par_in, func_eval_in.T, method = 'PCGP_ozge', args = {'is_pca': True}) 
@@ -84,23 +86,49 @@ pred_model_filter_2 = emulator_filter_2.predict(x, par_in)
 pred_mean_f_2 = pred_model_filter_2.mean()
 plot_observed_data(description, pred_mean_f_2.T, real_data, par_in, title='PCGPwM Emulator mean (filtered)')
 
-# # Run ML
-y = np.zeros(len(pred_mean))
-y[np.logical_and.reduce((pred_mean[:, 130] > 200, pred_mean[:, 50] < 1000, pred_mean[:, 130] < 1000))] = 1
-    
+# Compare emulators
 pred_model_nofilter_test = emulator_nofilter.predict(x, param_values_test)
 pred_mean_test = pred_model_nofilter_test.mean()
 
-y_test = np.zeros(len(pred_mean_test))
-y_test[np.logical_and.reduce((pred_mean_test[:, 130] > 200, pred_mean_test[:, 50] < 1000, pred_mean_test[:, 130] < 1000))] = 1
+print(np.mean(np.sum(np.square(pred_mean_test - func_eval_test.T), axis = 1)))
 
-X_0 = pred_mean[y == 0][0:450]
+pred_model_nofilter_2_test = emulator_nofilter_2.predict(x, param_values_test)
+pred_mean_2_test = pred_model_nofilter_2_test.mean()
+
+print(np.mean(np.sum(np.square(pred_mean_2_test - func_eval_test.T), axis = 1)))
+
+pred_model_filter_test = emulator_filter.predict(x, par_in_test)
+pred_mean_test_f = pred_model_filter_test.mean()
+
+print(np.mean(np.sum(np.square(pred_mean_test_f - func_eval_in_test.T), axis = 1)))
+
+pred_model_filter_2_test = emulator_filter_2.predict(x, par_in_test)
+pred_mean_2_test_f = pred_model_filter_2_test.mean()
+
+print(np.mean(np.sum(np.square(pred_mean_2_test_f - func_eval_in_test.T), axis = 1)))
+
+# # Run ML
+y = np.zeros(len(pred_mean.T))
+y[np.logical_and.reduce((pred_mean.T[:, 130] > 200, pred_mean.T[:, 50] < 1000, pred_mean.T[:, 130] < 1000))] = 1
+ 
+# Create the test data
+pred_model_nofilter_test = emulator_nofilter.predict(x, param_values_test)
+pred_mean_test = pred_model_nofilter_test.mean()
+y_test = np.zeros(len(pred_mean_test.T))
+y_test[np.logical_and.reduce((pred_mean_test.T[:, 130] > 200, pred_mean_test.T[:, 50] < 1000, pred_mean_test.T[:, 130] < 1000))] = 1
+
+# Create a balanced data set
+X_0 = pred_mean.T[y == 0][0:450]
 y_0 = y[y == 0][0:450]
-X_1 = pred_mean[y == 1]
+X_1 = pred_mean.T[y == 1]
 y_1 = y[y == 1]
     
 X = np.concatenate((X_0, X_1), axis=0)
 y = np.concatenate((y_0, y_1), axis=0)
+
+# Fit the classification model
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import classification_report, confusion_matrix
 
 model = RandomForestClassifier(n_estimators = 100, random_state = 42)
 model.fit(X, y)
@@ -108,7 +136,7 @@ model.fit(X, y)
 #Training accuracy
 print(model.score(X, y))
 print(confusion_matrix(y, model.predict(X)))
+
 #Test accuracy
-print(model.score(pred_mean_test, y_test))
-print(confusion_matrix(y_test, model.predict(pred_mean_test)))
-    
+print(model.score(pred_mean_test.T, y_test))
+print(confusion_matrix(y_test, model.predict(pred_mean_test.T)))

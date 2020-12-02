@@ -180,11 +180,18 @@ from base.calibration import calibrator
 # pdb.set_trace()
 # cal_m_f = calibrator(emulator_f, Y.reshape(21), X_std2, thetaprior = prior_balldrop, yvar = obsvar, method = 'directbayes_wgrad')
 
-# cal_f = calibrator(emulator_f, Y, X_std, thetaprior = prior_balldrop, 
-#                     method = 'MLcal', yvar = obsvar, 
-#                     args = {'clf_method': clf}) 
 
+
+import pdb
+pdb.set_trace()
 cal_nf = calibrator(emulator_f, Y, X_std2, thetaprior = prior_balldrop, 
                     method = 'MLcal', yvar = obsvar, 
                     args = {'clf_method': None}) 
 cal_nf.theta.rnd(100)    
+plt.plot(cal_nf.theta.rnd(100))
+plt.boxplot(cal_nf.theta.rnd(1000))
+
+cal_f = calibrator(emulator_f, Y, X_std2, thetaprior = prior_balldrop, 
+                   method = 'MLcal', yvar = obsvar, 
+                   args = {'clf_method': clf}) 
+plt.boxplot(cal_f.theta.rnd(1000))

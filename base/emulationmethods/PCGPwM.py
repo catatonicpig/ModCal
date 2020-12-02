@@ -329,7 +329,7 @@ def __standardizef(fitinfo, offset=None, scale=None):
     f = fitinfo['f']
     mof = fitinfo['mof']
     mofrows = fitinfo['mofrows']
-    epsilon = 10 ** (-3)
+    epsilon = 1 #10 ** (-3)
     if (offset is not None) and (scale is not None):
         if offset.shape[0] == f.shape[1] and scale.shape[0] == f.shape[1]:
             if np.any(np.nanmean(np.abs(f-offset)/scale,1) > 4):

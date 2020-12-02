@@ -132,8 +132,8 @@ def predict(predinfo, fitinfo, x, theta, args=None):
     predmean = (predvecs @ fitinfo['PCs'][xind, :].T)*fitinfo['scale'][xind] + fitinfo['offset'][xind]
     predvar = fitinfo['extravar'][xind] + (predvars @ (fitinfo['PCs'][xind,:] ** 2).T) * (fitinfo['scale'][xind] ** 2)
     
-    predinfo['mean'] = predmean
-    predinfo['var'] = predvar
+    predinfo['mean'] = predmean.T
+    predinfo['var'] = predvar.T
 
     return 
 
