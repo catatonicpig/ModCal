@@ -11,8 +11,7 @@ import scipy.stats as sps
 ball = np.loadtxt('ball.csv', delimiter=',')
 n = len(ball)
 
-# Note that this is a stochastic one but we convert it deterministic by taking the average
-# height
+# Note that this is a stochastic one but we convert it deterministic by taking the average height
 X = np.reshape(ball[:, 0], (n, 1))
 X = X[0:21]
 
@@ -22,8 +21,8 @@ Ysplit = np.split(Y, 3)
 ysum = 0
 for y in  Ysplit:
     ysum += y 
-obsvar = 0.00001*np.ones(X.shape[0])
-Y = ysum/3 + sps.norm.rvs(0, np.sqrt(obsvar)).reshape((21, 1)) 
+obsvar = np.maximum(0.2*X, 0.5) #0.00001*np.ones(X.shape[0])
+Y = ysum/3 #+ sps.norm.rvs(0, np.sqrt(obsvar)).reshape((21, 1)) 
 
 # Observe the data
 plt.scatter(X, Y)
@@ -55,24 +54,20 @@ X_std = (X - min(X))/(max(X) - min(X))
 
 # Obtain computer model output
 Y_model = timedrop(X_std, theta, height_range, theta_range)
+plt.plot(X_std, Y_model)
+plt.show()
 
 print(np.shape(theta))
 print(np.shape(X_std))
 print(np.shape(Y_model))
 
 
-plt.plot(X_std, Y_model)
-plt.show()
-
-
 current = os.path.abspath(os.getcwd())
 sys.path.append(os.path.normpath(os.path.join(os.path.dirname(current), '..')))
 from base.emulation import emulator
-X_std2 = np.concatenate((X_std, X_std), axis = 1)
-emulator_no_f = emulator(X_std2, theta, Y_model, method = 'PCGPwM')
-
-#Predict
-pred_model = emulator_no_f.predict(X_std2, theta)
+#X_std2 = np.concatenate((X_std, X_std), axis = 1)
+emulator_no_f = emulator(X_std, theta, Y_model, method = 'PCGPwM')
+pred_model = emulator_no_f.predict(X_std, theta)
 pred_mean = pred_model.mean()
 print(np.shape(pred_mean))
 
@@ -84,47 +79,21 @@ plt.ylabel("time")
 plt.title("Computer model surrogates for different theta")
 plt.show()
 
-# emunf = emulator(X_std, theta_f, Y_model, method = 'PCGP_ozge', args = {'is_pca': False}) 
-# prednf = emulator_f.predict(X_std, theta_f)
-# pred_meannf = prednf.mean()
-# plt.scatter(X, Y, color = 'grey')
-# for i in range(np.shape(pred_meanf)[1]):
-#     plt.plot(X, pred_meanf[:, i])
-# plt.xlabel("height")
-# plt.ylabel("time")
-# plt.title("Computer model surrogates for different theta")
-# plt.show()
-
+# Filter out the data
 ys = 1 - np.sum((Y_model - Y)**2, 0)/np.sum((Y - np.mean(Y))**2, 0)
 theta_f = theta[ys > 0.5]
-# Obtain computer model output
+
+# Obtain computer model output via filtered data
 Y_model = timedrop(X_std, theta_f, height_range, theta_range)
 print(np.shape(Y_model))
-
 plt.plot(X_std, Y_model)
 plt.show()
 
-Y_cls = np.zeros(len(theta))
-Y_cls[ys > 0.5] = 1
-
-emulator_f = emulator(X_std2, theta_f, Y_model, method = 'PCGPwM')
-
-#### TO check if the new emulator works with a single dim
-# import pdb
-# pdb.set_trace()
-# emuf = emulator(X_std, theta_f, Y_model, method = 'PCGP_ozge', args = {'is_pca': False}) 
-# predf = emuf.predict(X_std, theta_f)
-# pred_meanf = predf.mean()
-# plt.scatter(X, Y, color = 'grey')
-# for i in range(np.shape(pred_meanf)[1]):
-#     plt.plot(X, pred_meanf[:, i])
-# plt.xlabel("height")
-# plt.ylabel("time")
-# plt.title("Computer model surrogates for different theta")
-# plt.show()
 
 
-pred_model = emulator_f.predict(X_std2, theta_f)
+
+emulator_f = emulator(X_std, theta_f, Y_model, method = 'PCGPwM')
+pred_model = emulator_f.predict(X_std, theta_f)
 pred_mean = pred_model.mean()
 print(np.shape(pred_mean))
 
@@ -149,9 +118,9 @@ Y_model_test = timedrop(X_std, theta_test, height_range, theta_range)
 print(np.shape(Y_model_test))
 
 #Predict
-p_no_f = emulator_no_f.predict(X_std2, theta_test)
+p_no_f = emulator_no_f.predict(X_std, theta_test)
 pred_mean_no_f = p_no_f.mean()
-p_f = emulator_f.predict(X_std2, theta_test)
+p_f = emulator_f.predict(X_std, theta_test)
 pred_mean_f = p_f.mean()
 print(np.shape(pred_mean_no_f))
 print(np.shape(pred_mean_f))
@@ -159,7 +128,9 @@ print(np.shape(pred_mean_f))
 
 # Fit a classifier
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import classification_report, confusion_matrix
+from sklearn.metrics import confusion_matrix
+Y_cls = np.zeros(len(theta))
+Y_cls[ys > 0.5] = 1
 clf = RandomForestClassifier(n_estimators = 100, random_state = 42)#
 clf.fit(theta, Y_cls)
 print(clf.score(theta, Y_cls))
@@ -176,22 +147,25 @@ class prior_balldrop:
     
 
 from base.calibration import calibrator   
-# import pdb
-# pdb.set_trace()
-# cal_m_f = calibrator(emulator_f, Y.reshape(21), X_std2, thetaprior = prior_balldrop, yvar = obsvar, method = 'directbayes_wgrad')
-
-
-
 import pdb
 pdb.set_trace()
-cal_nf = calibrator(emulator_f, Y, X_std2, thetaprior = prior_balldrop, 
-                    method = 'MLcal', yvar = obsvar, 
-                    args = {'clf_method': None}) 
-cal_nf.theta.rnd(100)    
-plt.plot(cal_nf.theta.rnd(100))
-plt.boxplot(cal_nf.theta.rnd(1000))
 
-cal_f = calibrator(emulator_f, Y, X_std2, thetaprior = prior_balldrop, 
-                   method = 'MLcal', yvar = obsvar, 
-                   args = {'clf_method': clf}) 
-plt.boxplot(cal_f.theta.rnd(1000))
+cal_f = calibrator(emulator_f, Y, X_std, thetaprior = prior_balldrop, method = 'MLcal', yvar = obsvar, args = {'clf_method': None})
+#cal_nf = calibrator(emulator_no_f, Y, X_std, thetaprior = prior_balldrop, method = 'MLcal', yvar = obsvar, args = {'clf_method': None}) 
+cal_f_ml = calibrator(emulator_f, Y, X_std, thetaprior = prior_balldrop, method = 'MLcal', yvar = obsvar, args = {'clf_method': clf}) 
+#cal_nf_ml = calibrator(emulator_no_f, Y, X_std, thetaprior = prior_balldrop, method = 'MLcal', yvar = obsvar, args = {'clf_method': clf}) 
+
+
+cal_f_theta = cal_f.theta.rnd(1000) 
+cal_f_p = cal_f.predict(X_std)  
+plt.plot(cal_f_theta)
+plt.show()
+plt.boxplot(cal_f_theta)
+plt.show()
+
+cal_f_ml_theta = cal_f_ml.theta.rnd(1000) 
+cal_f_ml_p = cal_f_ml.predict(X_std)  
+plt.plot(cal_f_ml_theta)
+plt.show()
+plt.boxplot(cal_f_ml_theta)
+plt.show()

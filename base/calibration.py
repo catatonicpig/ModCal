@@ -183,7 +183,14 @@ class calibrator(object):
         if x is None:
             x = self.x
         info = {}
-        self.method.predict(info, self.info, self.emu, x, args)
+        if 'predict' in dir(self.method):
+            self.method.predict(info, self.info, self.emu, x, args)
+        else:
+            emupred = self.emu.predict(x, self.theta.rnd(1000))
+            info['mean'] = np.mean(emupred.mean(), 1)
+            info['var'] = np.var(emupred.mean(), 1)
+            #info['rnd'] = (emupred.mean()).T
+        
         return prediction(info, self)
 
 

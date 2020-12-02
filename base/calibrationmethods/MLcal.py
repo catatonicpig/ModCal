@@ -75,8 +75,8 @@ def fit(fitinfo, emu, x, y, args=None):
                 print('post', loglik(fitinfo, emu, theta, y, x, args) )
                 
                 # here construct feature later
-  
-                ml_logprobability = np.log(clf_method.predict_proba(theta)[0][1])
+                ml_probability = clf_method.predict_proba(theta)[0][1]
+                ml_logprobability = np.log(ml_probability) if ml_probability > 0 else float('inf')
                 print(clf_method.predict_proba(theta)[0][1])
                 
                 if np.isfinite(ml_logprobability):
@@ -89,7 +89,9 @@ def fit(fitinfo, emu, x, y, args=None):
         return logpost
     
     # Obtain an initial theta value 
-    thetastart = np.array([0.4]).reshape(1, 1)#np.mean(thetaprior.rnd(1000)).reshape(1, 1)
+    #thetastart = np.array([0.4]).reshape(1, 1)
+    theta_initial = np.mean(thetaprior.rnd(1000), axis = 0)
+    thetastart = theta_initial.reshape(1, len(theta_initial))
     
     # Call the sampler
     theta = postsampler(thetastart, logpostfull)
@@ -136,7 +138,7 @@ def loglik(fitinfo, emulator, theta, y, x, args):
     emucov = emupredict.var()
 
     # Compute the covariance matrix
-    CovMat = np.diag(np.squeeze(emucov)) + obsvar
+    CovMat = np.diag(np.squeeze(emucov)) + np.diag(np.squeeze(obsvar))
     
     # Get the decomposition of covariance matrix
     CovMatEigS, CovMatEigW = np.linalg.eigh(CovMat)

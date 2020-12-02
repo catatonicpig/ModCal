@@ -5,11 +5,12 @@ import os
 import copy
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import classification_report, confusion_matrix
+import scipy.stats as sps
 
 current = os.path.abspath(os.getcwd())
 sys.path.append(os.path.normpath(os.path.join(os.path.dirname(current), '..')))
 from base.emulation import emulator
-
+from base.calibration import calibrator   
 
 # Read data 
 real_data = np.loadtxt('real_observations.csv', delimiter=',')
@@ -47,25 +48,19 @@ def plot_observed_data(description, func_eval, real_data, param_values, title = 
     
 #plot_observed_data(description, func_eval, real_data, param_values, title='Computer model output (no filter)')
 
-
-
 x = np.reshape(np.tile(range(164), 3), (492, 1))
-
-
-import pdb
-pdb.set_trace()
 
 # (No filter) Fit an emulator via 'PCGP_ozge'
 emulator_nofilter = emulator(x, param_values, func_eval.T, method = 'PCGP_ozge', args = {'is_pca': True}) 
 pred_model_nofilter = emulator_nofilter.predict(x, param_values)
 pred_mean = pred_model_nofilter.mean()
-plot_observed_data(description, pred_mean.T, real_data, param_values, title='PCGP Emulator mean (no filter)')
+#plot_observed_data(description, pred_mean.T, real_data, param_values, title='PCGP Emulator mean (no filter)')
 
 # (No filter) Fit an emulator via 'PCGPwM'
 emulator_nofilter_2 = emulator(x, param_values, func_eval.T, method = 'PCGPwM') 
 pred_model_nofilter_2 = emulator_nofilter_2.predict(x, param_values)
 pred_mean_2 = pred_model_nofilter_2.mean()
-plot_observed_data(description, pred_mean_2.T, real_data, param_values, title='PCGPwM Emulator mean (no filter)')
+#plot_observed_data(description, pred_mean_2.T, real_data, param_values, title='PCGPwM Emulator mean (no filter)')
 
 # Filter out the data and fit a new emulator with the filtered data 
 par_out = param_values[np.logical_or.reduce((func_eval[:, 130] <= 200, func_eval[:, 50] >= 1000, func_eval[:, 130] >= 1000)),:]
@@ -78,13 +73,13 @@ func_eval_in_test = func_eval_test[np.logical_and.reduce((func_eval_test[:, 130]
 emulator_filter = emulator(x, par_in, func_eval_in.T, method = 'PCGP_ozge', args = {'is_pca': True}) 
 pred_model_filter = emulator_nofilter.predict(x, par_in)
 pred_mean_f = pred_model_filter.mean()
-plot_observed_data(description, pred_mean_f, real_data, par_in, title='PCGP Emulator mean (filtered)')
+#plot_observed_data(description, pred_mean_f, real_data, par_in, title='PCGP Emulator mean (filtered)')
 
 # (Filter) Fit an emulator via 'PCGPwM'
 emulator_filter_2 = emulator(x, par_in, func_eval_in.T, method = 'PCGPwM') 
 pred_model_filter_2 = emulator_filter_2.predict(x, par_in)
 pred_mean_f_2 = pred_model_filter_2.mean()
-plot_observed_data(description, pred_mean_f_2.T, real_data, par_in, title='PCGPwM Emulator mean (filtered)')
+#plot_observed_data(description, pred_mean_f_2.T, real_data, par_in, title='PCGPwM Emulator mean (filtered)')
 
 # Compare emulators
 pred_model_nofilter_test = emulator_nofilter.predict(x, param_values_test)
@@ -140,3 +135,35 @@ print(confusion_matrix(y, model.predict(X)))
 #Test accuracy
 print(model.score(pred_mean_test.T, y_test))
 print(confusion_matrix(y_test, model.predict(pred_mean_test.T)))
+
+obsvar = np.maximum(0.2*real_data, 5)
+   
+ 
+class prior_covid:
+    """ This defines the class instance of priors provided to the method. """
+    def lpdf(theta):
+        return np.squeeze(sps.norm.logpdf(theta[:, 0], 2.5, 0.5) + 
+                          sps.norm.logpdf(theta[:, 1], 4.0, 0.5) + 
+                          sps.norm.logpdf(theta[:, 2], 4.0, 0.5) + 
+                          sps.norm.logpdf(theta[:, 3], 1.875, 0.1) + 
+                          sps.norm.logpdf(theta[:, 4], 14, 1.5) + 
+                          sps.norm.logpdf(theta[:, 5], 18, 1.5) + 
+                          sps.norm.logpdf(theta[:, 6], 20, 1.5) + 
+                          sps.norm.logpdf(theta[:, 7], 14, 1.5) + 
+                          sps.norm.logpdf(theta[:, 8], 13, 1.5) + 
+                          sps.norm.logpdf(theta[:, 9], 12, 1.5))
+
+    def rnd(n):
+        return np.vstack((sps.norm.rvs(2.5, 0.5, size=n),
+                          sps.norm.rvs(4.0, 0.5, size=n),
+                          sps.norm.rvs(4.0, 0.5, size=n),
+                          sps.norm.rvs(1.875, 0.1, size=n),
+                          sps.norm.rvs(14, 1.5, size=n),
+                          sps.norm.rvs(18, 1.5, size=n),
+                          sps.norm.rvs(20, 1.5, size=n),
+                          sps.norm.rvs(14, 1.5, size=n),
+                          sps.norm.rvs(13, 1.5, size=n),
+                          sps.norm.rvs(12, 1.5, size=n))).T
+import pdb
+pdb.set_trace()    
+cal_f = calibrator(emulator_filter, real_data, x, thetaprior = prior_covid, method = 'MLcal', yvar = obsvar, args = {'clf_method': None})
