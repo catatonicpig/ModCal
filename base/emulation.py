@@ -229,7 +229,6 @@ class emulator(object):
                 raise ValueError('Your theta shape seems to not agree with the emulator build.')
             elif theta.shape[1] != self.__theta.shape[1] and theta.shape[0] == self.__theta.shape[1]:
                 theta = theta.T
-                print('here?')
             elif theta.shape[1] != self.__theta.shape[1] and theta.shape[0] != self.__theta.shape[1]:
                 raise ValueError('Your theta shape seems to not agree with the emulator build.')
         

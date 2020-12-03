@@ -143,9 +143,13 @@ def plumleepostsampler_wgrad(thetastart, logpostfunc, numsamp, tarESS):
         startingv = np.random.choice(np.arange(0, Lsave.shape[0]),size=Lsave.shape[0],p=post)
         thetasave = thetasave[startingv,:]
         covmat0 = np.cov(thetasave.T)
-        covmat0 += (10 ** (-4)) * np.diag(np.diag(covmat0) + thetas)
-        Wc, Vc = np.linalg.eigh(covmat0)
-        hc = (Vc @ np.diag(np.sqrt(Wc)) @ Vc.T)
+        print(covmat0.ndim)
+        if covmat0.ndim > 1:
+            covmat0 += (10 ** (-4)) * np.diag(np.diag(covmat0) + thetas)
+            Wc, Vc = np.linalg.eigh(covmat0)
+            hc = (Vc @ np.diag(np.sqrt(Wc)) @ Vc.T)
+        else:
+            hc = np.sqrt(covmat0 + thetas)
         thetac = thetasave[np.random.choice(range(0,thetasave.shape[0]),size = numchain),:]
         if logpostf_grad is not None:
             fval, dfval = logpostf(thetac)
@@ -157,6 +161,8 @@ def plumleepostsampler_wgrad(thetastart, logpostfunc, numsamp, tarESS):
         for k in range(0,numsamppc):
             rvalo = np.random.normal(0,1,thetac.shape)
             rval = np.sqrt(2) * rho * (rvalo @ hc)
+            if rval.ndim != thetac.ndim:
+                rval = np.reshape(rval,(thetac.shape))
             thetap = thetac + rval
             if logpostf_grad is not None:
                 diffval = rho ** 2 * (dfval @ covmat0)

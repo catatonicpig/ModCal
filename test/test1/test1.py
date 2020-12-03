@@ -1,6 +1,6 @@
 import numpy as np
 from scipy.stats import norm
-from pyDOE import *
+#from pyDOE import *
 import scipy.optimize as spo
 import sys
 import os
@@ -40,7 +40,9 @@ def timedrop(x, theta, hr, gr):
 
 # Draw 100 random parameters from uniform prior
 n2 = 100
-theta = lhs(1, samples=n2)
+#theta = lhs(1, samples=n2)
+
+theta = np.reshape(np.random.uniform(size=30),(-1,1))
 theta_range = np.array([1, 30])
 
 # Standardize 
@@ -68,7 +70,7 @@ Y_model = timedrop(X_std, theta_f, height_range, theta_range)
 print(np.shape(Y_model))
 
 # Build up an emulator
-emulator_f = emulator(X_std, theta_f, Y_model, method = 'PCGPwM')
+emulator_f = emulator(x = X_std, theta = theta_f, f = Y_model, method = 'PCGPwM')
 pred_model = emulator_f.predict(X_std, theta_f)
 pred_mean = pred_model.mean()
 print(np.shape(pred_mean))
@@ -83,9 +85,9 @@ class prior_balldrop:
 
 
 from base.calibration import calibrator  
-import pdb
-pdb.set_trace() 
-cal_f_pl = calibrator(emulator_f, Y, X_std, thetaprior = prior_balldrop, method = 'MLcal', yvar = obsvar, 
+#import pdb
+#pdb.set_trace() 
+cal_f_pl = calibrator(emulator_f, y = Y, x = X_std, thetaprior = prior_balldrop, method = 'MLcal', yvar = obsvar, 
                       args = {'method' : 'plumlee', 'theta0': np.array([0.4]), 'numsamp' : 1000, 'stepType' : 'normal', 'stepParam' : [0.8]})
 
 # NOTE: plumleeMCMC_wgrad (Line 146) gives an error when we have theta of size 1 because of the size of covmat0.

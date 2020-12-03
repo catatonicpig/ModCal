@@ -65,7 +65,6 @@ def fit(fitinfo, emu, x, y, args=None):
 
     def logpostfull(theta):
         logpost = thetaprior.lpdf(theta)
-
         if logpost.ndim > 0.5 and logpost.shape[0] > 1.5:
             inds = np.where(np.isfinite(logpost))[0]
             logpost[inds] += loglik(fitinfo, emu, theta[inds], y, x, args)
