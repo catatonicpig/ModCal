@@ -58,43 +58,44 @@ def fit(fitinfo, emu, x, y, args=None):
     """
     
     thetaprior = fitinfo['thetaprior']
-    clf_method = args['clf_method']
-    
+    if 'clf_method' in args.keys():
+        clf_method = args['clf_method']
+    else:
+        clf_method = None
 
     def logpostfull(theta):
+        logpost = thetaprior.lpdf(theta)
 
-        logpost = thetaprior.lpdf(theta) 
-        print('theta', theta)
-        print('prior', logpost)
-        
-        if np.isfinite(logpost):
-            if clf_method is None:
-                logpost += loglik(fitinfo, emu, theta, y, x, args)
-            else:
-                logpost += loglik(fitinfo, emu, theta, y, x, args) 
-                print('post', loglik(fitinfo, emu, theta, y, x, args) )
-                
-                # here construct feature later
-                ml_probability = clf_method.predict_proba(theta)[0][1]
-                ml_logprobability = np.log(ml_probability) if ml_probability > 0 else float('inf')
-                print(clf_method.predict_proba(theta)[0][1])
-                
-                if np.isfinite(ml_logprobability):
-                    logpost += ml_logprobability
-                else:
-                    logpost = float('inf')
+        if logpost.ndim > 0.5 and logpost.shape[0] > 1.5:
+            inds = np.where(np.isfinite(logpost))[0]
+            logpost[inds] += loglik(fitinfo, emu, theta[inds], y, x, args)
         else:
-            logpost = float('inf')
-                
+            if np.isfinite(logpost):
+                if clf_method is None:
+                    logpost += loglik(fitinfo, emu, theta, y, x, args)
+                else:
+                    logpost += loglik(fitinfo, emu, theta, y, x, args) 
+                    
+                    ml_probability = clf_method.predict_proba(theta)[0][1]
+                    ml_logprobability = np.log(ml_probability) if ml_probability > 0 else np.inf
+                    #print(clf_method.predict_proba(theta)[0][1])
+                    if np.isfinite(ml_logprobability):
+                        logpost += ml_logprobability
+                    else:
+                        logpost = np.inf
+
         return logpost
     
-    # Obtain an initial theta value 
-    #thetastart = np.array([0.4]).reshape(1, 1)
-    theta_initial = np.mean(thetaprior.rnd(1000), axis = 0)
-    thetastart = theta_initial.reshape(1, len(theta_initial))
-    
+    # Obtain an initial theta value for plumlee (i think we should define this within sampler)    
+    if 'method' in args.keys():
+        if args['method'] == 'plumlee':
+            thetastart = thetaprior.rnd(1000)
+    else:
+        thetastart = None
+    ### ### ### ### ### ### 
+        
     # Call the sampler
-    theta = postsampler(thetastart, logpostfull)
+    theta = postsampler(thetastart, logpostfull, options = args)
 
     fitinfo['thetarnd'] = theta
     fitinfo['y'] = y
@@ -136,22 +137,35 @@ def loglik(fitinfo, emulator, theta, y, x, args):
     emupredict = emulator.predict(x, theta)
     emumean = emupredict.mean()
     emucov = emupredict.var()
+    
+    p = emumean.shape[1]
+    n = emumean.shape[0]
+    y = y.reshape((n, 1))
+    
+    loglikelihood = np.zeros(p)
 
-    # Compute the covariance matrix
-    CovMat = np.diag(np.squeeze(emucov)) + np.diag(np.squeeze(obsvar))
-    
-    # Get the decomposition of covariance matrix
-    CovMatEigS, CovMatEigW = np.linalg.eigh(CovMat)
-    
-    # Calculate residuals
-    resid = emumean - np.reshape(y, (len(y), 1))
-    
-    # 
-    CovMatEigInv = CovMatEigW @ np.diag(1/CovMatEigS) @ CovMatEigW.T
-    
-    #
-    loglikelihood = float(-1/2 * resid.T @ CovMat @ resid)
-    #loglikelihood = float(-1/2 * resid.T @ CovMatEigInv @ resid - 1/2 * np.sum(np.log(CovMatEigS)))
+    for k in range(0, p):
+        m0 = emumean[:, k].reshape((n, 1))
+        s0 = emucov[:, k].reshape((n, 1))
+        
+        # Compute the covariance matrix
+        CovMat = np.diag(np.squeeze(s0)) + np.diag(np.squeeze(obsvar))
+        
+        # Get the decomposition of covariance matrix
+        CovMatEigS, CovMatEigW = np.linalg.eigh(CovMat)
+        
+        # Calculate residuals
+        resid = m0 - y
+        
+        # 
+        CovMatEigInv = CovMatEigW @ np.diag(1/CovMatEigS) @ CovMatEigW.T
+        
+        #
+        loglikelihood[k] = -0.5 * (resid.T @ CovMat @ resid)
+        #loglikelihood = float(-0.5 * resid.T @ CovMatEigInv @ resid - 0.5 * np.sum(np.log(CovMatEigS)))
 
-    return loglikelihood
+    if p == 1:
+        return float(loglikelihood)
+    else:
+        return loglikelihood
 

@@ -164,6 +164,21 @@ class prior_covid:
                           sps.norm.rvs(14, 1.5, size=n),
                           sps.norm.rvs(13, 1.5, size=n),
                           sps.norm.rvs(12, 1.5, size=n))).T
+# import pdb
+# pdb.set_trace()    
+# cal_f_pl = calibrator(emulator_filter, real_data, x, thetaprior = prior_covid, method = 'MLcal', yvar = obsvar, 
+#                    args = {'method' : 'plumlee', 'clf_method' : None, 'numsamp' : 1000, 'stepType' : 'normal', 'stepParam' : np.array([0.01, 0.01, 0.01, 0.01, 0.03, 0.03, 0.03, 0.03, 0.03, 0.03])})
+
 import pdb
-pdb.set_trace()    
-cal_f = calibrator(emulator_filter, real_data, x, thetaprior = prior_covid, method = 'MLcal', yvar = obsvar, args = {'clf_method': None})
+pdb.set_trace() 
+cal_f = calibrator(emulator_filter, real_data, x, thetaprior = prior_covid, method = 'MLcal', yvar = obsvar, 
+                   args = {'theta0': np.array([2, 4, 4, 1.875, 14, 18, 20, 14, 13, 12]), 
+                           'numsamp' : 1000, 'stepType' : 'normal', 
+                           'stepParam' : np.array([0.01, 0.01, 0.01, 0.01, 0.03, 0.03, 0.03, 0.03, 0.03, 0.03])})
+
+
+cal_f_theta = cal_f.theta.rnd(1000) 
+plt.plot(cal_f_theta)
+plt.show()
+plt.boxplot(cal_f_theta)
+plt.show()

@@ -3,7 +3,7 @@
 import numpy as np
 from base.utilitiesmethods.plumleeMCMC import plumleepostsampler
 from base.utilitiesmethods.plumleeMCMC_wgrad import plumleepostsampler_wgrad
-from base.utilitiesmethods.metropolis_hasting import metropolis_hasting
+from base.utilitiesmethods.metropolis_hasting import metropolis_hastings
 
 def postsampler(thetastart, logpostfunc, options= {}):
     """
@@ -31,9 +31,9 @@ def postsampler(thetastart, logpostfunc, options= {}):
         numsamp = 2000
     
     def postsamplefunc(thetastart, logpostfunc):
-        if method is 'plumlee':
+        if method == 'plumlee':
             tarESS = np.max((150, 10 * thetastart.shape[1]))
             return plumleepostsampler_wgrad(thetastart, logpostfunc, numsamp, tarESS)
         else:
-            return metropolis_hasting(thetastart, logpostfunc, numsamp)
+            return metropolis_hastings(logpostfunc, options)
     return postsamplefunc(thetastart, logpostfunc)
