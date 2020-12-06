@@ -64,6 +64,9 @@ def fit(fitinfo, emu, x, y, args=None):
         clf_method = None
 
     def logpostfull(theta):
+        #print(theta)
+        if theta.ndim < 1.5:
+            theta = theta.reshape((1, len(theta)))
         logpost = thetaprior.lpdf(theta)
         if logpost.ndim > 0.5 and logpost.shape[0] > 1.5:
             inds = np.where(np.isfinite(logpost))[0]
@@ -160,9 +163,13 @@ def loglik(fitinfo, emulator, theta, y, x, args):
         CovMatEigInv = CovMatEigW @ np.diag(1/CovMatEigS) @ CovMatEigW.T
         
         #
-        loglikelihood[k] = -0.5 * (resid.T @ CovMat @ resid)
-        #loglikelihood = float(-0.5 * resid.T @ CovMatEigInv @ resid - 0.5 * np.sum(np.log(CovMatEigS)))
-
+        #print(theta)
+        #print(-0.5 * (resid.T @ CovMat @ resid))
+        #print(float(-0.5 * resid.T @ CovMatEigInv @ resid - 0.5 * np.sum(np.log(CovMatEigS))))
+        #loglikelihood[k] = -0.5 * (resid.T @ CovMat @ resid)
+        
+        loglikelihood[k] = float(-0.5 * resid.T @ CovMatEigInv @ resid - 0.5 * np.sum(np.log(CovMatEigS)))
+        #print(loglikelihood[k])
     if p == 1:
         return float(loglikelihood)
     else:

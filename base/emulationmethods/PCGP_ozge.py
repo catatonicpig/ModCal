@@ -64,9 +64,10 @@ def fit(fitinfo, x, theta, f, args=None):
         Valssq = (fstand.shape[0]*(Vals ** 2) + 0.001) /(fstand.shape[0] + 0.001)
         
         # Find the best size of the reduced space
+  
         numVals = 1 + np.sum(np.cumsum(Valssq) < 0.9995*np.sum(Valssq))
         numVals = np.maximum(np.minimum(2,fstand.shape[1]), numVals)
-    
+        #numVals = 1
         # 
         fitinfo['Cs'] = Vecs * np.sqrt(Valssq)
         fitinfo['PCs'] = fitinfo['Cs'][:, :numVals]
@@ -308,6 +309,7 @@ def emulation_fit(theta, pcaval, hypstarts=None, hypinds=None):
     nughyp0 = -6
     nughypLB = -8
     nughypUB = 1
+    
     #######  ####### ####### #######
     # Get a random sample of thetas to find the optimized hyperparameters
     n_train = np.min((20*theta.shape[1], theta.shape[0]))

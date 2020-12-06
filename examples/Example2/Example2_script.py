@@ -22,8 +22,9 @@ Ysplit = np.split(Y, 3)
 ysum = 0
 for y in  Ysplit:
     ysum += y 
-obsvar = np.maximum(0.2*X, 0.01) #0.00001*np.ones(X.shape[0])
+#obsvar = np.maximum(0.2*X, 0.01) #0.00001*np.ones(X.shape[0])
 Y = ysum/3 #+ sps.norm.rvs(0, np.sqrt(obsvar)).reshape((21, 1)) 
+
 
 # Observe the data
 plt.scatter(X, Y)
@@ -66,6 +67,8 @@ current = os.path.abspath(os.getcwd())
 sys.path.append(os.path.normpath(os.path.join(os.path.dirname(current), '..')))
 from base.emulation import emulator
 
+import pdb
+pdb.set_trace()
 emulator_no_f = emulator(X_std, theta, Y_model, method = 'PCGPwM')
 pred_model = emulator_no_f.predict(X_std, theta)
 pred_mean = pred_model.mean()
@@ -89,6 +92,7 @@ print(np.shape(Y_model))
 plt.plot(X_std, Y_model)
 plt.show()
 
+
 emulator_f = emulator(X_std, theta_f, Y_model, method = 'PCGPwM')
 pred_model = emulator_f.predict(X_std, theta_f)
 pred_mean = pred_model.mean()
@@ -101,6 +105,20 @@ plt.xlabel("height")
 plt.ylabel("time")
 plt.title("Computer model surrogates for different theta")
 plt.show()
+
+emulator_f_2 = emulator(X_std, theta_f, Y_model, method = 'PCGP_ozge', args = {'is_pca': True}) 
+pred_model_2 = emulator_f_2.predict(X_std, theta_f)
+pred_mean_2 = pred_model_2.mean()
+print(np.shape(pred_mean_2))
+
+plt.scatter(X, Y, color = 'grey')
+for i in range(np.shape(pred_mean_2)[1]):
+    plt.plot(X, pred_mean_2[:, i])
+plt.xlabel("height")
+plt.ylabel("time")
+plt.title("Computer model surrogates for different theta")
+plt.show()
+
 
 #Generate random reasonable theta values
 theta_test = lhs(1, samples=1000)
@@ -140,13 +158,13 @@ class prior_balldrop:
     def rnd(n):
         return np.vstack((sps.uniform.rvs(0.1, 0.9, size=n)))
     
-#import pdb
-#pdb.set_trace()
+import pdb
+pdb.set_trace()
 from base.calibration import calibrator  
-
+obsvar = np.maximum(0.2*Y, 0.1)
 # Fit a calibrator with filtered emulator without ML
 cal_f = calibrator(emulator_f, Y, X_std, thetaprior = prior_balldrop, method = 'MLcal', yvar = obsvar, 
-                   args = {'theta0': np.array([0.4]), 'numsamp' : 1000, 'stepType' : 'normal', 'stepParam' : [0.8]})
+                   args = {'theta0': np.array([0.4]), 'numsamp' : 1000, 'stepType' : 'normal', 'stepParam' : [0.6]})
 
 cal_f_theta = cal_f.theta.rnd(1000) 
 cal_f_p = cal_f.predict(X_std)  
@@ -157,7 +175,7 @@ plt.show()
 
 # Fit a calibrator with filtered emulator with ML
 cal_f_ml = calibrator(emulator_f, Y, X_std, thetaprior = prior_balldrop, method = 'MLcal', yvar = obsvar, 
-                      args = {'theta0': np.array([0.4]), 'clf_method': clf, 'numsamp' : 1000, 'stepType' : 'normal', 'stepParam' : [0.8]})
+                      args = {'theta0': np.array([0.4]), 'clf_method': clf, 'numsamp' : 1000, 'stepType' : 'normal', 'stepParam' : [0.5]})
 
 cal_f_ml_theta = cal_f_ml.theta.rnd(1000) 
 cal_f_ml_p = cal_f_ml.predict(X_std)  
@@ -168,7 +186,28 @@ plt.show()
 
 # Fit a calibrator with filtered emulator without ML (plumlee's sampler)
 cal_f_pl = calibrator(emulator_f, Y, X_std, thetaprior = prior_balldrop, method = 'MLcal', yvar = obsvar, 
-                      args = {'method' : 'plumlee', 'theta0': np.array([0.4]), 'numsamp' : 1000, 'stepType' : 'normal', 'stepParam' : [0.8]})
+                      args = {'method' : 'plumlee'})
+
+cal_f_pl_theta = cal_f_pl.theta.rnd(1000) 
+#cal_f_ml_p = cal_f_ml.predict(X_std)  
+plt.plot(cal_f_pl_theta)
+plt.show()
+plt.boxplot(cal_f_pl_theta)
+plt.show()
+
+pdb.set_trace()
+obsvar = np.maximum(0.2*Y, 0.1)
+# Fit a calibrator with filtered emulator without ML
+cal_f = calibrator(emulator_f_2, Y, X_std, thetaprior = prior_balldrop, method = 'MLcal', yvar = obsvar, 
+                   args = {'theta0': np.array([0.2]), 'numsamp' : 1000, 'stepType' : 'normal', 'stepParam' : [0.9]})
+
+cal_f_theta = cal_f.theta.rnd(1000) 
+cal_f_p = cal_f.predict(X_std)  
+plt.plot(cal_f_theta)
+plt.show()
+plt.boxplot(cal_f_theta)
+plt.show()
+
 
 #cal_nf_ml = calibrator(emulator_no_f, Y, X_std, thetaprior = prior_balldrop, method = 'MLcal', yvar = obsvar, args = {'clf_method': clf}) 
 #cal_nf = calibrator(emulator_no_f, Y, X_std, thetaprior = prior_balldrop, method = 'MLcal', yvar = obsvar, args = {'clf_method': None}) 

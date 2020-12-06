@@ -67,7 +67,7 @@ def plumleepostsampler_wgrad(thetastart, logpostfunc, numsamp, tarESS):
         if np.any(np.std(thetaposs,0) < 10 ** (-8) * np.min(np.std(thetastart,0))):
             thetastar = thetastart[np.argmax(logpost),:]
             thetastart = thetastar + (thetastart - thetastar) / 2
-            iteratttempt += iteratttempt
+            iteratttempt += 1
         else:
             thetastart = thetaposs
             keepgoing = False
