@@ -143,7 +143,6 @@ def plumleepostsampler_wgrad(thetastart, logpostfunc, numsamp, tarESS):
         startingv = np.random.choice(np.arange(0, Lsave.shape[0]),size=Lsave.shape[0],p=post)
         thetasave = thetasave[startingv,:]
         covmat0 = np.cov(thetasave.T)
-        print(covmat0.ndim)
         if covmat0.ndim > 1:
             covmat0 += (10 ** (-4)) * np.diag(np.diag(covmat0) + thetas)
             Wc, Vc = np.linalg.eigh(covmat0)

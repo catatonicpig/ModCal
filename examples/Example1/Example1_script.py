@@ -113,16 +113,18 @@ cal_lin = calibrator(emu_lin, y, x, # need to build a calibrator
                     thetaprior = priorphys_lin,
                     method = 'BDM',
                     yvar = obsvar,
-                    args = {'cov_disc': cov_delta,
-                               'phiprior': priorstatdisc_model})# the arguments are being passed 
+                    args = {'method': 'plumlee', 
+                            'cov_disc': cov_delta,
+                            'phiprior': priorstatdisc_model})# the arguments are being passed 
                                                                 # to the BDM method
 pred_lin = cal_lin.predict(xtot) # getting a prediction object
 
 cal_grav = calibrator(emu_grav, y, x, # need to build a calibrator
                        thetaprior = priorphys_grav,
                        method = 'BDM',
-                    yvar = obsvar,
-                    args = { 'cov_disc': cov_delta,
+                       yvar = obsvar,
+                       args = {'method': 'plumlee',
+                               'cov_disc': cov_delta,
                                'phiprior': priorstatdisc_model}) # the arguments are being passed 
                                                                 # to the BDM method
 pred_grav = cal_grav.predict(xtot) # getting a prediction object
@@ -148,7 +150,6 @@ ax2.hist(cal_grav.theta(2000), bins=30)
 ax2.set_xlabel('gravity')
 ax2.set_ylabel('frequency')
 ax2.set_title('histogram for gravity')
-
 
 def plotpreds(axis, pred):
     preds = pred.rnd(1000)

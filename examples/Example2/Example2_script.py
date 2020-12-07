@@ -1,39 +1,41 @@
 import numpy as np
-from scipy.stats import norm
-from pyDOE import *
-import scipy.optimize as spo
 import sys
 import os
 from matplotlib import pyplot as plt
 import scipy.stats as sps
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import confusion_matrix
+current = os.path.abspath(os.getcwd())
+sys.path.append(os.path.normpath(os.path.join(os.path.dirname(current), '..')))
+from base.emulation import emulator
+from base.calibration import calibrator
 
 
 # Read the data
 ball = np.loadtxt('ball.csv', delimiter=',')
 n = len(ball)
-
-# Note that this is a stochastic one but we convert it deterministic by taking the average height
+#height
 X = np.reshape(ball[:, 0], (n, 1))
 X = X[0:21]
-
-# time
+#time
 Y = np.reshape(ball[:, 1], ((n, 1)))
+# This is a stochastic one but we convert it deterministic by taking the average height
 Ysplit = np.split(Y, 3)
 ysum = 0
 for y in  Ysplit:
     ysum += y 
-#obsvar = np.maximum(0.2*X, 0.01) #0.00001*np.ones(X.shape[0])
-Y = ysum/3 #+ sps.norm.rvs(0, np.sqrt(obsvar)).reshape((21, 1)) 
-
+obsvar = np.maximum(0.2*X, 0.5)
+Y = ysum/3
 
 # Observe the data
-plt.scatter(X, Y)
-plt.xlabel("height")
-plt.ylabel("time")
+plt.scatter(X, Y, color = 'red')
+plt.xlabel("height (meters)")
+plt.ylabel("time (seconds)")
 plt.show()
 
 # Computer implementation of the mathematical model
 def timedrop(x, theta, hr, gr):
+    # Assume x and theta are within (0, 1)
     min_g = min(gr)
     range_g = max(gr) - min(gr)
     min_h = min(hr)
@@ -41,13 +43,13 @@ def timedrop(x, theta, hr, gr):
     f = np.zeros((theta.shape[0], x.shape[0]))
     for k in range(0, theta.shape[0]):
         g = range_g*theta[k] + min_g
-        h = range_h*x + min(hr)
+        h = range_h*x + min_h
         f[k, :] = np.sqrt(2*h/g).reshape(x.shape[0])
     return f.T
 
 # Draw 100 random parameters from uniform prior
 n2 = 100
-theta = lhs(1, samples=n2)
+theta = np.random.random(n2).reshape((n2, 1))
 theta_range = np.array([1, 30])
 
 # Standardize 
@@ -56,72 +58,103 @@ X_std = (X - min(X))/(max(X) - min(X))
 
 # Obtain computer model output
 Y_model = timedrop(X_std, theta, height_range, theta_range)
-plt.plot(X_std, Y_model)
-plt.show()
 
 print(np.shape(theta))
 print(np.shape(X_std))
 print(np.shape(Y_model))
 
-current = os.path.abspath(os.getcwd())
-sys.path.append(os.path.normpath(os.path.join(os.path.dirname(current), '..')))
-from base.emulation import emulator
+#import pdb
+#pdb.set_trace()
 
-import pdb
-pdb.set_trace()
-emulator_no_f = emulator(X_std, theta, Y_model, method = 'PCGPwM')
-pred_model = emulator_no_f.predict(X_std, theta)
-pred_mean = pred_model.mean()
-print(np.shape(pred_mean))
+# Fit emualtors using two different methods 
 
-plt.scatter(X, Y, color = 'grey')
-for i in range(np.shape(pred_mean)[1]):
-    plt.plot(X, pred_mean[:, i])
-plt.xlabel("height")
-plt.ylabel("time")
-plt.title("Computer model surrogates for different theta")
-plt.show()
+# Emulator 1
+emulator_1 = emulator(X_std, theta, Y_model, method = 'PCGPwM')
+# Emulator 2
+emulator_2 = emulator(X_std, theta, Y_model, method = 'PCGP_ozge', args = {'is_pca': True})
+
+def plot_pred(X_std, Y, cal, theta_range):
+    
+    fig, axs = plt.subplots(1, 4, figsize=(14, 3))
+    
+    cal_theta = cal.theta.rnd(1000) 
+    cal_theta = cal_theta*(theta_range[1] - theta_range[0]) + theta_range[0]  
+    axs[0].plot(cal_theta)
+    axs[1].boxplot(cal_theta)
+    axs[2].hist(cal_theta)
+    post = cal.predict(X_std)
+    rndm_m = post.rnd(s = 1000)
+    upper = np.percentile(rndm_m, 97.5, axis = 0)
+    lower = np.percentile(rndm_m, 2.5, axis = 0)
+    median = np.percentile(rndm_m, 50, axis = 0)
+    #plt.xlabel("height (meters)")
+    #plt.ylabel("time (seconds)")
+    axs[3].plot(median, color = 'black')
+    axs[3].fill_between(range(0, 21), lower, upper, color = 'grey')
+    axs[3].plot(range(0, 21), Y, 'ro', markersize = 5, color='red')
+    
+    plt.show()
+    
+# Define prior
+class prior_balldrop:
+    """ This defines the class instance of priors provided to the method. """
+    def lpdf(theta):
+        return np.squeeze(sps.uniform.logpdf(theta, 0, 1))
+
+    def rnd(n):
+        return np.vstack((sps.uniform.rvs(0, 1, size=n)))
+    
+obsvar = np.maximum(0.2*Y, 0.1)
+
+# Fit a calibrator with emulator 1 via metropolis-hastings
+cal_1 = calibrator(emulator_1, Y, X_std, thetaprior = prior_balldrop, method = 'MLcal', yvar = obsvar, 
+                   args = {'theta0': np.array([0.4]), 
+                           'numsamp' : 1000, 
+                           'stepType' : 'normal', 
+                           'stepParam' : [0.6]})
+
+plot_pred(X_std, Y, cal_1, theta_range)
+    
+# Fit a calibrator with emulator 2 via metropolis-hastings
+cal_2 = calibrator(emulator_2, Y, X_std, thetaprior = prior_balldrop, method = 'MLcal', yvar = obsvar, 
+                   args = {'theta0': np.array([0.4]), 
+                           'numsamp' : 1000, 
+                           'stepType' : 'normal', 
+                           'stepParam' : [0.6]})
+
+plot_pred(X_std, Y, cal_2, theta_range)
+
+# Fit a calibrator with emulator 1 via plumlee sampler
+cal_3 = calibrator(emulator_1, Y, X_std, thetaprior = prior_balldrop, method = 'MLcal', yvar = obsvar, 
+                   args = {'method' : 'plumlee'})
+
+plot_pred(X_std, Y, cal_3, theta_range)
+
+# # # # # # # # # # # # # # # # # # # # 
+# # # # ML adjustment approach # # # #  
+# # # # # # # # # # # # # # # # # # # # 
 
 # Filter out the data
 ys = 1 - np.sum((Y_model - Y)**2, 0)/np.sum((Y - np.mean(Y))**2, 0)
 theta_f = theta[ys > 0.5]
+print(theta_f.shape)
 
 # Obtain computer model output via filtered data
 Y_model = timedrop(X_std, theta_f, height_range, theta_range)
 print(np.shape(Y_model))
-plt.plot(X_std, Y_model)
-plt.show()
-
-
-emulator_f = emulator(X_std, theta_f, Y_model, method = 'PCGPwM')
-pred_model = emulator_f.predict(X_std, theta_f)
-pred_mean = pred_model.mean()
-print(np.shape(pred_mean))
-
-plt.scatter(X, Y, color = 'grey')
-for i in range(np.shape(pred_mean)[1]):
-    plt.plot(X, pred_mean[:, i])
+plt.plot(X, Y_model)
 plt.xlabel("height")
-plt.ylabel("time")
-plt.title("Computer model surrogates for different theta")
+plt.ylabel("time (model with filtered data)")
 plt.show()
 
-emulator_f_2 = emulator(X_std, theta_f, Y_model, method = 'PCGP_ozge', args = {'is_pca': True}) 
-pred_model_2 = emulator_f_2.predict(X_std, theta_f)
-pred_mean_2 = pred_model_2.mean()
-print(np.shape(pred_mean_2))
+# Fit an emulator via filtered data
+emulator_f_1 = emulator(X_std, theta_f, Y_model, method = 'PCGPwM')
 
-plt.scatter(X, Y, color = 'grey')
-for i in range(np.shape(pred_mean_2)[1]):
-    plt.plot(X, pred_mean_2[:, i])
-plt.xlabel("height")
-plt.ylabel("time")
-plt.title("Computer model surrogates for different theta")
-plt.show()
-
+# Fit an emulator via filtered data
+emulator_f_2 = emulator(X_std, theta_f, Y_model, method = 'PCGP_ozge', args = {'is_pca': True})
 
 #Generate random reasonable theta values
-theta_test = lhs(1, samples=1000)
+theta_test = np.random.random(1000).reshape((1000, 1))
 theta_test = theta_test[(theta_test > 0.2) & (theta_test < 0.5)]
 theta_test = theta_test.reshape(len(theta_test), 1)
 theta_range = np.array([1, 30])
@@ -131,17 +164,26 @@ print(np.shape(theta_test))
 Y_model_test = timedrop(X_std, theta_test, height_range, theta_range)
 print(np.shape(Y_model_test))
 
-#Predict
-p_no_f = emulator_no_f.predict(X_std, theta_test)
-pred_mean_no_f = p_no_f.mean()
-p_f = emulator_f.predict(X_std, theta_test)
-pred_mean_f = p_f.mean()
-print(np.shape(pred_mean_no_f))
-print(np.shape(pred_mean_f))
+#Predict and compare emulator accuracy
+p_1 = emulator_1.predict(X_std, theta_test)
+p_1_mean = p_1.mean()
+p_2 = emulator_2.predict(X_std, theta_test)
+p_2_mean = p_2.mean()
+p_f_1 = emulator_f_1.predict(X_std, theta_test)
+p_f_1_mean = p_f_1.mean()
+p_f_2 = emulator_f_2.predict(X_std, theta_test)
+p_f_2_mean = p_2.mean()
 
+print('SSE = ', np.sum((p_1_mean - Y_model_test)**2))
+print('SSE = ', np.sum((p_2_mean - Y_model_test)**2))
+print('SSE = ', np.sum((p_f_1_mean - Y_model_test)**2))
+print('SSE = ', np.sum((p_f_2_mean - Y_model_test)**2))
+
+print('Rsq = ', 1 - np.sum(np.square(p_1_mean - Y_model_test))/np.sum(np.square(Y_model_test.T - np.mean(Y_model_test, axis = 1))))
+print('Rsq = ', 1 - np.sum(np.square(p_2_mean - Y_model_test))/np.sum(np.square(Y_model_test.T - np.mean(Y_model_test, axis = 1))))
+print('Rsq = ', 1 - np.sum(np.square(p_f_1_mean - Y_model_test))/np.sum(np.square(Y_model_test.T - np.mean(Y_model_test, axis = 1))))
+print('Rsq = ', 1 - np.sum(np.square(p_f_2_mean - Y_model_test))/np.sum(np.square(Y_model_test.T - np.mean(Y_model_test, axis = 1))))
 # Fit a classifier
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import confusion_matrix
 
 Y_cls = np.zeros(len(theta))
 Y_cls[ys > 0.5] = 1
@@ -150,64 +192,21 @@ clf.fit(theta, Y_cls)
 print(clf.score(theta, Y_cls))
 print(confusion_matrix(Y_cls, clf.predict(theta)))
 
-class prior_balldrop:
-    """ This defines the class instance of priors provided to the method. """
-    def lpdf(theta):
-        return np.squeeze(sps.uniform.logpdf(theta, 0.1, 0.9))
+# Fit a calibrator with emulator 1 (filtered & ML)
+cal_1_f = calibrator(emulator_f_1, Y, X_std, thetaprior = prior_balldrop, method = 'MLcal', yvar = obsvar, 
+                   args = {'clf_method': clf,
+                           'theta0': np.array([0.4]), 
+                           'numsamp' : 1000, 
+                           'stepType' : 'normal', 
+                           'stepParam' : [0.6]})
 
-    def rnd(n):
-        return np.vstack((sps.uniform.rvs(0.1, 0.9, size=n)))
-    
-import pdb
-pdb.set_trace()
-from base.calibration import calibrator  
-obsvar = np.maximum(0.2*Y, 0.1)
-# Fit a calibrator with filtered emulator without ML
-cal_f = calibrator(emulator_f, Y, X_std, thetaprior = prior_balldrop, method = 'MLcal', yvar = obsvar, 
-                   args = {'theta0': np.array([0.4]), 'numsamp' : 1000, 'stepType' : 'normal', 'stepParam' : [0.6]})
+plot_pred(X_std, Y, cal_1_f, theta_range)
 
-cal_f_theta = cal_f.theta.rnd(1000) 
-cal_f_p = cal_f.predict(X_std)  
-plt.plot(cal_f_theta)
-plt.show()
-plt.boxplot(cal_f_theta)
-plt.show()
+# Fit a calibrator with emulator 1 (filtered)
+cal_2_f = calibrator(emulator_f_1, Y, X_std, thetaprior = prior_balldrop, method = 'MLcal', yvar = obsvar, 
+                   args = {'theta0': np.array([0.4]), 
+                           'numsamp' : 1000, 
+                           'stepType' : 'normal', 
+                           'stepParam' : [0.6]})
 
-# Fit a calibrator with filtered emulator with ML
-cal_f_ml = calibrator(emulator_f, Y, X_std, thetaprior = prior_balldrop, method = 'MLcal', yvar = obsvar, 
-                      args = {'theta0': np.array([0.4]), 'clf_method': clf, 'numsamp' : 1000, 'stepType' : 'normal', 'stepParam' : [0.5]})
-
-cal_f_ml_theta = cal_f_ml.theta.rnd(1000) 
-cal_f_ml_p = cal_f_ml.predict(X_std)  
-plt.plot(cal_f_ml_theta)
-plt.show()
-plt.boxplot(cal_f_ml_theta)
-plt.show()
-
-# Fit a calibrator with filtered emulator without ML (plumlee's sampler)
-cal_f_pl = calibrator(emulator_f, Y, X_std, thetaprior = prior_balldrop, method = 'MLcal', yvar = obsvar, 
-                      args = {'method' : 'plumlee'})
-
-cal_f_pl_theta = cal_f_pl.theta.rnd(1000) 
-#cal_f_ml_p = cal_f_ml.predict(X_std)  
-plt.plot(cal_f_pl_theta)
-plt.show()
-plt.boxplot(cal_f_pl_theta)
-plt.show()
-
-pdb.set_trace()
-obsvar = np.maximum(0.2*Y, 0.1)
-# Fit a calibrator with filtered emulator without ML
-cal_f = calibrator(emulator_f_2, Y, X_std, thetaprior = prior_balldrop, method = 'MLcal', yvar = obsvar, 
-                   args = {'theta0': np.array([0.2]), 'numsamp' : 1000, 'stepType' : 'normal', 'stepParam' : [0.9]})
-
-cal_f_theta = cal_f.theta.rnd(1000) 
-cal_f_p = cal_f.predict(X_std)  
-plt.plot(cal_f_theta)
-plt.show()
-plt.boxplot(cal_f_theta)
-plt.show()
-
-
-#cal_nf_ml = calibrator(emulator_no_f, Y, X_std, thetaprior = prior_balldrop, method = 'MLcal', yvar = obsvar, args = {'clf_method': clf}) 
-#cal_nf = calibrator(emulator_no_f, Y, X_std, thetaprior = prior_balldrop, method = 'MLcal', yvar = obsvar, args = {'clf_method': None}) 
+plot_pred(X_std, Y, cal_2_f, theta_range)

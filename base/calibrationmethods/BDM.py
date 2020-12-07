@@ -92,7 +92,7 @@ def fit(fitinfo, emu, x, y,  args=None):
     
     numsamp = 1000
     tarESS = np.max((100, 10 * thetaphi.shape[1]))
-    thetaphi = postsampler(thetaphi, logpostfull)
+    thetaphi = postsampler(thetaphi, logpostfull, args)
     
     if phidim > 0.5:
         theta = thetaphi[:, :thetadim]
