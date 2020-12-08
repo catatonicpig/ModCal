@@ -21,17 +21,17 @@ def postsampler(thetastart, logpostfunc, options= {}):
     -------
     theta : matrix of sampled paramter values
     """
-    if 'method' in options.keys():
-        method = options['method']
+    if 'sampler' in options.keys():
+        sampler = options['sampler']
     else:
-        method = 'default'
+        sampler = 'default'
     if 'numsamp' in options.keys():
         numsamp = options['numsamp']
     else:
         numsamp = 2000
     
     def postsamplefunc(thetastart, logpostfunc):
-        if method == 'plumlee':
+        if sampler == 'plumlee':
             tarESS = np.max((150, 10 * thetastart.shape[1]))
             return plumleepostsampler_wgrad(thetastart, logpostfunc, numsamp, tarESS)
         else:

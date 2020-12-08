@@ -54,16 +54,16 @@ class emulator(object):
         
         if f is not None:
             if f.ndim < 1 or f.ndim > 2:
-                raise ValueError('f must have either 1 or 2 demensions.')
+                raise ValueError('f must have either 1 or 2 dimensions.')
             if (x is None) and (theta is None):
                 raise ValueError('You have not provided any theta or x, no emulator' +
                                  ' inference possible.')
             if x is not None:
                 if x.ndim < 0.5 or x.ndim > 2.5:
-                    raise ValueError('x must have either 1 or 2 demensions.')
+                    raise ValueError('x must have either 1 or 2 dimensions.')
             if theta is not None:
                 if theta.ndim < 0.5 or theta.ndim > 2.5:
-                    raise ValueError('theta must have either 1 or 2 demensions.')
+                    raise ValueError('theta must have either 1 or 2 dimensions.')
         else:
             print('You have not provided f, ignoring everything and just warming up.')
             if (x is not None) and (theta is not None):

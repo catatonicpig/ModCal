@@ -89,8 +89,8 @@ def fit(fitinfo, emu, x, y, args=None):
         return logpost
     
     # Obtain an initial theta value for plumlee (i think we should define this within sampler)    
-    if 'method' in args.keys():
-        if args['method'] == 'plumlee':
+    if 'sampler' in args.keys():
+        if args['sampler'] == 'plumlee':
             thetastart = thetaprior.rnd(1000)
     else:
         thetastart = None
@@ -138,8 +138,15 @@ def loglik(fitinfo, emulator, theta, y, x, args):
     # Obtain emulator results
     emupredict = emulator.predict(x, theta)
     emumean = emupredict.mean()
-    emucov = emupredict.var()
+    #emucov = emupredict.var()
     
+    try:
+        emucov = emupredict.covx()
+        is_cov = True
+    except ValueError:
+        emucov = emupredict.var()
+        is_cov = False
+        
     p = emumean.shape[1]
     n = emumean.shape[0]
     y = y.reshape((n, 1))
@@ -148,11 +155,15 @@ def loglik(fitinfo, emulator, theta, y, x, args):
 
     for k in range(0, p):
         m0 = emumean[:, k].reshape((n, 1))
-        s0 = emucov[:, k].reshape((n, 1))
-        
+    
         # Compute the covariance matrix
-        CovMat = np.diag(np.squeeze(s0)) + np.diag(np.squeeze(obsvar))
-        
+        if is_cov == True:
+            s0 = emucov[:, k, :].reshape((n, n))
+            CovMat = s0 + np.diag(np.squeeze(obsvar))
+        else:
+            s0 = emucov[:, k].reshape((n, 1))
+            CovMat = np.diag(np.squeeze(s0)) + np.diag(np.squeeze(obsvar))
+            
         # Get the decomposition of covariance matrix
         CovMatEigS, CovMatEigW = np.linalg.eigh(CovMat)
         

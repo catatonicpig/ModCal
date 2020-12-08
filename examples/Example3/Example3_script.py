@@ -68,10 +68,10 @@ plot_model_data(description, func_eval_rnd, real_data, param_values_rnd)
 x = np.reshape(np.tile(range(134), 3), (402, 1))
 
 # (No filter) Fit an emulator via 'PCGP_ozge'
-emulator_1 = emulator(x, param_values_rnd, func_eval_rnd.T, method = 'PCGP_ozge', args = {'is_pca': True}) 
+emulator_1 = emulator(x = x, theta = param_values_rnd, f = func_eval_rnd.T, method = 'PCGP_ozge', args = {'is_pca': True}) 
 
 # (No filter) Fit an emulator via 'PCGPwM'
-emulator_2 = emulator(x, param_values_rnd, func_eval_rnd.T, method = 'PCGPwM') 
+emulator_2 = emulator(x = x, theta = param_values_rnd, f = func_eval_rnd.T, method = 'PCGPwM') 
 
 def plot_pred_interval(cal):
     pr = cal.predict(x)
@@ -129,7 +129,7 @@ class prior_covid:
 obsvar = np.maximum(0.2*real_data, 5)
 
 # Calibrator 1
-cal_1 = calibrator(emulator_1, real_data, x, thetaprior = prior_covid, method = 'MLcal', yvar = obsvar, 
+cal_1 = calibrator(emu = emulator_1, y = real_data, x = x, thetaprior = prior_covid, method = 'MLcal', yvar = obsvar, 
                    args = {'theta0': np.array([2, 4, 4, 1.875, 14, 18, 20, 14, 13, 12]), 
                            'numsamp' : 1000, 'stepType' : 'normal', 
                            'stepParam' : np.array([0.01, 0.01, 0.01, 0.01, 0.03, 0.03, 0.03, 0.03, 0.03, 0.03])})
@@ -138,7 +138,7 @@ cal_1_theta = cal_1.theta.rnd(1000)
 plot_pred_interval(cal_1)
 
 # Calibrator 2
-cal_2 = calibrator(emulator_2, real_data, x, thetaprior = prior_covid, method = 'MLcal', yvar = obsvar, 
+cal_2 = calibrator(emu = emulator_2, y = real_data, x = x, thetaprior = prior_covid, method = 'MLcal', yvar = obsvar, 
                    args = {'theta0': np.array([2, 4, 4, 1.875, 14, 18, 20, 14, 13, 12]), 
                            'numsamp' : 1000, 'stepType' : 'normal', 
                            'stepParam' : np.array([0.01, 0.01, 0.01, 0.01, 0.03, 0.03, 0.03, 0.03, 0.03, 0.03])})
@@ -158,10 +158,10 @@ func_eval_in_test = func_eval_test[np.logical_and.reduce((func_eval_test[:, 100]
 plot_model_data(description, func_eval_in, real_data, par_in, title='Computer model output')
 
 # (Filter) Fit an emulator via 'PCGP_ozge'
-emulator_f_1 = emulator(x, par_in, func_eval_in.T, method = 'PCGP_ozge', args = {'is_pca': True}) 
+emulator_f_1 = emulator(x = x, theta = par_in, f = func_eval_in.T, method = 'PCGP_ozge', args = {'is_pca': True}) 
 
 # (Filter) Fit an emulator via 'PCGPwM'
-emulator_f_2 = emulator(x, par_in, func_eval_in.T, method = 'PCGPwM') 
+emulator_f_2 = emulator(x = x, theta = par_in, f = func_eval_in.T, method = 'PCGPwM') 
 
 ##### ##### ##### ##### #####
 # Compare emulators
@@ -237,8 +237,9 @@ def boxplot_param(theta):
     plt.show()
 
 
-    
-cal_f_1 = calibrator(emulator_f_1, real_data, x, thetaprior = prior_covid, method = 'MLcal', yvar = obsvar, 
+import pdb
+pdb.set_trace()     
+cal_f_1 = calibrator(emu = emulator_f_1, y = real_data, x = x, thetaprior = prior_covid, method = 'MLcal', yvar = obsvar, 
                         args = {'theta0': np.array([2, 4, 4, 1.875, 14, 18, 20, 14, 13, 12]), 
                                 'numsamp' : 1000, 
                                 'stepType' : 'normal', 
@@ -248,7 +249,7 @@ plot_pred_interval(cal_f_1)
 cal_f_1_theta = cal_f_1.theta.rnd(1000) 
 boxplot_param(cal_f_1_theta)
 
-cal_f_ml_1 = calibrator(emulator_f_1, real_data, x, thetaprior = prior_covid, method = 'MLcal', yvar = obsvar, 
+cal_f_ml_1 = calibrator(emu = emulator_f_1, y = real_data, x = x, thetaprior = prior_covid, method = 'MLcal', yvar = obsvar, 
                         args = {'clf_method': model, 
                                 'theta0': np.array([2, 4, 4, 1.875, 14, 18, 20, 14, 13, 12]), 
                                 'numsamp' : 1000, 
@@ -259,17 +260,33 @@ plot_pred_interval(cal_f_ml_1)
 cal_f_ml_1_theta = cal_f_ml_1.theta.rnd(1000) 
 boxplot_param(cal_f_ml_1_theta)
 
-cal_f_pl = calibrator(emulator_f_1, real_data, x, thetaprior = prior_covid, method = 'MLcal', yvar = obsvar, 
-                      args = {'method' : 'plumlee'})
+# cal_f_pl = calibrator(emu = emulator_f_1, y = real_data, x = x, thetaprior = prior_covid, method = 'MLcal', yvar = obsvar, 
+#                       args = {'sampler' : 'plumlee'})
 
-plot_pred_interval(cal_f_pl)
-cal_f_pl_theta = cal_f_pl.theta.rnd(1000) 
-boxplot_param(cal_f_pl_theta)
-
-
+# plot_pred_interval(cal_f_pl)
+# cal_f_pl_theta = cal_f_pl.theta.rnd(1000) 
+# boxplot_param(cal_f_pl_theta)
 
 
+cal_f_2 = calibrator(emu = emulator_f_2, y = real_data, x = x, thetaprior = prior_covid, method = 'MLcal', yvar = obsvar, 
+                        args = {'theta0': np.array([2, 4, 4, 1.875, 14, 18, 20, 14, 13, 12]), 
+                                'numsamp' : 1000, 
+                                'stepType' : 'normal', 
+                                'stepParam' : np.array([0.02, 0.02, 0.02, 0.02, 0.03, 0.03, 0.03, 0.03, 0.03, 0.03])})
+
+plot_pred_interval(cal_f_2)
+cal_f_2_theta = cal_f_2.theta.rnd(1000) 
+boxplot_param(cal_f_2_theta)
 
 
+cal_f_ml_2 = calibrator(emu = emulator_f_2, y = real_data, x = x, thetaprior = prior_covid, method = 'MLcal', yvar = obsvar, 
+                        args = {'clf_method': model,
+                                'theta0': np.array([2, 4, 4, 1.875, 14, 18, 20, 14, 13, 12]), 
+                                'numsamp' : 1000, 
+                                'stepType' : 'normal', 
+                                'stepParam' : np.array([0.02, 0.02, 0.02, 0.02, 0.03, 0.03, 0.03, 0.03, 0.03, 0.03])})
 
+plot_pred_interval(cal_f_ml_2)
+cal_f_ml_2_theta = cal_f_ml_2.theta.rnd(1000) 
+boxplot_param(cal_f_ml_2_theta)
 
