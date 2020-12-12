@@ -20,7 +20,8 @@ import scipy.optimize as spo
 ##############################################################################
 ##############################################################################
 """
-def fit(fitinfo, theta, f, x, args=None):
+#def fit(fitinfo, theta, f, x, args=None):
+def fit(fitinfo, x, theta, f, args=None):
     r"""
     Fits a calibration model.
 

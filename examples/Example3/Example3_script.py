@@ -67,7 +67,12 @@ plot_model_data(description, func_eval_rnd, real_data, param_values_rnd)
 
 x = np.reshape(np.tile(range(134), 3), (402, 1))
 
+
+emulator_0 = emulator(x = x, theta = param_values_rnd, f = func_eval_rnd.T, method = 'PCGP') 
+
 # (No filter) Fit an emulator via 'PCGP_ozge'
+import pdb
+pdb.set_trace() 
 emulator_1 = emulator(x = x, theta = param_values_rnd, f = func_eval_rnd.T, method = 'PCGP_ozge', args = {'is_pca': True}) 
 
 # (No filter) Fit an emulator via 'PCGPwM'

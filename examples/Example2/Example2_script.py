@@ -126,7 +126,7 @@ plot_pred(X_std, Y, cal_2, theta_range)
 
 # Fit a calibrator with emulator 1 via plumlee sampler
 cal_3 = calibrator(emulator_1, Y, X_std, thetaprior = prior_balldrop, method = 'MLcal', yvar = obsvar, 
-                   args = {'method' : 'plumlee'})
+                   args = {'sampler' : 'plumlee'})
 
 plot_pred(X_std, Y, cal_3, theta_range)
 
