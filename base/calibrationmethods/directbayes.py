@@ -287,8 +287,8 @@ def loglik(fitinfo, emu, theta, y, x, args):
         J = (S0.T / np.sqrt(obsvar)).T
         if J.ndim < 1.5:
             # I changed this part too
-            J = J[:,None].T
-            #stndresid = stndresid[:,None]
+            J = J[:,None]#.T
+            stndresid = stndresid[:,None]
         J2 =  J.T @ stndresid
         W, V = np.linalg.eigh(np.eye(J.shape[1]) + J.T @ J)
         J3 = V @ np.diag(1/W) @ V.T @ J2 # np.squeeze(V) @ np.diag(1/W) @ np.squeeze(V).T @ np.squeeze(J2)
@@ -297,11 +297,11 @@ def loglik(fitinfo, emu, theta, y, x, args):
         loglik[k] = -0.5 * residsq - 0.5 * np.sum(np.log(W))
      
     #THis part is just temporary to make univariate theta to work   
-    # if emumean.shape[1] == 1:
-    #     return float(loglik)
-    # else:
-    #     return loglik
-    return loglik
+    if emumean.shape[1] == 1:
+        return float(loglik)
+    else:
+        return loglik
+    #return loglik
 
 
 def loglik_gradapprox(fitinfo, emu, theta, y, x, args):

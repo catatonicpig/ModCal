@@ -71,14 +71,14 @@ lin_results = balldropmodel_linear(xtotv, thetacompexp_lin)
 grav_results = balldropmodel_grav(xtotv, thetacompexp_grav)  
 
 # build an emulator for the linear simulation
-emu_lin_1 = emulator(xtot, thetacompexp_lin, lin_results, method = 'PCGP_ozge', args = {'is_pca': True}) 
+emu_lin_1 = emulator(x = xtot, theta = thetacompexp_lin, f = lin_results, method = 'PCGP_ozge', args = {'is_pca': True}) 
 
-emu_lin_2 = emulator(xtot, thetacompexp_lin, lin_results, method = 'PCGPwM') 
+emu_lin_2 = emulator(x = xtot, theta = thetacompexp_lin, f = lin_results, method = 'PCGPwM') 
 
 # build an emulator for the gravity simulation
-emu_grav_1 = emulator(xtot, thetacompexp_grav, grav_results, method = 'PCGP_ozge', args = {'is_pca': True})
+emu_grav_1 = emulator(x = xtot, theta = thetacompexp_grav, f = grav_results, method = 'PCGP_ozge', args = {'is_pca': True})
 
-emu_grav_2 = emulator(xtot, thetacompexp_grav, grav_results, method = 'PCGPwM')  
+emu_grav_2 = emulator(x = xtot, theta = thetacompexp_grav, f = grav_results, method = 'PCGPwM')  
 
 # (Test) draw 50 random parameters from the prior
 thetacompexp_lin_test = priorphys_lin.rnd(50)  
