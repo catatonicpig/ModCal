@@ -92,4 +92,6 @@ emu_grav = emulator(x, thetacompexp_grav, grav_results, method = 'PCGPwM')
 cal_grav_1 = calibrator(emu = emu_grav, y = y, x = x, thetaprior = priorphys_grav, 
                      method = 'directbayes', 
                      yvar = obsvar)
- 
+
+#### NOTE: This is not a test basically. But, to check my temporary corrections to make it work with univariate theta.
+#########  Please read my comments in directbayes.py between lines 263-307 to see if they are OK.

@@ -100,8 +100,6 @@ x[x[:,1] == 50, 1] = 'highdrop'
 obsvar = 4*np.ones(x.shape[0])  # variance for the observations in 'y' below
 y = balldroptrue(xv) + sps.norm.rvs(0, np.sqrt(obsvar)) #observations at each row of 'x'
 
-import pdb
-pdb.set_trace()
 # build a calibrator for the linear simulation
 cal_lin = calibrator(emu = emu_lin, y = y, x = x, thetaprior = priorphys_lin, 
                      method = 'directbayes', 

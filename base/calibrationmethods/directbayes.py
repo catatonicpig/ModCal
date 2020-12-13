@@ -279,14 +279,17 @@ def loglik(fitinfo, emu, theta, y, x, args):
     for k in range(0, emumean.shape[1]):
         m0 = emumean[:,k]
         
-        #### MATT: This part does not work with single dimensional theta!!!
+        #### MATT: This part does not work with 1d theta!!!
         
         S0 = np.squeeze(emucovxhalf[:,k,:]) # np.reshape(emucovxhalf[:,k,:], (emumean.shape[0], theta.shape[1])) # np.squeeze(emucovxhalf[:,k,:])
         stndresid = (np.squeeze(y) - m0) / np.sqrt(obsvar)
         term1 = np.sum(stndresid ** 2)
         J = (S0.T / np.sqrt(obsvar)).T
         if J.ndim < 1.5:
-            # I changed this part too
+            # I changed this part:
+            # Replace line 291
+            # J = J[:,None].T
+            # with line 293 and 294
             J = J[:,None]#.T
             stndresid = stndresid[:,None]
         J2 =  J.T @ stndresid
@@ -296,7 +299,7 @@ def loglik(fitinfo, emu, theta, y, x, args):
         residsq = term1 - term2
         loglik[k] = -0.5 * residsq - 0.5 * np.sum(np.log(W))
      
-    #THis part is just temporary to make univariate theta to work   
+    #Replace line 307 with 303--306  
     if emumean.shape[1] == 1:
         return float(loglik)
     else:
