@@ -119,7 +119,7 @@ def fit(fitinfo, emu, x, y,  args=None):
         theta = np.vstack((fitinfo['thetarnd'],theta))
     if '_emulator__theta' in dir(emu):
         theta = np.vstack((theta,copy.copy(emu._emulator__theta)))
-    theta = postsampler(theta, logpostfull_wgrad, options={'method': 'plumlee'})
+    theta = postsampler(theta, logpostfull_wgrad, options={'sampler': 'plumlee'})
     ladj = logpostfull_wgrad(theta, return_grad = False)
     mladj = np.max(ladj)
     fitinfo['lpdfapproxnorm'] = np.log(np.mean(np.exp(ladj - mladj))) + mladj
@@ -178,10 +178,12 @@ def predict(predinfo, fitinfo, emu, x, args=None):
     mx =fitinfo['x'].shape[0]
     emupredict = emu.predict(xtot, theta)
     meanfull = copy.deepcopy(emupredict()[mx:,:]).T
-    varfull = copy.deepcopy(emupredict()[mx:,:]).T
+    varfull = copy.deepcopy(emupredict.var()[mx:,:]).T
+    #varfull = copy.deepcopy(emupredict()[mx:,:]).T
     predinfo['rnd'] = copy.deepcopy(emupredict()[mx:,:]).T
     predinfo['modelrnd'] = copy.deepcopy(emupredict()[mx:,:]).T
     
+
     
     emupredict = emu.predict(xtot, theta)
     emumean = emupredict.mean()
@@ -284,13 +286,21 @@ def loglik(fitinfo, emu, theta, y, x, args):
         term1 = np.sum(stndresid ** 2)
         J = (S0.T / np.sqrt(obsvar)).T
         if J.ndim < 1.5:
+            # I changed this part too
             J = J[:,None].T
+            #stndresid = stndresid[:,None]
         J2 =  J.T @ stndresid
         W, V = np.linalg.eigh(np.eye(J.shape[1]) + J.T @ J)
         J3 = V @ np.diag(1/W) @ V.T @ J2 # np.squeeze(V) @ np.diag(1/W) @ np.squeeze(V).T @ np.squeeze(J2)
         term2 = np.sum(J3 * J2)
         residsq = term1 - term2
         loglik[k] = -0.5 * residsq - 0.5 * np.sum(np.log(W))
+     
+    #THis part is just temporary to make univariate theta to work   
+    # if emumean.shape[1] == 1:
+    #     return float(loglik)
+    # else:
+    #     return loglik
     return loglik
 
 

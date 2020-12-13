@@ -9,7 +9,9 @@ current = os.path.abspath(os.getcwd())
 sys.path.append(os.path.normpath(os.path.join(os.path.dirname(current), '..')))
 from base.emulation import emulator
 from base.calibration import calibrator
-
+# # # # # # # # # # # # # # # # # # # # 
+# # # # ML adjustment approach # # # #  
+# # # # # # # # # # # # # # # # # # # # 
 
 # Read the data
 ball = np.loadtxt('ball.csv', delimiter=',')
