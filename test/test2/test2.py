@@ -21,9 +21,12 @@ def balldropmodel_linear(x, theta):
 class priorphys_lin:
     """ This defines the class instance of priors provided to the method. """
     def lpdf(theta):
-        return np.squeeze(sps.norm.logpdf(theta[:, 0], 0, 5) +  # initial height deviation
-                          sps.gamma.logpdf(theta[:, 1], 2, 0, 10))   # terminal velocity
-
+        if theta.ndim > 1.5:
+            return np.squeeze(sps.norm.logpdf(theta[:, 0], 0, 5) +  # initial height deviation
+                              sps.gamma.logpdf(theta[:, 1], 2, 0, 10))   # terminal velocity
+        else:
+            return np.squeeze(sps.norm.logpdf(theta[0], 0, 5) +  # initial height deviation
+                              sps.gamma.logpdf(theta[1], 2, 0, 10))   # terminal velocity
 
     def rnd(n):
         return np.vstack((sps.norm.rvs(0, 5, size=n),  # initial height deviation

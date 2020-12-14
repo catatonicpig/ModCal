@@ -253,7 +253,7 @@ def loglik(fitinfo, emu, theta, y, x, args):
     emucovxhalf = emupredict.covxhalf()
     loglik = np.zeros(emumean.shape[1])
     if '_info' in dir(emu) and 'extravar' in emu._info:
-        obsvar = obsvar + emu._info['extravar']
+        obsvar = obsvar + np.mean(emu._info['extravar'])
     for k in range(0, emumean.shape[1]):
         m0 = emumean[:,k]
         
@@ -305,7 +305,7 @@ def loglik_gradapprox(fitinfo, emu, theta, y, x, args):
     dterm1 = np.zeros(emu._info['theta'].shape[1])
     dterm2 = np.zeros(emu._info['theta'].shape[1])
     if '_info' in dir(emu) and 'extravar' in emu._info:
-        obsvar = obsvar + emu._info['extravar']
+        obsvar = obsvar + np.mean(emu._info['extravar'])
     for k in range(0, emumean.shape[1]):
         m0 = emumean[:,k]
         dm0 = np.squeeze(emumean_grad[:, k, :])
@@ -354,7 +354,7 @@ def loglik_grad(fitinfo, emu, theta, y, x, args):
     dterm2 = np.zeros(emu._info['theta'].shape[1])
     dterm3 = np.zeros(emu._info['theta'].shape[1])
     if '_info' in dir(emu) and 'extravar' in emu._info:
-        obsvar = obsvar + emu._info['extravar']
+        obsvar = obsvar + np.mean(emu._info['extravar'])
     for k in range(0, emumean.shape[1]):
         m0 = emumean[:,k]
         dm0 = np.squeeze(emumean_grad[:, k, :])
