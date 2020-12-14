@@ -65,7 +65,9 @@ def plot_model_data(description, func_eval, real_data, param_values, title = Non
 # Observe computer model outputs     
 plot_model_data(description, func_eval_rnd, real_data, param_values_rnd)
 
-x = np.reshape(np.tile(range(134), 3), (402, 1))
+x = np.hstack((np.reshape(np.tile(range(134), 3), (402, 1)),
+              np.reshape(np.tile(np.array(('tothosp','totadmiss','icu')),134), (402, 1))))
+x =  np.array(x, dtype='object')
 
 # (No filter) Fit an emulator via 'PCGP_ozge'
 emulator_1 = emulator(x = x, theta = param_values_rnd, f = func_eval_rnd.T, method = 'PCGP_ozge', args = {'is_pca': True}) 
@@ -141,6 +143,14 @@ class prior_covid:
     
 obsvar = np.maximum(0.2*real_data, 5)
 
+
+
+# Calibrator 3
+cal_3 = calibrator(emu = emulator_2, y = real_data, x = x, thetaprior = prior_covid, method = 'directbayes', yvar = obsvar)
+
+cal_3_theta = cal_3.theta.rnd(100)
+plot_pred_interval(cal_3) 
+
 # Calibrator 1
 cal_1 = calibrator(emu = emulator_2, y = real_data, x = x, thetaprior = prior_covid, method = 'MLcal', yvar = obsvar, 
                    args = {'theta0': np.array([2, 4, 4, 1.875, 14, 18, 20, 14, 13, 12]), 
@@ -156,12 +166,3 @@ cal_2 = calibrator(emu = emulator_2, y = real_data, x = x, thetaprior = prior_co
 
 cal_2_theta = cal_2.theta.rnd(1000)
 plot_pred_interval(cal_2) 
-
-# Calibrator 3
-
-import pdb
-pdb.set_trace()
-cal_3 = calibrator(emu = emulator_2, y = real_data, x = x, thetaprior = prior_covid, method = 'directbayes', yvar = obsvar)
-
-cal_3_theta = cal_3.theta.rnd(100)
-plot_pred_interval(cal_3) 

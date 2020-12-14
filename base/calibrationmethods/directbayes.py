@@ -174,43 +174,21 @@ def predict(predinfo, fitinfo, emu, x, args=None):
         obsvar = fitinfo['yvar']
     else:
         raise ValueError('Must provide yvar in this software.')
-    xtot = np.vstack((fitinfo['x'],x))
-    mx =fitinfo['x'].shape[0]
-    emupredict = emu.predict(xtot, theta)
-    meanfull = copy.deepcopy(emupredict()[mx:,:]).T
-    varfull = copy.deepcopy(emupredict.var()[mx:,:]).T
-    #varfull = copy.deepcopy(emupredict()[mx:,:]).T
-    predinfo['rnd'] = copy.deepcopy(emupredict()[mx:,:]).T
-    predinfo['modelrnd'] = copy.deepcopy(emupredict()[mx:,:]).T
+    emupredict = emu.predict(x, theta)
+    predinfo['rnd'] = copy.deepcopy(emupredict()).T
+    predinfo['modelrnd'] = copy.deepcopy(emupredict()).T
     
-
-    
-    emupredict = emu.predict(xtot, theta)
+    emupredict = emu.predict(x, theta)
     emumean = emupredict.mean()
-    emucov = emupredict.covx()
-    xind = range(0,mx)
-    xindnew = range(mx,xtot.shape[0])
+    emucovxhalf = emupredict.covxhalf()
+    varfull = np.sum(np.square(emucovxhalf), axis = 2)
     for k in range(0, theta.shape[0]):
-        m0 = np.squeeze(y) * 0
-        mut = np.squeeze(y) - emupredict()[(xind,k)]
-        m0 = emumean[:,k]
-        St = emucov[:,k,:]
-        St[np.isnan(St)] = 0
-        S0 = St[xind,:][:,xind]
-        S10 = St[xindnew,:][:,xind]
-        S11 =St[xindnew,:][:,xindnew]
-        S0 += np.diag(obsvar)
-        mus0 = emupredict()[(xindnew, k)]
-        meanfull[k, :] = mus0 + S10 @ np.linalg.solve(S0, mut)
-        varfull[k, :] = np.diag(S11 - S10 @ np.linalg.solve(S0, S10.T))
-        Wmat, Vmat = np.linalg.eigh(S11 - S10 @ np.linalg.solve(S0, S10.T))
-        re = Vmat @ np.diag(np.sqrt(np.abs(Wmat))) @ Vmat.T @\
-            sps.norm.rvs(0,1,size=(Vmat.shape[1]))
-        predinfo['rnd'][k,:] = meanfull[k, :]  + re
-        predinfo['modelrnd'][k,:] = mus0
+        re = emucovxhalf[:,k,:] @ sps.norm.rvs(0,1,size=(emucovxhalf.shape[2]))
+        predinfo['rnd'][k,:] += re
+        predinfo['modelrnd'][k,:] += re
         
-    predinfo['mean'] = np.mean(meanfull, 0)
-    varterm1 = np.var(meanfull, 0)
+    predinfo['mean'] = np.mean(emumean, 0)
+    varterm1 = np.var(emumean, 0)
     predinfo['var'] = np.mean(varfull, 0) + varterm1
     return
 
