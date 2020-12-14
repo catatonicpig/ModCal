@@ -39,8 +39,8 @@ tvec = np.concatenate((np.arange(0.1, 4.3, 0.1), np.arange(0.1, 4.3, 0.1)))
 hvec = np.concatenate((25 * np.ones(42), 50 * np.ones(42)))  
 
 # the input of interest
-xtot = (np.vstack((tvec, hvec)).T).astype('object')  
-xtotv = xtot.astype('float')
+xtot = (np.round(np.vstack((tvec, hvec)).T,3)).astype('object')  
+xtotv = np.round(xtot.astype('float'),3)
 xtot[xtot[:,1] == 25, 1] = 'lowdrop'
 xtot[xtot[:,1] == 50, 1] = 'highdrop'
 
