@@ -50,8 +50,8 @@ def plot_model_data(description, func_eval, real_data, param_values, title = Non
 
     for j in range(type_no):
         for i in range(N):
-            p2 = axs[j].plot(range(T), func_eval[i,(j*T):(j*T + T)], color='grey')
-        p1 = axs[j].plot(range(T), real_data[(j*T):(j*T + T)], 'ro' ,markersize = 5, color='red')
+            p2 = axs[j].plot(range(T), func_eval[i,(j*T):(j*T + T)], color='grey', alpha = 0.25)
+        p1 = axs[j].plot(range(T), real_data[(j*T):(j*T + T)], 'ro', markersize = 5, color='red')
         if j == 0:
             axs[j].set_ylabel('COVID-19 Total Hospitalizations')
         elif j == 1:
@@ -77,7 +77,7 @@ emulator_2 = emulator(x = x, theta = param_values_rnd, f = func_eval_rnd.T, meth
 
 def plot_pred_interval(cal):
     pr = cal.predict(x)
-    rndm_m = pr.rnd(s = 1000)
+    rndm_m = pr.rnd(s = 100)
     plt.rcParams["font.size"] = "10"
     fig, axs = plt.subplots(3, figsize=(8, 12))
 
@@ -141,7 +141,7 @@ class prior_covid:
                           sps.norm.rvs(13, 1.5, size=n),
                           sps.norm.rvs(12, 1.5, size=n))).T
     
-obsvar = np.maximum(0.2*real_data, 5)
+obsvar = 5*np.ones(real_data.shape[0]) # np.maximum(0.2*real_data, 5)
 
 
 
@@ -152,17 +152,27 @@ cal_3_theta = cal_3.theta.rnd(100)
 plot_pred_interval(cal_3) 
 
 # Calibrator 1
-cal_1 = calibrator(emu = emulator_2, y = real_data, x = x, thetaprior = prior_covid, method = 'MLcal', yvar = obsvar, 
-                   args = {'theta0': np.array([2, 4, 4, 1.875, 14, 18, 20, 14, 13, 12]), 
-                           'numsamp' : 1000, 'stepType' : 'normal', 
-                           'stepParam' : np.array([0.01, 0.01, 0.01, 0.01, 0.03, 0.03, 0.03, 0.03, 0.03, 0.03])})
+# cal_1 = calibrator(emu = emulator_2, y = real_data, x = x, thetaprior = prior_covid, method = 'MLcal', yvar = obsvar, 
+#                    args = {'theta0': np.array([2, 4, 4, 1.875, 14, 18, 20, 14, 13, 12]), 
+#                            'numsamp' : 1000, 'stepType' : 'normal', 
+#                            'stepParam' : np.array([0.01, 0.01, 0.01, 0.01, 0.03, 0.03, 0.03, 0.03, 0.03, 0.03])})
 
-cal_1_theta = cal_1.theta.rnd(1000) 
-plot_pred_interval(cal_1)
+# #cal_1_theta = cal_1.theta.rnd(1000) 
+# plot_pred_interval(cal_1)
 
-# Calibrator 2
-cal_2 = calibrator(emu = emulator_2, y = real_data, x = x, thetaprior = prior_covid, method = 'MLcal', yvar = obsvar, 
-                   args = {'sampler': 'plumlee'})
+# # Calibrator 2
+# cal_2 = calibrator(emu = emulator_2, y = real_data, x = x, thetaprior = prior_covid, method = 'MLcal', yvar = obsvar, 
+#                    args = {'sampler': 'plumlee'})
 
-cal_2_theta = cal_2.theta.rnd(1000)
-plot_pred_interval(cal_2) 
+# #cal_2_theta = cal_2.theta.rnd(1000)
+# plot_pred_interval(cal_2) 
+
+# Calibrator 3
+
+import pdb
+pdb.set_trace()
+obsvar = 100*np.ones(real_data.shape[0]) 
+cal_3 = calibrator(emu = emulator_2, y = real_data, x = x, thetaprior = prior_covid, method = 'directbayes', yvar = obsvar)
+
+#cal_3_theta = cal_3.theta.rnd(100)
+plot_pred_interval(cal_3) 
