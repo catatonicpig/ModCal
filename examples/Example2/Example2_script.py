@@ -125,6 +125,28 @@ emu_lin = emulator(x = x, theta = thetacompexp_lin, f = lin_results, method = 'P
 # build an emulator for the gravity simulation
 emu_grav = emulator(x = x, theta = thetacompexp_grav, f = grav_results, method = 'PCGPwM')  
 
+def plotpreds(cal, whichtheta):
+    fig, axs = plt.subplots(1, 4, figsize=(20, 5))
+    cal_theta = cal.theta.rnd(1000) 
+    axs[0].plot(cal_theta[:, whichtheta])
+    axs[1].boxplot(cal_theta[:, whichtheta])
+    axs[2].hist(cal_theta[:, whichtheta])
+    # getting a prediction object   
+    post = cal.predict(x)
+    rndm_m = post.rnd(s = 1000)
+        
+    for k in (25,50):
+        inds = np.where(xv[:,1] == k)[0]
+        upper = np.percentile(rndm_m[:, inds], 97.5, axis = 0)
+        lower = np.percentile(rndm_m[:, inds], 2.5, axis = 0)
+        median = np.percentile(rndm_m[:, inds], 50, axis = 0)
+        #axs[3].plot(xv[inds,0], median, 'k--', color = 'black')
+        axs[3].plot(xv[inds,0], balldroptrue(xv[inds,:]), 'k--',linewidth=2)
+        axs[3].fill_between(xv[inds,0], lower, upper, color = 'grey', alpha=0.25)
+        axs[3].plot(xv[inds, 0], y[inds], 'ro', markersize = 5, color='red')
+    
+    plt.show()
+    
 # build calibrators for the linear simulation
 cal_lin_1 = calibrator(emu = emu_lin, y = y, x = x, thetaprior = priorphys_lin, 
                      method = 'directbayes', 
@@ -140,36 +162,15 @@ cal_lin_2 = calibrator(emu = emu_lin, y = y, x = x, thetaprior = priorphys_lin,
 cal_lin_3 = calibrator(emu = emu_lin, y = y, x = x, thetaprior = priorphys_lin, 
                        method = 'MLcal', yvar = obsvar, 
                        args = {'sampler' : 'plumlee'})                            
- 
-# getting a prediction object                           
-pred_lin_1 = cal_lin_1.predict(x) 
-pred_lin_2 = cal_lin_2.predict(x) 
-pred_lin_3 = cal_lin_3.predict(x) 
 
-def plotpreds(axis, pred):
-    preds = pred.rnd(1000)
-    for k in (25,50):
-        inds = np.where(xv[:,1] == k)[0]
-        uppercurve = np.quantile(preds[:, inds],0.975,0)
-        lowercurve = np.quantile(preds[:, inds],0.025,0)
-        p4 = axis.plot(xv[inds,0], balldroptrue(xv[inds,:]), 'k--',linewidth=2)
-        axis.fill_between(xv[inds,0], lowercurve, uppercurve, color='k', alpha=0.25)
-    p1 = axis.plot(np.NaN, np.NaN, color='k', linewidth=3)
-    p2 = axis.fill(np.NaN, np.NaN, 'k', alpha=0.5)
-    p3 = axis.plot(xv,y, 'ro' ,markersize = 8)
-    axis.set_xlim([0,4.2])
-    axis.set_ylim([-5,55])
-    axis.set_xlabel('time')
-    axis.set_ylabel('distance')
-    axis.legend([p4[0],(p2[0], p1[0]), p3[0]], ['truth','prediction','observations'])
-    
-fig, axes = plt.subplots(ncols=3, nrows=1, figsize=(15, 5))
-plotpreds(axes[0], pred_lin_1)
-axes[0].set_title('prediction using linear model (1)')
-plotpreds(axes[1], pred_lin_2)
-axes[1].set_title('prediction using linear model (2)')
-plotpreds(axes[2], pred_lin_3)
-axes[2].set_title('prediction using linear model (3)')
+# visualize posterior draws
+plotpreds(cal_lin_1, 0)
+plotpreds(cal_lin_2, 0)
+plotpreds(cal_lin_3, 0)
+
+plotpreds(cal_lin_1, 1)
+plotpreds(cal_lin_2, 1)
+plotpreds(cal_lin_3, 1)
 
 # build calibrators for the gravity simulation
 cal_grav_1 = calibrator(emu = emu_grav, y = y, x = x, thetaprior = priorphys_grav, 
@@ -186,16 +187,11 @@ cal_grav_2 = calibrator(emu = emu_grav, y = y, x = x, thetaprior = priorphys_gra
 cal_grav_3 = calibrator(emu = emu_grav, y = y, x = x, thetaprior = priorphys_grav, 
                        method = 'MLcal', yvar = obsvar, 
                        args = {'sampler' : 'plumlee'})                            
- 
-# getting a prediction object                           
-pred_grav_1 = cal_grav_1.predict(x) 
-pred_grav_2 = cal_grav_2.predict(x) 
-pred_grav_3 = cal_grav_3.predict(x) 
 
-fig, axes = plt.subplots(ncols=3, nrows=1, figsize=(15, 5))
-plotpreds(axes[0], pred_grav_1)
-axes[0].set_title('prediction using gravity model (1)')
-plotpreds(axes[1], pred_grav_2)
-axes[1].set_title('prediction using gravity model (2)')
-plotpreds(axes[2], pred_grav_3)
-axes[2].set_title('prediction using gravity model (3)')
+plotpreds(cal_grav_1, 0)
+plotpreds(cal_grav_2, 0)
+plotpreds(cal_grav_3, 0)
+
+
+
+    

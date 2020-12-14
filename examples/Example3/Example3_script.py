@@ -104,7 +104,7 @@ def plot_pred(X_std, Y, cal, theta_range):
     lower = np.percentile(rndm_m, 2.5, axis = 0)
     median = np.percentile(rndm_m, 50, axis = 0)
     axs[3].plot(median, color = 'black')
-    axs[3].fill_between(range(0, 21), lower, upper, color = 'grey')
+    axs[3].fill_between(range(0, 21), lower, upper, color = 'grey', alpha = 0.25)
     axs[3].plot(range(0, 21), Y, 'ro', markersize = 5, color='red')
     
     plt.show()
@@ -121,8 +121,8 @@ class prior_balldrop:
     def rnd(n):
         return np.vstack((sps.uniform.rvs(0, 1, size=n)))
     
-obsvar = np.maximum(0.2*Y, 0.1)
-
+#obsvar = np.maximum(0.2*Y, 0.1)
+obsvar = 0.1*np.ones(X_std.shape[0])
 # Fit a calibrator with emulator 1 via via method = 'MLcal' and 'sampler' = metropolis-hastings 
 cal_1 = calibrator(emulator_1, Y, X_std, thetaprior = prior_balldrop, method = 'MLcal', yvar = obsvar, 
                     args = {'theta0': np.array([0.4]), 
