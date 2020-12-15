@@ -169,10 +169,10 @@ plot_pred_interval(cal_3)
 
 # Calibrator 3
 
-import pdb
-pdb.set_trace()
-obsvar = 100*np.ones(real_data.shape[0]) 
-cal_3 = calibrator(emu = emulator_2, y = real_data, x = x, thetaprior = prior_covid, method = 'directbayes', yvar = obsvar)
+# import pdb
+# pdb.set_trace()
+# obsvar = 100*np.ones(real_data.shape[0]) 
+# cal_3 = calibrator(emu = emulator_2, y = real_data, x = x, thetaprior = prior_covid, method = 'directbayes', yvar = obsvar)
 
-#cal_3_theta = cal_3.theta.rnd(100)
-plot_pred_interval(cal_3) 
+# #cal_3_theta = cal_3.theta.rnd(100)
+# plot_pred_interval(cal_3) 
