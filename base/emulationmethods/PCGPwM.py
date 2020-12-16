@@ -83,6 +83,7 @@ def fit(fitinfo, x, theta, f, args):
                 emulist[pcanum]['hypind'] = 1*pcanum
             hypinds[pcanum] = 1*emulist[pcanum]['hypind']
     fitinfo['emulist'] = emulist
+    print(pcanum)
     return
 
 
@@ -248,18 +249,18 @@ def supplementtheta(fitinfo, size, theta, thetachoices, choicecosts, cal, args):
     info : array
         An an optional info dictionary that can pass back to the user.
     """
-    
+    pending = None
+    if ('pending' in args.keys()):
+        pending = args['pending'].T
+        pendvar = __getnewvar(fitinfo, pending)
     if ('includepending' in args.keys()) and (args['includepending'] is True):
         includepending = True
-        if ('pending' in args.keys()):
-            pending = args['pending'].T
-            pendvar = __getnewvar(fitinfo, pending)
-        else:
-            pending = None
         if ('costpending' in args.keys()):
             costpending = args['costpending'] * np.ones(fitinfo['theta'].shape[0])
         else:
             costpending = np.mean(choicecosts) * np.ones(fitinfo['theta'].shape[0])
+    else:
+        includepending = False
     if theta is None: 
         raise ValueError('this method is designed to take in the theta values.')
     
@@ -338,20 +339,20 @@ def supplementtheta(fitinfo, size, theta, thetachoices, choicecosts, cal, args):
     # eliminant some values and see what happens
     info ={}
     info['crit'] = critsave
-    
-    critpend = np.zeros((fitinfo['theta'].shape[0],len(infos)))
-    for k in range(0, len(infos)):
-        if infos[k]['hypind'] == k: #this is to speed things up a bit...
-            Rh = R[infos[k]['hypind']] + np.diag(varpca[:, k])
-            term1 = np.linalg.solve(Rh,rsave[infos[k]['hypind']].T)
-            delta = (pendvar[:,k] - varpca[:fitinfo['theta'].shape[0], k])
-            term3 = np.diag(np.linalg.inv(Rh))[:fitinfo['theta'].shape[0]]
-            critpend[:,k] = -weightma[k] *  delta * np.mean((term1[:fitinfo['theta'].shape[0],:] ** 2),1) \
-                / (1 + delta * term3)
-        else:
-            critpend[:,k] = weightma[k] / weightma[infos[k]['hypind']] * critpend[:, infos[k]['hypind']]
-    critpend = np.sum(critpend,1)
-    info['obviatesugg'] = np.where(np.any(pending,1) *(np.mean(critsave[:size]) > critpend / costpending) > 0.5)[0]
+    if includepending:
+        critpend = np.zeros((fitinfo['theta'].shape[0],len(infos)))
+        for k in range(0, len(infos)):
+            if infos[k]['hypind'] == k: #this is to speed things up a bit...
+                Rh = R[infos[k]['hypind']] + np.diag(varpca[:, k])
+                term1 = np.linalg.solve(Rh,rsave[infos[k]['hypind']].T)
+                delta = (pendvar[:,k] - varpca[:fitinfo['theta'].shape[0], k])
+                term3 = np.diag(np.linalg.inv(Rh))[:fitinfo['theta'].shape[0]]
+                critpend[:,k] = -weightma[k] *  delta * np.mean((term1[:fitinfo['theta'].shape[0],:] ** 2),1) \
+                    / (1 + delta * term3)
+            else:
+                critpend[:,k] = weightma[k] / weightma[infos[k]['hypind']] * critpend[:, infos[k]['hypind']]
+        critpend = np.sum(critpend,1)
+        info['obviatesugg'] = np.where(np.any(pending,1) *(np.mean(critsave[:size]) > critpend / costpending) > 0.5)[0]
     return thetachoicesave, info
 
 
@@ -370,7 +371,7 @@ def __standardizef(fitinfo, offset=None, scale=None):
     f = fitinfo['f']
     mof = fitinfo['mof']
     mofrows = fitinfo['mofrows']
-    epsilon = 10 ** (-1)
+    epsilon = 0.1
     if (offset is not None) and (scale is not None):
         if offset.shape[0] == f.shape[1] and scale.shape[0] == f.shape[1]:
             if np.any(np.nanmean(np.abs(f-offset)/scale,1) > 4):
@@ -487,8 +488,8 @@ def __getnewvar(fitinfo, pending):
 def __fitGP1d(theta, g, gvar=None, hypstarts=None, hypinds=None, prevsubmodel=None):
     """Return a fitted model from the emulator model using smart method."""
     subinfo = {}
-    subinfo['hypregmean'] = np.append(0 + 0.5*np.log(theta.shape[1]) + np.log(np.std(theta, 0)), (0, -20))
-    subinfo['hypregLB'] = np.append(-4 + 0.5*np.log(theta.shape[1]) + np.log(np.std(theta, 0)), (-12, -30))
+    subinfo['hypregmean'] = np.append(0 + 0.5*np.log(theta.shape[1]) + np.log(np.std(theta, 0)), (0, -25))
+    subinfo['hypregLB'] = np.append(-4 + 0.5*np.log(theta.shape[1]) + np.log(np.std(theta, 0)), (-12, -35))
     subinfo['hypregUB'] = np.append(4 + 0.5*np.log(theta.shape[1]) + np.log(np.std(theta, 0)), (2, 0))
     subinfo['hypregstd'] = (subinfo['hypregUB'] - subinfo['hypregLB']) / 8
     subinfo['hypregstd'][-2] = 2
