@@ -195,7 +195,10 @@ class emulator(object):
         """
         if self.__ptf is not None:
             info = {}
-            info['mean'] = self.__ptf(x, theta)
+            if theta is not None:
+                info['mean'] = self.__ptf(x, theta)
+            else:
+                info['mean'] = self.__ptf(x, self.__theta)
             info['var'] = 0 *  info['mean'] 
             info['covxhalf'] = 0 *  np.stack((info['mean'],info['mean']), 2)
             return prediction(info, self)
@@ -284,9 +287,9 @@ class emulator(object):
         """
         
         if args is not None:
-            argstemp = {**self._args, **copy.deepcopy(args)} #properly merge the arguments
+            argstemp = {**self._args, **args} #properly merge the arguments
         else:
-            argstemp = copy.copy(self._args)
+            argstemp = self._args
         
         if removereps is None:
             if x is not None:
@@ -362,7 +365,6 @@ class emulator(object):
                 raise ValueError('cal.theta(n) produces the wrong shape.')
         else:
             theta = None
-        
         if thetachoices is not None:
             supptheta, suppinfo = self.method.supplementtheta(self._info, copy.copy(size),
                                                               copy.copy(theta),
@@ -592,18 +594,18 @@ class emulator(object):
                     self.__options['thetarmnan'] = 0
                 else:
                     self.__options['thetarmnan'] =  1 + (10** (-12))
-            elif options['thetarmnan'] is str and options['thetarmnan']=='any':
+            elif isinstance(options['thetarmnan'],str) and options['thetarmnan']=='any':
                     self.__options['thetarmnan'] = 0
-            elif options['thetarmnan'] is str and options['thetarmnan']=='some':
+            elif isinstance(options['thetarmnan'],str) and options['thetarmnan']=='some':
                     self.__options['thetarmnan'] = 0.2
-            elif options['thetarmnan'] is str and options['thetarmnan']=='most':
+            elif isinstance(options['thetarmnan'],str) and options['thetarmnan']=='most':
                     self.__options['thetarmnan'] = 0.5
-            elif options['thetarmnan'] is str and options['thetarmnan']=='alot':
+            elif isinstance(options['thetarmnan'],str) and options['thetarmnan']=='alot':
                     self.__options['thetarmnan'] = 0.8
-            elif options['thetarmnan'] is str and options['thetarmnan']=='all':
-                    self.__options['thetarmnan'] = 1 - (10** (-12))
-            elif options['thetarmnan'] is str and options['thetarmnan']=='never':
-                    self.__options['thetarmnan'] = 1 + (10** (-12))
+            elif isinstance(options['thetarmnan'],str) and options['thetarmnan']=='all':
+                    self.__options['thetarmnan'] = 1 - (10** (-8))
+            elif isinstance(options['thetarmnan'],str)  and options['thetarmnan']=='never':
+                    self.__options['thetarmnan'] = 1 + (10** (-8))
             elif np.isfinite(options['thetarmnan']) and options['thetarmnan']>=0\
                 and options['thetarmnan']<=1:
                 self.__options['thetarmnan'] = options['thetarmnan']
@@ -627,9 +629,9 @@ class emulator(object):
             elif isinstance(options['xrmnan'],str) and options['xrmnan']=='alot':
                     self.__options['xrmnan'] = 0.8
             elif isinstance(options['xrmnan'],str) and options['xrmnan']=='all':
-                    self.__options['xrmnan'] = 1- (10** (-12))
+                    self.__options['xrmnan'] = 1- (10** (-8))
             elif isinstance(options['xrmnan'],str) and  options['xrmnan']=='never':
-                    self.__options['xrmnan'] = 1 + (10** (-12))
+                    self.__options['xrmnan'] = 1 + (10** (-8))
             elif np.isfinite(options['xrmnan']) and options['xrmnan']>=0\
                 and options['xrmnan']<=1:
                 self.__options['xrmnan'] = options['xrmnan']

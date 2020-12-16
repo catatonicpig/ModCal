@@ -33,13 +33,13 @@ class thetaprior:
     def lpdf(theta):
         if theta.ndim > 1.5:
             logprior = -50 * np.sum((theta - 0.6) ** 2, axis=1)
-            logprior += 0.5*np.log(2-np.sum(np.abs(theta - 0.5), axis=1))
+            logprior += 2*np.log(2-np.sum(np.abs(theta - 0.5), axis=1))
             flag = np.sum(np.abs(theta - 0.5), axis=1) > 2
             logprior[flag] = -np.inf
             logprior = np.array(logprior,ndmin=1)
         else:
             logprior = -50 * np.sum((theta - 0.6) ** 2)
-            logprior += 0.5*np.log(2-np.sum(np.abs(theta - 0.5)))
+            logprior += 2*np.log(2-np.sum(np.abs(theta - 0.5)))
             if np.sum(np.abs(theta - 0.5)) > 2:
                 logprior = -np.inf
             logprior = np.array(logprior,ndmin=1)
@@ -140,7 +140,7 @@ indsstar= np.where(cal.theta.lpdf(thetaeval) > -20)[0]
 Lfull = np.nanmean(feval ** 2,1)
 Lfull = -1 / 2 * np.nansum(feval ** 2,1) - (1 ** 2)/2*np.sum(np.isnan(feval),1)
 mLfull = np.max(Lfull[np.isfinite(Lfull)])
-indfocus = np.where(np.logical_and(Lfull > np.max(Lfull) - 80, np.sum(np.isnan(feval),1) < 20))[0]
+indfocus = np.where(np.logical_and(Lfull > np.max(Lfull) - 80, np.sum(np.isnan(feval),1) < 1))[0]
 
 plt.plot(Lfull[indfocus], cal.theta.lpdf(thetaeval[indfocus]),'.')
 plt.plot(Lfull[indfocus], Lfull[indfocus]-Lfull[indfocus[5]]+cal.theta.lpdf(thetaeval[indfocus])[5],'-')
