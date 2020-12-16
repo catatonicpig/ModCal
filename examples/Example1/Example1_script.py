@@ -31,17 +31,24 @@ def balldropmodel_grav(x, theta):
 class priorphys_lin:
     """ This defines the class instance of priors provided to the method. """
     def lpdf(theta):
-        return np.squeeze(sps.norm.logpdf(theta[:, 0], 0, 5) +  # initial height deviation
-                          sps.gamma.logpdf(theta[:, 1], 2, 0, 10))   # terminal velocity
+        if theta.ndim > 1.5:
+            return np.squeeze(sps.norm.logpdf(theta[:, 0], 0, 5) +  # initial height deviation
+                              sps.gamma.logpdf(theta[:, 1], 2, 0, 10))   # terminal velocity
+        else:
+            return np.squeeze(sps.norm.logpdf(theta[0], 0, 5) +  # initial height deviation
+                              sps.gamma.logpdf(theta[1], 2, 0, 10))   # terminal velocity
 
     def rnd(n):
         return np.vstack((sps.norm.rvs(0, 5, size=n),  # initial height deviation
                           sps.gamma.rvs(2, 0, 10, size=n))).T  # terminal velocity
-
+     
 class priorphys_grav:
     """ This defines the class instance of priors provided to the method. """
     def lpdf(theta):
-        return np.squeeze(sps.gamma.logpdf(theta, 2, 0, 5))  # gravity
+        if theta.ndim > 1.5:
+            return np.squeeze(sps.gamma.logpdf(theta[:, 0], 2, 0, 5))  # gravity
+        else:
+            return np.squeeze(sps.gamma.logpdf(theta, 2, 0, 5))  # gravity
 
     def rnd(n):
         return np.reshape(sps.gamma.rvs(2, 0, 5, size=n), (-1,1))  # gravity
@@ -50,10 +57,10 @@ class priorphys_grav:
 tvec = np.concatenate((np.arange(0.1, 4.3, 0.1), np.arange(0.1, 4.3, 0.1))) 
 
 # the drop heights vector of interest
-hvec = np.concatenate((25 * np.ones(42), 50 * np.ones(42)))  
+h0vec = np.concatenate((25 * np.ones(42), 50 * np.ones(42)))  
 
 # the input of interest
-xtot = (np.vstack((tvec, hvec)).T).astype('object')  
+xtot = (np.vstack((tvec, h0vec)).T).astype('object')  
 xtotv = xtot.astype('float')
 xtot[xtot[:,1] == 25, 1] = 'lowdrop'
 xtot[xtot[:,1] == 50, 1] = 'highdrop'

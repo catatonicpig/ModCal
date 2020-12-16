@@ -26,9 +26,3 @@ Although there are many model parameters, we estimated most of them based on the
 
 [Link to Example 4](http://localhost:8888/notebooks/Desktop/GitHub_Folders/ModCal/examples/Example4/Example4_nb.ipynb)
   
-# Example 5
-
-To illustrate how we can utilize machine learning algorithms when calibrating the parameters, we introduce our approach.
-
-[Link to Example 5](http://localhost:8888/notebooks/Desktop/GitHub_Folders/ModCal/examples/Example5/Example5_nb.ipynb)
-  
