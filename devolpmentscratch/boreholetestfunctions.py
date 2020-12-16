@@ -3,6 +3,16 @@
 import numpy as np
 
 
+def borehole_failmodel(x, theta):
+    """Given x and theta, return matrix of [row x] times [row theta] of values."""
+
+    f = borehole_model(x, theta)
+    wheretoobig = np.where( (f / borehole_true(x)) > 1.25)
+    f[wheretoobig[0],wheretoobig[1]] = np.inf
+    
+    return f
+
+
 def borehole_model(x, theta):
     """Given x and theta, return matrix of [row x] times [row theta] of values."""
 
@@ -37,7 +47,9 @@ def borehole_vec(x, theta):
     denom2 = Treff
     
     f = ((numer / ((denom1 + denom2))) * np.exp(powparam * rw)).reshape(-1)
+    
     return f
+
 
 
 def tstd2theta(tstd, hard=True):

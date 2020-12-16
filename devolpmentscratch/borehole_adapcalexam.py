@@ -7,7 +7,7 @@ import os
 import copy
 import time
 from line_profiler import LineProfiler
-from boreholetestfunctions import borehole_model, borehole_true
+from boreholetestfunctions import borehole_model, borehole_failmodel, borehole_true
 SCRIPT_DIR = os.path.dirname(os.path.realpath(
     os.path.join(os.getcwd(), os.path.expanduser(__file__))))
 sys.path.append(os.path.normpath(os.path.join(SCRIPT_DIR, '..')))
@@ -28,9 +28,11 @@ x[:,2] = x[:,2] > 0.5
 yt = np.squeeze(borehole_true(x))
 yvar = (10 ** (-2)) * np.ones(yt.shape)
 thetatot = (thetaprior.rnd(15))
-f = (borehole_model(x, thetatot).T ).T
+f = (borehole_failmodel(x, thetatot).T ).T
 y = yt + sps.norm.rvs(0,np.sqrt(yvar))
-emu = emulator(x, thetatot, f, method = 'PCGPwM', options = {'xrmnan': 'all'})
+emu = emulator(x, thetatot, f, method = 'PCGPwM', options = {'xrmnan': 'all',
+                                                             'thetarmnan': 'never',
+                                                             'return_grad': True})
 emu.fit()
 emu2 = emulator(passthroughfunc = borehole_model)
 cal2 = calibrator( emu2, y, x, thetaprior, yvar, method = 'directbayes')
@@ -73,8 +75,10 @@ thetaidqueue = np.zeros(0)
 xidqueue = np.zeros(0)
 pending = np.full(f.shape, False)
 complete = np.full(f.shape, True)
+cancelled = np.full(f.shape, False)
+failures = np.logical_not(np.isfinite(f))
 thetaspending = np.full(f.shape[0], False)
-numperbatch = 120
+numperbatch = 250
 for k in range(0,20):
     print('Percentage Cancelled: %0.2f ( %d / %d)' % (100*np.round(np.mean(1-pending-complete),4),
                                                     np.sum(1-pending-complete),
@@ -85,37 +89,32 @@ for k in range(0,20):
     print('Percentage Complete: %0.2f ( %d / %d)' % (100*np.round(np.mean(complete),4),
                                                     np.sum(complete),
                                                     np.prod(pending.shape)))
-    numnewtheta = 14
+    numnewtheta = 10
     keepadding = True
-    while keepadding:
+    while keepadding and (k>-1):
         numnewtheta += 2
         thetachoices = cal.theta(200)
         choicescost = np.ones(thetachoices.shape[0])
-        if np.sum(pending) > 0:
-            thetaspending = np.where(np.any(pending,0))[0]
-            thetachoices = np.vstack((thetatot[thetaspending,:], thetachoices))
-            v1 = (np.sum(pending[:,thetaspending],0)/x.shape[0]) ** 10
-            v1 = 10 ** (-2) + (1-10 ** (-2)) * (v1 > 0.999999)
-            choicescost = np.append(v1, choicescost)
         thetaneworig, info = emu.supplement(size = numnewtheta, thetachoices = thetachoices, 
                                         choicescost = choicescost,
-                                        removereps = False,
-                                        cal = cal, overwrite=True)
-        if np.sum(pending) > 0:
-            nctheta, _, _ = matrixmatching(thetatot, thetaneworig)
-            ncthetaold, _, _ = matrixmatching(thetaneworig,thetatot)
-            pending[:, ncthetaold] = False #obviation
-            nctr, _, _ = matrixmatching(thetaneworig,thetachoices)
-            for k in ncthetaold:
+                                        cal = cal, overwrite=True,
+                                        args = {'includepending': True,
+                                              'costpending': 0.01+0.99*np.mean(pending,0),
+                                              'pending': pending})
+        thetaneworig = thetaneworig[:numnewtheta,:]
+        thetanew = thetaneworig
+        if info['obviatesugg'].shape[0] > 0:
+            pending[:, info['obviatesugg']] = False
+            print('obviating')
+            print(info['obviatesugg'])
+            for k in info['obviatesugg']:
                 queue2delete = np.where(thetaidqueue == k)[0]
                 if queue2delete.shape[0] > 0.5:
                     thetaidqueue = np.delete(thetaidqueue,queue2delete,0)
                     xidqueue = np.delete(xidqueue,queue2delete,0)
-            thetanew = thetaneworig[nctheta,:]
-        else:
-            thetanew = thetaneworig
         
-        if thetanew.shape[0] > 0.5:
+        if (thetanew.shape[0] > 0.5) and \
+            (np.sum(np.hstack((pending,np.full((x.shape[0],thetanew.shape[0]),True)))) > 600):
             pending = np.hstack((pending,np.full((x.shape[0],thetanew.shape[0]),True)))
             complete = np.hstack((complete,np.full((x.shape[0],thetanew.shape[0]),False)))
             f = np.hstack((f,np.full((x.shape[0],thetanew.shape[0]),np.nan)))
@@ -129,26 +128,15 @@ for k in range(0,20):
             else:
                 thetaidqueue = np.append(thetaidqueue,thetaidnewqueue)
                 xidqueue = np.append(xidqueue,xidnewqueue)
-        c,nc,r = matrixmatching(thetaneworig,thetatot)
-        #cx,ncx,rx = matrixmatching(info['orderedx'],x)
-        priorityscore = np.zeros(thetaidqueue.shape)
-        ncx = np.random.choice(np.arange(0,x.shape[0]),
-                                    size=x.shape[0],replace=False)
-        #nc = np.random.choice(np.arange(0,thetatot.shape[0]),
-        #                            size=thetatot.shape[0],replace=False)
-        for l in range(0,nc.shape[0]):
-            priorityscore[thetaidqueue == nc[l]] += l
-        for l in range(0,ncx.shape[0]):
-            priorityscore[xidqueue == ncx[l]] += thetatot.shape[0] * l
-        priorityscore = np.random.choice(np.arange(0,priorityscore.shape[0]),
-                                    size=priorityscore.shape[0],replace=False)
-        if np.sum(pending) > 600:
-             keepadding = False
+            keepadding = False
+    priorityscore = np.zeros(thetaidqueue.shape)
+    priorityscore = np.random.choice(np.arange(0,priorityscore.shape[0]),
+                                size=priorityscore.shape[0],replace=False)
     queuerearr = np.argsort(priorityscore)
     xidqueue = xidqueue[queuerearr]
     thetaidqueue = thetaidqueue[queuerearr]
     for l in range(0,np.minimum(xidqueue.shape[0],numperbatch)):
-        f[xidqueue[l], thetaidqueue[l]] = borehole_model(x[xidqueue[l],:],
+        f[xidqueue[l], thetaidqueue[l]] = borehole_failmodel(x[xidqueue[l],:],
                                                          thetatot[thetaidqueue[l],:])
         pending[xidqueue[l], thetaidqueue[l]] = False
         complete[xidqueue[l], thetaidqueue[l]] = True

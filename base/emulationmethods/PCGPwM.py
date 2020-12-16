@@ -59,7 +59,7 @@ def fit(fitinfo, x, theta, f, args):
     if 'emulist' in fitinfo.keys():
         hypstarts = np.zeros((numpcs, fitinfo['emulist'][0]['hyp'].shape[0]))
         hypinds = -1*np.ones(numpcs)
-        for pcanum in range(0, len(fitinfo['emulist'])):
+        for pcanum in range(0, min(numpcs, len(fitinfo['emulist']))):
             hypstarts[pcanum, :] = fitinfo['emulist'][pcanum]['hyp']
             hypinds[pcanum] = fitinfo['emulist'][pcanum]['hypind']
         emulist = [dict() for x in range(0, numpcs)]
@@ -124,7 +124,6 @@ def predict(predinfo, fitinfo, x, theta, args={}):
     return_grad = False
     if args is not None and 'return_grad' in args.keys() and args['return_grad'] is True:
         return_grad = True
-    
     infos = fitinfo['emulist']
     predvecs = np.zeros((theta.shape[0], len(infos)))
     predvars = np.zeros((theta.shape[0], len(infos)))
@@ -249,6 +248,18 @@ def supplementtheta(fitinfo, size, theta, thetachoices, choicecosts, cal, args):
     info : array
         An an optional info dictionary that can pass back to the user.
     """
+    
+    if ('includepending' in args.keys()) and (args['includepending'] is True):
+        includepending = True
+        if ('pending' in args.keys()):
+            pending = args['pending'].T
+            pendvar = __getnewvar(fitinfo, pending)
+        else:
+            pending = None
+        if ('costpending' in args.keys()):
+            costpending = args['costpending'] * np.ones(fitinfo['theta'].shape[0])
+        else:
+            costpending = np.mean(choicecosts) * np.ones(fitinfo['theta'].shape[0])
     if theta is None: 
         raise ValueError('this method is designed to take in the theta values.')
     
@@ -258,13 +269,14 @@ def supplementtheta(fitinfo, size, theta, thetachoices, choicecosts, cal, args):
     varpca = copy.copy(fitinfo['pcstdvar'])
     mof = copy.copy(fitinfo['mof'])
     thetaposs = thetachoices
+    
     rsave = np.array(np.ones(len(infos)), dtype=object)
     rposssave = np.array(np.ones(len(infos)), dtype=object)
     rnewsave = np.array(np.ones(len(infos)), dtype=object)
     R = np.array(np.ones(len(infos)), dtype=object)
+    
     crit = np.zeros(thetaposs.shape[0])
     weightma = np.mean(fitinfo['pct'] ** 2,0)
-    
     for k in range(0, len(infos)):
         if infos[k]['hypind'] == k:
             rsave[k] = (1-infos[k]['nug']) * __covmat(theta, thetaold, infos[k]['hypcov'])
@@ -273,22 +285,35 @@ def supplementtheta(fitinfo, size, theta, thetachoices, choicecosts, cal, args):
             R[k] = __covmat(thetaold, thetaold, infos[k]['hypcov'])
             R[k] = (1-infos[k]['nug']) * R[k] + np.eye(R[k].shape[0]) * infos[k]['nug']
     critsave = np.zeros(thetaposs.shape[0])
-    for j in range(0,4*size):
-        crit = 0*crit
+    
+    critcount = np.zeros((crit.shape[0],len(infos)))
+    if pending is None:
+        varpcause = 1*varpca
+    else:
+        varpcause = 1*pendvar
+    
+    thetachoicesave = np.zeros((4*size, fitinfo['theta'].shape[1]))
+    for j in range(0,size):
+        critcount = np.zeros((crit.shape[0],len(infos)))
         if thetaposs.shape[0] < 1.5:
             thetaold = np.vstack((thetaold, thetaposs))
             break
         for k in range(0, len(infos)):
             if infos[k]['hypind'] == k: #this is to speed things up a bit...
-                Rh = R[infos[k]['hypind']] + np.diag(varpca[:, k])
+                Rh = R[infos[k]['hypind']] + np.diag(varpcause[:, k])
                 p = rnewsave[infos[k]['hypind']]
                 term1 = np.linalg.solve(Rh,rposssave[infos[k]['hypind']].T)
                 q = rsave[infos[k]['hypind']] @ term1
                 r = rposssave[infos[k]['hypind']].T * term1
-                crit += weightma[k] * np.mean((p.T-q) ** 2,0) / np.abs(1 - np.sum(r,0))
+                critcount[:,k] = weightma[k] * np.mean((p.T-q) ** 2,0) / np.abs(1 - np.sum(r,0))
+            else:
+                critcount[:,k] = weightma[k] / weightma[infos[k]['hypind']] *\
+                   critcount[:, infos[k]['hypind']]
+        crit = np.sum(critcount,1)
         jstar = np.argmax(crit / choicecosts)
         critsave[j] = crit[jstar] / choicecosts[jstar]
         thetaold = np.vstack((thetaold, thetaposs[jstar]))
+        thetachoicesave[j] = thetaposs[jstar]
         thetaposs = np.delete(thetaposs, jstar, 0)
         for k in range(0, len(infos)):
             if infos[k]['hypind'] == k:
@@ -300,18 +325,34 @@ def supplementtheta(fitinfo, size, theta, thetachoices, choicecosts, cal, args):
                 rsave[k] = np.hstack((rsave[k], rnewsave[k][jstar,:][:,None]))
                 rnewsave[k] = np.delete(rnewsave[k], jstar, 0)
         crit = np.delete(crit, jstar)
+        critcount = np.delete(critcount, jstar, 0)
         choicecosts = np.delete(choicecosts, jstar)
+        varpcause = np.vstack((varpcause,0*varpca[0, :]))
         varpca = np.vstack((varpca,0*varpca[0, :]))
-    for k in range(0, len(infos)):
-        if infos[k]['hypind'] == k:
-            rsave[k] = (1-infos[k]['nug']) * __covmat(theta, thetaold, infos[k]['hypcov'])
-            R[k] = __covmat(thetaold, thetaold, infos[k]['hypcov'])
-            R[k] = (1-infos[k]['nug']) * R[k] + np.eye(R[k].shape[0]) * infos[k]['nug']
+        for k in range(0, len(infos)):
+            if infos[k]['hypind'] == k:
+                rsave[k] = (1-infos[k]['nug']) * __covmat(theta, thetaold, infos[k]['hypcov'])
+                R[k] = __covmat(thetaold, thetaold, infos[k]['hypcov'])
+                R[k] = (1-infos[k]['nug']) * R[k] + np.eye(R[k].shape[0]) * infos[k]['nug']
     
     # eliminant some values and see what happens
     info ={}
     info['crit'] = critsave
-    return thetaold[norig:(norig+size),:], info
+    
+    critpend = np.zeros((fitinfo['theta'].shape[0],len(infos)))
+    for k in range(0, len(infos)):
+        if infos[k]['hypind'] == k: #this is to speed things up a bit...
+            Rh = R[infos[k]['hypind']] + np.diag(varpca[:, k])
+            term1 = np.linalg.solve(Rh,rsave[infos[k]['hypind']].T)
+            delta = (pendvar[:,k] - varpca[:fitinfo['theta'].shape[0], k])
+            term3 = np.diag(np.linalg.inv(Rh))[:fitinfo['theta'].shape[0]]
+            critpend[:,k] = -weightma[k] *  delta * np.mean((term1[:fitinfo['theta'].shape[0],:] ** 2),1) \
+                / (1 + delta * term3)
+        else:
+            critpend[:,k] = weightma[k] / weightma[infos[k]['hypind']] * critpend[:, infos[k]['hypind']]
+    critpend = np.sum(critpend,1)
+    info['obviatesugg'] = np.where(np.any(pending,1) *(np.mean(critsave[:size]) > critpend / costpending) > 0.5)[0]
+    return thetachoicesave, info
 
 
 """
@@ -329,7 +370,7 @@ def __standardizef(fitinfo, offset=None, scale=None):
     f = fitinfo['f']
     mof = fitinfo['mof']
     mofrows = fitinfo['mofrows']
-    epsilon = 1 #10 ** (-3)
+    epsilon = 10 ** (-1)
     if (offset is not None) and (scale is not None):
         if offset.shape[0] == f.shape[1] and scale.shape[0] == f.shape[1]:
             if np.any(np.nanmean(np.abs(f-offset)/scale,1) > 4):
@@ -381,7 +422,7 @@ def __standardizef(fitinfo, offset=None, scale=None):
     return
 
 
-def __PCs(fitinfo, pct=None, pcti=None, pcw=None, extravar=None):
+def __PCs(fitinfo):
     "Creates BLANK."
     # Extracting from input dictionary
     f = fitinfo['f']
@@ -390,26 +431,13 @@ def __PCs(fitinfo, pct=None, pcti=None, pcw=None, extravar=None):
     mofrows = fitinfo['mofrows']
     theta = fitinfo['theta']
     epsilon = fitinfo['epsilon']
-    PCAskip = False
-    if (pct is not None) and (pcw is not None) and (extravar is not None):
-        if pct.shape[0] == fs.shape[1] and extravar.shape[0] == fs.shape[1]:
-            newextravar = np.mean((fs - (fs @ pcti) @ pct.T) ** 2, 0)
-            newpcw = np.sqrt(np.mean((fs @ pcti) ** 2,0))
-            if np.any(newpcw > 4) or np.any(np.sqrt(newextravar/extravar) > 4):
-                pct = None
-                pcw = None
-                extravar = None
-            else:
-                PCAskip = True
-        else:
-            pct = None
-            pcw = None
-            extravar = None
-    if pct is None or pcw is None or extravar is None:
-        U, S, _ = np.linalg.svd(fs.T, full_matrices=False)
-        Sp = S ** 2 - epsilon
-        pct = U[:, Sp > 0]
-        pcw = np.sqrt(Sp[Sp > 0])
+    pct = None
+    pcw = None
+    extravar = None
+    U, S, _ = np.linalg.svd(fs.T, full_matrices=False)
+    Sp = S ** 2 - epsilon
+    pct = U[:, Sp > 0]
+    pcw = np.sqrt(Sp[Sp > 0])
     pc = fs @ pct
     pcstdvar = np.zeros((f.shape[0],pct.shape[1]))
     if mof is not None:
@@ -423,31 +451,44 @@ def __PCs(fitinfo, pct=None, pcti=None, pcw=None, extravar=None):
             pc[rv,:] = (pcw ** 2 /epsilon + 1) * (J - H @ np.linalg.solve(Amat, J))
             Qmat = np.diag(epsilon / pcw ** 2) + H
             term3 = np.diag(H) - np.sum(H * spla.solve(Qmat,H,assume_a='pos'),0)
-            pcstdvar[rv, :] = np.abs(1 - (pcw ** 2 /epsilon +1) * term3)
-    if  PCAskip:
-        fitinfo['pcw'] = 1*pcw
-        fitinfo['pct'] = 1*pct
-        fitinfo['pcti'] = 1*pcti
-        fitinfo['extravar'] =1*extravar
-        fitinfo['pc'] = 1*pc
-        fitinfo['pcstdvar'] = 1*pcstdvar
-        fitinfo['PCAskip'] = PCAskip
-    else:
-        fitinfo['pcw'] = pcw
-        fitinfo['pct'] = pct * pcw / np.sqrt(pc.shape[0])
-        fitinfo['pcti'] = pct  * (np.sqrt(pc.shape[0])/ pcw)
-        fitinfo['pc'] = pc  * (np.sqrt(pc.shape[0]) / pcw)
-        fitinfo['extravar'] = np.mean((fs - fitinfo['pc'] @ fitinfo['pct'].T) ** 2, 0) *\
-            (fitinfo['scale'] ** 2)
-        fitinfo['pcstdvar'] = 1*pcstdvar
-        fitinfo['PCAskip'] = PCAskip
+            pcstdvar[rv, :] = 1 - (pcw ** 2 /epsilon +1) * term3
+    fitinfo['pcw'] = pcw
+    fitinfo['pcto'] = 1*pct
+    fitinfo['pct'] = pct * pcw / np.sqrt(pc.shape[0])
+    fitinfo['pcti'] = pct  * (np.sqrt(pc.shape[0])/ pcw)
+    fitinfo['pc'] = pc  * (np.sqrt(pc.shape[0]) / pcw)
+    fitinfo['extravar'] = np.mean((fs - fitinfo['pc'] @ fitinfo['pct'].T) ** 2, 0) *\
+        (fitinfo['scale'] ** 2)
+    fitinfo['pcstdvar'] = 10*pcstdvar
     return
+
+
+def __getnewvar(fitinfo, pending):
+    "Creates BLANK."
+    # Extracting from input dictionary
+    pct = copy.copy(fitinfo['pcto'])
+    pcw = copy.copy(fitinfo['pcw'])
+    epsilon = fitinfo['epsilon']
+    
+    realfail = np.logical_and(np.logical_not(pending), fitinfo['mof'])
+    
+    failrows = np.where(np.any(realfail,1))[0]
+    pcstdvar = np.zeros((pending.shape[0],pct.shape[1]))
+    for j in range(0, failrows.shape[0]):
+        rv = failrows[j]
+        wherenotmof = np.where(realfail[rv,:] < 0.5)[0]
+        H = pct[wherenotmof,:].T @ pct[wherenotmof,:]
+        Hp = np.diag(pcw ** 2 + epsilon) @ H
+        Qmat = np.diag(epsilon / pcw ** 2) + H
+        term3 = np.diag(H) - np.sum(H * spla.solve(Qmat,H,assume_a='pos'),0)
+        pcstdvar[rv, :] = 1 - (pcw ** 2 /epsilon +1) * term3
+    return (10*pcstdvar)
 
 def __fitGP1d(theta, g, gvar=None, hypstarts=None, hypinds=None, prevsubmodel=None):
     """Return a fitted model from the emulator model using smart method."""
     subinfo = {}
-    subinfo['hypregmean'] = np.append(0 + 0.5*np.log(theta.shape[1]) + np.log(np.std(theta, 0)), (0, -10))
-    subinfo['hypregLB'] = np.append(-4 + 0.5*np.log(theta.shape[1]) + np.log(np.std(theta, 0)), (-12, -20))
+    subinfo['hypregmean'] = np.append(0 + 0.5*np.log(theta.shape[1]) + np.log(np.std(theta, 0)), (0, -20))
+    subinfo['hypregLB'] = np.append(-4 + 0.5*np.log(theta.shape[1]) + np.log(np.std(theta, 0)), (-12, -30))
     subinfo['hypregUB'] = np.append(4 + 0.5*np.log(theta.shape[1]) + np.log(np.std(theta, 0)), (2, 0))
     subinfo['hypregstd'] = (subinfo['hypregUB'] - subinfo['hypregLB']) / 8
     subinfo['hypregstd'][-2] = 2
