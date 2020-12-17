@@ -4,8 +4,6 @@ import sys
 import os
 from random import sample
 import scipy.stats as sps
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import confusion_matrix
 current = os.path.abspath(os.getcwd())
 sys.path.append(os.path.normpath(os.path.join(os.path.dirname(current), '..')))
 from base.calibration import calibrator 
@@ -141,38 +139,27 @@ class prior_covid:
                           sps.norm.rvs(13, 1.5, size=n),
                           sps.norm.rvs(12, 1.5, size=n))).T
     
-obsvar = 5*np.ones(real_data.shape[0]) # np.maximum(0.2*real_data, 5)
+obsvar = np.maximum(0.2*real_data, 5) #5*np.ones(real_data.shape[0]) # np.maximum(0.2*real_data, 5)
 
 
+# Calibrator 1
+cal_1 = calibrator(emu = emulator_2, y = real_data, x = x, thetaprior = prior_covid, method = 'MLcal', yvar = obsvar, 
+                    args = {'theta0': np.array([2, 4, 4, 1.875, 14, 18, 20, 14, 13, 12]), 
+                            'numsamp' : 1000, 'stepType' : 'normal', 
+                            'stepParam' : np.array([0.01, 0.01, 0.01, 0.01, 0.03, 0.03, 0.03, 0.03, 0.03, 0.03])})
 
+plot_pred_interval(cal_1)
+
+# Calibrator 2
+cal_2 = calibrator(emu = emulator_2, y = real_data, x = x, thetaprior = prior_covid, method = 'MLcal', yvar = obsvar, 
+                    args = {'sampler': 'plumlee'})
+
+plot_pred_interval(cal_2) 
+
+# import pdb
+# pdb.set_trace()
 # Calibrator 3
 cal_3 = calibrator(emu = emulator_2, y = real_data, x = x, thetaprior = prior_covid, method = 'directbayes', yvar = obsvar)
 
 cal_3_theta = cal_3.theta.rnd(100)
 plot_pred_interval(cal_3) 
-
-# Calibrator 1
-# cal_1 = calibrator(emu = emulator_2, y = real_data, x = x, thetaprior = prior_covid, method = 'MLcal', yvar = obsvar, 
-#                    args = {'theta0': np.array([2, 4, 4, 1.875, 14, 18, 20, 14, 13, 12]), 
-#                            'numsamp' : 1000, 'stepType' : 'normal', 
-#                            'stepParam' : np.array([0.01, 0.01, 0.01, 0.01, 0.03, 0.03, 0.03, 0.03, 0.03, 0.03])})
-
-# #cal_1_theta = cal_1.theta.rnd(1000) 
-# plot_pred_interval(cal_1)
-
-# # Calibrator 2
-# cal_2 = calibrator(emu = emulator_2, y = real_data, x = x, thetaprior = prior_covid, method = 'MLcal', yvar = obsvar, 
-#                    args = {'sampler': 'plumlee'})
-
-# #cal_2_theta = cal_2.theta.rnd(1000)
-# plot_pred_interval(cal_2) 
-
-# Calibrator 3
-
-# import pdb
-# pdb.set_trace()
-# obsvar = 100*np.ones(real_data.shape[0]) 
-# cal_3 = calibrator(emu = emulator_2, y = real_data, x = x, thetaprior = prior_covid, method = 'directbayes', yvar = obsvar)
-
-# #cal_3_theta = cal_3.theta.rnd(100)
-# plot_pred_interval(cal_3) 
