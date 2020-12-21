@@ -161,8 +161,12 @@ def loglik(fitinfo, emulator, theta, y, x, args):
             s0 = emucov[:, k, :].reshape((n, n))
             CovMat = s0 + np.diag(np.squeeze(obsvar))
         else:
-            s0 = emucov[:, k].reshape((n, 1))
-            CovMat = np.diag(np.squeeze(s0)) + np.diag(np.squeeze(obsvar))
+            if n == 1:
+                s0 = emucov[:, k].reshape((n, 1))
+                CovMat = np.diag(s0) + np.diag(obsvar)
+            else:     
+                s0 = emucov[:, k].reshape((n, 1))
+                CovMat = np.diag(np.squeeze(s0)) + np.diag(np.squeeze(obsvar))
             
         # Get the decomposition of covariance matrix
         CovMatEigS, CovMatEigW = np.linalg.eigh(CovMat)

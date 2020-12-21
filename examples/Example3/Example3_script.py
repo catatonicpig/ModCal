@@ -72,7 +72,7 @@ print(np.shape(f))
 # Emulator 1
 emulator_1 = emulator(x = x_std, theta = theta, f = f, method = 'PCGPwM')
 # Emulator 2
-emulator_2 = emulator(x = x_std, theta = theta, f = f, method = 'PCGP_ozge', args = {'is_pca': True})
+emulator_2 = emulator(x = x_std, theta = theta, f = f, method = 'PCGP_ozge')
 
 # Compare emulators
 # Generate random reasonable theta values
@@ -120,6 +120,8 @@ def plot_pred(x_std, xrep, y, cal, theta_range):
     
 obsvar = np.maximum(0.2*y, 0.1)
 
+import pdb
+pdb.set_trace()
 # Fit a calibrator with emulator 1 via via method = 'MLcal' and 'sampler' = metropolis-hastings 
 cal_1 = calibrator(emu = emulator_1, y = y, x = xrep_std, thetaprior = prior_balldrop, 
                    method = 'MLcal', yvar = obsvar, 
@@ -143,3 +145,28 @@ cal_3 = calibrator(emu = emulator_1, y = y, x = xrep_std, thetaprior = prior_bal
 
 plot_pred(x_std, xrep, y, cal_3, theta_range)
 
+import pdb
+pdb.set_trace()
+# Calibrator 3
+# Fit a calibrator with emulator 2 via via method = 'MLcal' and 'sampler' = metropolis-hastings 
+cal_1_2 = calibrator(emu = emulator_2, y = y, x = xrep_std, thetaprior = prior_balldrop, 
+                   method = 'MLcal', yvar = obsvar, 
+                   args = {'theta0': np.array([0.4]), 
+                           'numsamp' : 1000, 
+                           'stepType' : 'normal', 
+                           'stepParam' : [0.6]})
+
+plot_pred(x_std, xrep, y, cal_1_2, theta_range)
+
+# Fit a calibrator via method = 'MLcal' and 'sampler' : 'plumlee'
+cal_2_2 = calibrator(emu = emulator_2, y = y, x = xrep_std, thetaprior = prior_balldrop, 
+                   method = 'MLcal', yvar = obsvar, 
+                   args = {'sampler' : 'plumlee'})
+
+plot_pred(x_std, xrep, y, cal_2_2, theta_range)
+
+# Fit a calibrator via method = 'directbayes' and 'sampler' : 'plumlee'
+cal_3_2 = calibrator(emu = emulator_2, y = y, x = xrep_std, thetaprior = prior_balldrop, 
+                   method = 'directbayes', yvar = obsvar)
+
+plot_pred(x_std, xrep, y, cal_3_2, theta_range)

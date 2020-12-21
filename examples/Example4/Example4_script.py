@@ -68,10 +68,11 @@ x = np.hstack((np.reshape(np.tile(range(134), 3), (402, 1)),
 x =  np.array(x, dtype='object')
 
 # (No filter) Fit an emulator via 'PCGP_ozge'
-emulator_1 = emulator(x = x, theta = param_values_rnd, f = func_eval_rnd.T, method = 'PCGP_ozge', args = {'is_pca': True}) 
+emulator_1 = emulator(x = x, theta = param_values_rnd, f = func_eval_rnd.T, method = 'PCGP_ozge') 
 
 # (No filter) Fit an emulator via 'PCGPwM'
-emulator_2 = emulator(x = x, theta = param_values_rnd, f = func_eval_rnd.T, method = 'PCGPwM') 
+emulator_2 = emulator(x = x, theta = param_values_rnd, f = func_eval_rnd.T, method = 'PCGPwM', 
+                      args = {'epsilon': 1.5, 'hyp1': -10, 'hyp2': -20}) 
 
 def plot_pred_interval(cal):
     pr = cal.predict(x)
@@ -139,7 +140,7 @@ class prior_covid:
                           sps.norm.rvs(13, 1.5, size=n),
                           sps.norm.rvs(12, 1.5, size=n))).T
     
-obsvar = np.maximum(0.2*real_data, 5) #5*np.ones(real_data.shape[0]) # np.maximum(0.2*real_data, 5)
+obsvar = np.maximum(0.2*real_data, 5)
 
 
 # Calibrator 1
@@ -161,5 +162,4 @@ plot_pred_interval(cal_2)
 # Calibrator 3
 cal_3 = calibrator(emu = emulator_2, y = real_data, x = x, thetaprior = prior_covid, method = 'directbayes', yvar = obsvar)
 
-cal_3_theta = cal_3.theta.rnd(100)
 plot_pred_interval(cal_3) 

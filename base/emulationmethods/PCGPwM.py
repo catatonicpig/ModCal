@@ -45,6 +45,11 @@ def fit(fitinfo, x, theta, f, args):
     else:
         fitinfo['mof'] = None
         fitinfo['mofrows'] = None
+        
+    fitinfo['epsilon'] = args['epsilon'] if 'epsilon' in args.keys() else 0.1 
+    hyp1 = args['hyp1'] if 'hyp1' in args.keys() else -10
+    hyp2 = args['hyp2'] if 'hyp2' in args.keys() else -20
+
     #Storing these values for future reference
     fitinfo['x'] = x
     fitinfo['theta'] = theta
@@ -55,6 +60,8 @@ def fit(fitinfo, x, theta, f, args):
     __standardizef(fitinfo)
     __PCs(fitinfo)
     numpcs = fitinfo['pc'].shape[1]
+
+    print(fitinfo['method'], 'considering ', numpcs, 'PCs')
     
     if 'emulist' in fitinfo.keys():
         hypstarts = np.zeros((numpcs, fitinfo['emulist'][0]['hyp'].shape[0]))
@@ -66,15 +73,24 @@ def fit(fitinfo, x, theta, f, args):
     else:
         hypinds = -1 * np.ones(numpcs)
         emulist = [dict() for x in range(0, numpcs)]
+        
     for iters in range(0,3):
         for pcanum in range(0, numpcs):
             if np.sum(hypinds == np.array(range(0, numpcs))) > 0.5:
                 hypwhere = np.where(hypinds == np.array(range(0, numpcs)))[0]
-                emulist[pcanum] = __fitGP1d(theta, fitinfo['pc'][:, pcanum],
-                                            fitinfo['pcstdvar'][:, pcanum], hypstarts[hypwhere,:],
-                                            hypwhere)
+                emulist[pcanum] = __fitGP1d(theta = theta, 
+                                            g = fitinfo['pc'][:, pcanum],
+                                            hyp1 = hyp1,
+                                            hyp2 = hyp2, 
+                                            gvar = fitinfo['pcstdvar'][:, pcanum], 
+                                            hypstarts = hypstarts[hypwhere,:],
+                                            hypinds = hypwhere)
             else:
-                emulist[pcanum] = __fitGP1d(theta,fitinfo['pc'][:, pcanum],fitinfo['pcstdvar'][:, pcanum])
+                emulist[pcanum] = __fitGP1d(theta = theta, 
+                                            g = fitinfo['pc'][:, pcanum],
+                                            hyp1 = hyp1,
+                                            hyp2 = hyp2, 
+                                            gvar = fitinfo['pcstdvar'][:, pcanum])
                 hypstarts = np.zeros((numpcs,
                                       emulist[pcanum]['hyp'].shape[0]))
             emulist[pcanum]['hypind'] = min(pcanum, emulist[pcanum]['hypind'])
@@ -83,7 +99,7 @@ def fit(fitinfo, x, theta, f, args):
                 emulist[pcanum]['hypind'] = 1*pcanum
             hypinds[pcanum] = 1*emulist[pcanum]['hypind']
     fitinfo['emulist'] = emulist
-    print(pcanum)
+    
     return
 
 
@@ -371,7 +387,8 @@ def __standardizef(fitinfo, offset=None, scale=None):
     f = fitinfo['f']
     mof = fitinfo['mof']
     mofrows = fitinfo['mofrows']
-    epsilon = 0.1
+    epsilon = fitinfo['epsilon']
+        
     if (offset is not None) and (scale is not None):
         if offset.shape[0] == f.shape[1] and scale.shape[0] == f.shape[1]:
             if np.any(np.nanmean(np.abs(f-offset)/scale,1) > 4):
@@ -415,7 +432,7 @@ def __standardizef(fitinfo, offset=None, scale=None):
                 J = Up[wherenotmof,:].T @ fs[rv,wherenotmof]
                 fs[rv,wheremof] = (Up[wheremof,:] * ((Sp / np.sqrt(epsilon)) ** 2)) @ (J -\
                     H @ (spla.solve(Amat, J,assume_a='pos')))
-    fitinfo['epsilon'] = epsilon
+    #fitinfo['epsilon'] = epsilon
     # Assigning new values to the dictionary
     fitinfo['offset'] = offset
     fitinfo['scale'] = scale
@@ -485,11 +502,16 @@ def __getnewvar(fitinfo, pending):
         pcstdvar[rv, :] = 1 - (pcw ** 2 /epsilon +1) * term3
     return (10*pcstdvar)
 
-def __fitGP1d(theta, g, gvar=None, hypstarts=None, hypinds=None, prevsubmodel=None):
+def __fitGP1d(theta, g, hyp1, hyp2, gvar=None, hypstarts=None, hypinds=None, prevsubmodel=None):
     """Return a fitted model from the emulator model using smart method."""
+    
+    # subinfo['hypregmean'] = np.append(0 + 0.5*np.log(theta.shape[1]) + np.log(np.std(theta, 0)), (0, -25))
+    # subinfo['hypregLB'] = np.append(-4 + 0.5*np.log(theta.shape[1]) + np.log(np.std(theta, 0)), (-12, -35))
+    
     subinfo = {}
-    subinfo['hypregmean'] = np.append(0 + 0.5*np.log(theta.shape[1]) + np.log(np.std(theta, 0)), (0, -25))
-    subinfo['hypregLB'] = np.append(-4 + 0.5*np.log(theta.shape[1]) + np.log(np.std(theta, 0)), (-12, -35))
+    subinfo['hypregmean'] = np.append(0 + 0.5*np.log(theta.shape[1]) + np.log(np.std(theta, 0)), (0, hyp1))
+    subinfo['hypregLB'] = np.append(-4 + 0.5*np.log(theta.shape[1]) + np.log(np.std(theta, 0)), (-12, hyp2))
+    
     subinfo['hypregUB'] = np.append(4 + 0.5*np.log(theta.shape[1]) + np.log(np.std(theta, 0)), (2, 0))
     subinfo['hypregstd'] = (subinfo['hypregUB'] - subinfo['hypregLB']) / 8
     subinfo['hypregstd'][-2] = 2

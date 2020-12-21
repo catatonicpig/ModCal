@@ -130,7 +130,7 @@ class emulator(object):
         self.__options = {}
         self.__optionsset(options)
         self._info = {}
-        
+        self._info = {'method': method}
         if self.__f is not None and self.__options['autofit']:
             self.fit()
 
@@ -681,7 +681,8 @@ class emulator(object):
             theta = theta[j,:]
         j = np.where(np.mean(isnanf, 1) < self.__options['xrmnan'])[0]
         f = f[j,:]
-        x = x[j,:]
+        if x is not None:
+            x = x[j,:]
         if not self.__options['rmthetafirst']:
             j = np.where(np.mean(isnanf, 0) < self.__options['thetarmnan'])[0]
             f = f[:,j]

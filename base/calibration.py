@@ -49,8 +49,8 @@ class calibrator(object):
             raise ValueError('You have not provided any y.')
         if y.ndim > 1.5:
             y = np.squeeze(y)
-        if y.shape[0] < 5:
-            raise ValueError('5 is the minimum number of observations at this time.')
+        # if y.shape[0] < 5:
+        #     raise ValueError('5 is the minimum number of observations at this time.')
         self.y = y
         if emu is None:
             raise ValueError('You have not provided any emulator.')

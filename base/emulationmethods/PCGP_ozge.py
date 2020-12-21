@@ -49,46 +49,44 @@ def fit(fitinfo, x, theta, f, args=None):
     fitinfo['scale'] = np.ones(f.shape[1])
     fitinfo['theta'] = theta
     fitinfo['x'] = x
-    
+     
     # Standardize the function evaluations f
     for k in range(0, f.shape[1]):
         fitinfo['offset'][k] = np.mean(f[:, k])
-        fitinfo['scale'][k] = 0.9*np.std(f[:, k]) + 0.1*np.std(f)
+        fitinfo['scale'][k] = np.std(f[:, k])
+        if fitinfo['scale'][k] == 0:
+            fitinfo['scale'][k] = 0.0001
+        #fitinfo['scale'][k] = 0.9*np.std(f[:, k]) + 0.1*np.std(f)
         
     fstand = (f - fitinfo['offset']) / fitinfo['scale']
-    
-    if args['is_pca'] == True:
-        # Do PCA to reduce the dimension of the function evaluations
-        Vecs, Vals, _ = np.linalg.svd((fstand / np.sqrt(fstand.shape[0])).T)
-        Vals = np.append(Vals, np.zeros(Vecs.shape[1] - Vals.shape[0]))
-        Valssq = (fstand.shape[0]*(Vals ** 2) + 0.001) /(fstand.shape[0] + 0.001)
-        
-        # Find the best size of the reduced space
-  
-        numVals = 1 + np.sum(np.cumsum(Valssq) < 0.9995*np.sum(Valssq))
-        numVals = np.maximum(np.minimum(2,fstand.shape[1]), numVals)
-        #numVals = 1
-        # 
-        fitinfo['Cs'] = Vecs * np.sqrt(Valssq)
-        fitinfo['PCs'] = fitinfo['Cs'][:, :numVals]
-        fitinfo['PCsi'] = Vecs[:,:numVals] * np.sqrt(1 / Valssq[:numVals])
-    
-        pcaval = fstand @ fitinfo['PCsi']
-        fhat = pcaval @ fitinfo['PCs'].T
-        fitinfo['extravar'] = np.mean((fstand-fhat) ** 2,0) * (fitinfo['scale'] ** 2)
-        
-        fitinfo['var0'] = np.ones(numVals)
-    else:
-        numVals = 1
-        pcaval = 1*fstand
 
-    emulist = [dict() for x in range(0, numVals)]
+    # Do PCA to reduce the dimension of the function evaluations
+    Vecs, Vals, _ = np.linalg.svd((fstand / np.sqrt(fstand.shape[0])).T)
+    Vals = np.append(Vals, np.zeros(Vecs.shape[1] - Vals.shape[0]))
+    Valssq = (fstand.shape[0]*(Vals ** 2) + 0.001) /(fstand.shape[0] + 0.001)
     
-    print('no of pcs:', numVals)
-    # Fit an emulator for each pc
+    # Find the best size of the reduced space
+  
+    numVals = 1 + np.sum(np.cumsum(Valssq) < 0.9995*np.sum(Valssq))
+    numVals = np.maximum(np.minimum(2,fstand.shape[1]), numVals)
+
+    # 
+    fitinfo['Cs'] = Vecs * np.sqrt(Valssq)
+    fitinfo['PCs'] = fitinfo['Cs'][:, :numVals]
+    fitinfo['PCsi'] = Vecs[:,:numVals] * np.sqrt(1 / Valssq[:numVals])
+
+    pcaval = fstand @ fitinfo['PCsi']
+    fhat = pcaval @ fitinfo['PCs'].T
+    fitinfo['extravar'] = np.mean((fstand-fhat) ** 2,0) * (fitinfo['scale'] ** 2)
+    
+    # create a dictionary to save the emu info for each PC
+    emulist = [dict() for x in range(0, numVals)]
+
+    print(fitinfo['method'], 'considering ', numVals, 'PCs')
+    
+    # fit an emulator for each pc
     for pcanum in range(0, numVals):
         emulist[pcanum] = emulation_fit(theta, pcaval[:, pcanum])
-
 
     fitinfo['emulist'] = emulist
     return
@@ -306,9 +304,13 @@ def emulation_fit(theta, pcaval, hypstarts=None, hypinds=None):
     covhypLB = covhyp0 - 2
     covhypUB = covhyp0 + 3
     
+    #nughyp0 = -6
+    #nughypLB = -8
+    #nughypUB = 1
+    
     nughyp0 = -6
-    nughypLB = -8
-    nughypUB = 1
+    nughypLB = -15
+    nughypUB = 5
     
     #######  ####### ####### #######
     # Get a random sample of thetas to find the optimized hyperparameters
