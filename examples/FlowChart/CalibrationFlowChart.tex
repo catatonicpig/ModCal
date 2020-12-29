@@ -1,0 +1,116 @@
+\documentclass[a4paper,10pt]{article}
+\usepackage{amsmath,amsthm,amsfonts}
+\usepackage[small,compact]{titlesec}
+\setlength{\textheight}{8.9in}
+\setlength{\textheight}{9.0in}
+\setlength{\topmargin}{-0.8in}
+\setlength{\oddsidemargin}{0.1in}
+\setlength{\textwidth}{6.3in}
+\newcommand{\bs}{\bigskip}
+\newcommand{\tcr}{\textcolor{red}}
+\newcommand{\tcb}{\textcolor{blue}}
+
+\usepackage[margin=1cm]{geometry}
+\usepackage[utf8]{inputenc}
+\usepackage{tikz}
+\usetikzlibrary{matrix,shapes,arrows,positioning,chains,calc}
+
+%(ii) What process did you use to calibrate?  I do not mean the code or specific algorithms for statistical process, but things like deciding which parameters of the model to use, when did you run the model, etc.  Your role in the BAND project will be about designing processes with many statistical tools, so deciding on workflow will be critical.
+
+
+\begin{document}
+\baselineskip0.26in
+
+\begin{center}
+\begin{large}
+\begin{bf}
+
+Calibration Flow Chart \bs
+
+\end{bf}
+\end{large}
+\end{center}
+% Define block styles
+\tikzset{
+desicion/.style={
+    diamond,
+    draw, thick,
+    text width=4em,
+    text badly centered,
+    inner sep=0pt
+},
+block/.style={
+    rectangle,
+    draw, thick,
+    text width=12em,
+    text centered,
+    rounded corners
+},
+blockend/.style={
+    rectangle,
+    draw, thick,
+    text width=6em,
+    text centered,
+    rounded corners
+},
+cloud/.style={
+    draw,
+    ellipse,
+    minimum height=2em
+},
+descr/.style={
+    rectangle,
+    draw=none,
+    fill=white
+},
+connector/.style={
+    -latex,
+    font=\scriptsize
+},
+rectangle connector/.style={
+    connector,
+    to path={(\tikztostart) -- ++(#1,0pt) \tikztonodes |- (\tikztotarget) },
+    pos=0.5,
+    thick
+},
+rectangle connector/.default=-2cm,
+straight connector/.style={
+    connector,
+    to path=--(\tikztotarget) \tikztonodes
+},
+line/.style={>=latex,->,thick}
+}
+
+\begin{tikzpicture}
+	\matrix (m)[matrix of nodes, column  sep=2cm, row  sep=1cm, align=center, nodes={rectangle, draw, anchor=center} ]
+	{
+	|[block]| {1. Collect field/measured data}       							&   								&  \\
+	|[block]| {2. Parameter screening/sensitivity analysis}  					&   |[block]| {10. Detect bias/discrepancy}   &                       \\
+	|[block]| {3. Design the experiment to obtain the computer model output}          	&             							 &                            \\
+	|[block]| {4. Obtain computer model outputs by running $m$ simulations}          	&            							  &                      \\
+	|[block]| {5. Combine measured data and simulation data in GP model}          	&            							  &                      \\
+	|[block]| {6. Select appropriate priors}    								&          							    &                     \\
+	|[block]| {7. Explore posterior distributions}         						&         							      &                          \\
+	|[block]| {8. Evaluate performance of the calibrated model}   				&  |[desicion]| {9. Is it accurate enough?}       &      |[blockend]| {End}         \\
+	};
+	\foreach \f/\t[evaluate=\f as \t using int(\f+1)]  in {2,3,4,5,6,7}{
+	\path [line] (m-\f-1) edge (m-\t-1);
+	}
+	
+	%Add additional lines
+	%\path [line] (m-1-1) edge (m-5-1);
+	\path [line] (m-8-1) edge (m-8-2);
+	\path [line] (m-8-2) edge (m-8-3);
+	\path [line] (m-8-2) edge (m-2-2);
+	\path [line] (m-2-2) edge (m-2-1);
+	
+	%\draw [rectangle connector=2.5cm] (m-1-1) to node[descr, pos=0.5] {No} (m-5-1);
+	\draw [rectangle connector=-2.5cm] (m-1-1) to (m-5-1);
+	\node[below,xshift=2.6cm,yshift=-0.5cm] at (m-2-1){Calibration parameters $t_1, \ldots, t_q$};
+	\node[below,xshift=1.9cm,yshift=-0.5cm] at (m-7-1){Samples from posterior};
+	\node[above,xshift=2.5cm] at (m-8-2){Yes};
+	\node[above,xshift=0.5cm,yshift=2cm] at (m-8-2){No};
+\end{tikzpicture}
+
+
+\end{document}

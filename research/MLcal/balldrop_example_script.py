@@ -72,9 +72,13 @@ print(np.shape(theta))
 print(np.shape(x_std))
 print(np.shape(f))
 
+# Fit an emulator via non-filtered data
+emulator_nf_1 = emulator(x = xrep_std, theta = theta, f = f, method = 'PCGPwM')
+pred_nf = emulator_nf_1.predict(x = xrep_std, theta = theta)
+pred_nf_mean = pred_nf.mean()
 
 # Filter out the data
-ys = 1 - np.sum((f - y)**2, 0)/np.sum((y - np.mean(y))**2, 0)
+ys = 1 - np.sum((pred_nf_mean - y)**2, 0)/np.sum((y - np.mean(y))**2, 0)
 theta_f = theta[ys > 0.5]
 print(theta_f.shape)
 
@@ -84,6 +88,7 @@ print(np.shape(f_f))
 
 # Fit an emulator via filtered data
 emulator_f_1 = emulator(x = x_std, theta = theta_f, f = f_f, method = 'PCGPwM')
+
 
 # Fit a classifier
 y_cls = np.zeros(len(theta))
@@ -123,7 +128,7 @@ cal_1_f = calibrator(emu = emulator_f_1, y = y, x = xrep_std, thetaprior = prior
                            'theta0': np.array([0.4]), 
                            'numsamp' : 1000, 
                            'stepType' : 'normal', 
-                           'stepParam' : [0.6]})
+                           'stepParam' : [0.4]})
 
 plot_pred(x_std, xrep, y, cal_1_f, theta_range)
 
@@ -132,7 +137,7 @@ cal_2_f = calibrator(emu = emulator_f_1, y = y, x = xrep_std, thetaprior = prior
                    args = {'theta0': np.array([0.4]), 
                            'numsamp' : 1000, 
                            'stepType' : 'normal', 
-                           'stepParam' : [0.6]})
+                           'stepParam' : [0.4]})
 
 plot_pred(x_std, xrep, y, cal_2_f, theta_range)
 

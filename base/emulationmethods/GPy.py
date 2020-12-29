@@ -16,6 +16,7 @@ def fit(fitinfo, x, theta, f, args=None):
         emulator.optimize()
     
     else:
+        # untensorized format
         row_flatten = x.shape[0]*theta.shape[0]
         col_flatten = x.shape[1] + theta.shape[1]
     

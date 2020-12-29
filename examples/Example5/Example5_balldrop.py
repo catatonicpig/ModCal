@@ -8,6 +8,10 @@ sys.path.append(os.path.normpath(os.path.join(os.path.dirname(current), '..')))
 from base.emulation import emulator
 from base.calibration import calibrator
 
+########################################################
+# This example shows how to use GPy within our framework
+########################################################
+
 # Read the data
 ball = np.loadtxt('ball.csv', delimiter=',')
 m = len(ball)
@@ -101,7 +105,7 @@ cal_1 = calibrator(emu = emulator_GPy, y = y, x = xrep_std, thetaprior = prior_b
 
 plot_pred(x_std, xrep, y, cal_1, theta_range)
 
-
+# Using GPy itself
 # ff = f.flatten('F').reshape(2100, 1)
 # xtheta = np.array([(x, y) for y in theta for x in x_std ]).reshape(2100, 2)
 # #Train GP on those realizations

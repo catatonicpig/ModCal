@@ -8,6 +8,14 @@ sys.path.append(os.path.normpath(os.path.join(os.path.dirname(current), '..')))
 from base.emulation import emulator
 from base.calibration import calibrator
 
+
+########################################################
+# This example shows how to use GPy within our framework
+# via Derek's example at BANDcamp 
+# (we might remove because it only has 1 observation--so it is not complete)
+########################################################
+
+
 np.random.seed(1)
 def lin_hydro_model(theta, intercept = 0.12, slope = -0.25, noise = 0.1):
     '''
@@ -92,7 +100,7 @@ class prior_hydro_normal:
 exp_rel_uncertainty = 0.1 
 
 #v_2 experimental mean
-y_exp = 0.11
+y_exp = 0.09
 
 #v_2 experimental uncertainty
 dy_exp = y_exp * exp_rel_uncertainty 

@@ -77,10 +77,11 @@ x = np.hstack((np.reshape(np.tile(range(134), 3), (402, 1)),
 x =  np.array(x, dtype='object')
 
 # (No filter) Fit an emulator via 'PCGPwM'
-emulator_1 = emulator(x = x, theta = param_values_rnd, f = func_eval_rnd.T, method = 'PCGPwM') 
-
+emulator_1 = emulator(x = x, theta = param_values_rnd, f = func_eval_rnd.T, method = 'PCGPwM', 
+                      args = {'epsilon': 1.5, 'hypregmean': -10, 'hypregLB': -20}) 
 # (Filter) Fit an emulator via 'PCGPwM'
-emulator_f_1 = emulator(x = x, theta = par_in, f = func_eval_in.T, method = 'PCGPwM') 
+emulator_f_1 = emulator(x = x, theta = par_in, f = func_eval_in.T, method = 'PCGPwM', 
+                      args = {'epsilon': 1.5, 'hypregmean': -10, 'hypregLB': -20}) 
 
 ##### ##### ##### ##### #####
 # Run a classification model

@@ -72,7 +72,18 @@ emulator_1 = emulator(x = x, theta = param_values_rnd, f = func_eval_rnd.T, meth
 
 # (No filter) Fit an emulator via 'PCGPwM'
 emulator_2 = emulator(x = x, theta = param_values_rnd, f = func_eval_rnd.T, method = 'PCGPwM', 
-                      args = {'epsilon': 1.5, 'hyp1': -10, 'hyp2': -20}) 
+                      args = {'epsilon': 1.5, 'hypregmean': -10, 'hypregLB': -20}) 
+
+# Compare emulators
+pred_1_test = emulator_1.predict(x, param_values_test)
+pred_mean_test_1 = pred_1_test.mean()
+print("Rsq = ", 1 - np.sum(np.square(pred_mean_test_1 - func_eval_test.T))/np.sum(np.square(func_eval_test - np.mean(func_eval_test.T, axis = 1))))
+print('MSE = ', np.mean(np.sum(np.square(pred_mean_test_1 - func_eval_test.T), axis = 1)))
+
+pred_2_test = emulator_2.predict(x, param_values_test)
+pred_mean_2_test = pred_2_test.mean()
+print("Rsq = ", 1 - np.sum(np.square(pred_mean_2_test - func_eval_test.T))/np.sum(np.square(func_eval_test - np.mean(func_eval_test.T, axis = 1))))
+print('MSE = ', np.mean(np.sum(np.square(pred_mean_2_test - func_eval_test.T), axis = 1)))
 
 def plot_pred_interval(cal):
     pr = cal.predict(x)

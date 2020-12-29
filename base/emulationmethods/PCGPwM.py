@@ -47,8 +47,8 @@ def fit(fitinfo, x, theta, f, args):
         fitinfo['mofrows'] = None
         
     fitinfo['epsilon'] = args['epsilon'] if 'epsilon' in args.keys() else 0.1 
-    hyp1 = args['hyp1'] if 'hyp1' in args.keys() else -10
-    hyp2 = args['hyp2'] if 'hyp2' in args.keys() else -20
+    hyp1 = args['hypregmean'] if 'hypregmean' in args.keys() else -10
+    hyp2 = args['hypregLB'] if 'hypregLB' in args.keys() else -20
 
     #Storing these values for future reference
     fitinfo['x'] = x

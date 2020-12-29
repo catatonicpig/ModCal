@@ -11,10 +11,10 @@ from base.calibration import calibrator
 # Read the data
 ball = np.loadtxt('ball.csv', delimiter=',')
 m = len(ball)
-#height
+# height
 xrep = np.reshape(ball[:, 0], (m, 1))
 x = xrep[0:21]
-#time
+# time
 y = np.reshape(ball[:, 1], ((m, 1)))
 
 # Observe the data
@@ -25,6 +25,24 @@ plt.show()
 
 # Computer implementation of the mathematical model
 def timedrop(x, theta, hr, gr):
+    '''
+    Parameters
+    ----------
+    x : m x 1 array
+        Input settings.
+    theta : n x 1 array 
+        Parameters to be calibrated.
+    hr : Array of size 2
+        min and max value of height.
+    gr : Array of size 2
+        min and max value of gravity.
+
+    Returns
+    -------
+    m x n array
+        m x n computer model evaluations.
+
+    '''
     # Assume x and theta are within (0, 1)
     min_g = min(gr)
     range_g = max(gr) - min(gr)
@@ -53,7 +71,7 @@ class prior_balldrop:
 # Draw 100 random parameters from uniform prior
 n = 100
 theta = prior_balldrop.rnd(n)
-theta_range = np.array([1, 30])
+theta_range = np.array([6, 15])
 
 # Standardize 
 x_range = np.array([min(x), max(x)])
@@ -66,7 +84,6 @@ f = timedrop(x_std, theta, x_range, theta_range)
 print(np.shape(theta))
 print(np.shape(x_std))
 print(np.shape(f))
-
 
 # Fit emualtors using two different methods 
 # Emulator 1
@@ -86,15 +103,28 @@ print(np.shape(f_test))
 
 #Predict
 p_1 = emulator_1.predict(x_std, theta_test)
-p_1_mean = p_1.mean()
+p_1_mean, p_1_var = p_1.mean(), p_1.var()
 p_2 = emulator_2.predict(x_std, theta_test)
-p_2_mean = p_2.mean()
+p_2_mean, p_2_var = p_2.mean(), p_2.var()
 
-print('SSE = ', np.sum((p_1_mean - f_test)**2))
-print('SSE = ', np.sum((p_2_mean - f_test)**2))
+# compare emulators
+def plot_residuals(f, pred_mean, pred_var):
+    fig, axs = plt.subplots(1, figsize=(5, 5))
+    t1 = (pred_mean - f)/np.sqrt(pred_var)
+    p1_ub = np.percentile(t1, 97.5, axis = 1)
+    p1_lb = np.percentile(t1, 2.5, axis = 1)
+    plt.fill_between(range(21), p1_lb, p1_ub, color = 'grey', alpha=0.25)
+    plt.hlines(0, 0, 21, linestyles = 'dashed', colors = 'black')
+    plt.show()
+    
+plot_residuals(f_test, p_1_mean, p_1_var) 
+plot_residuals(f_test, p_2_mean, p_2_var) 
+     
+print('SSE PCGPwM = ', np.sum((p_1_mean - f_test)**2))
+print('SSE PCGP_ozge = ', np.sum((p_2_mean - f_test)**2))
 
-print('Rsq = ', 1 - np.sum(np.square(p_1_mean - f_test))/np.sum(np.square(f_test.T - np.mean(f_test, axis = 1))))
-print('Rsq = ', 1 - np.sum(np.square(p_2_mean - f_test))/np.sum(np.square(f_test.T - np.mean(f_test, axis = 1))))
+print('Rsq PCGPwM = ', 1 - np.sum(np.square(p_1_mean - f_test))/np.sum(np.square(f_test.T - np.mean(f_test, axis = 1))))
+print('Rsq PCGP_ozge = ', 1 - np.sum(np.square(p_2_mean - f_test))/np.sum(np.square(f_test.T - np.mean(f_test, axis = 1))))
 
 def plot_pred(x_std, xrep, y, cal, theta_range):
     
@@ -120,15 +150,13 @@ def plot_pred(x_std, xrep, y, cal, theta_range):
     
 obsvar = np.maximum(0.2*y, 0.1)
 
-import pdb
-pdb.set_trace()
 # Fit a calibrator with emulator 1 via via method = 'MLcal' and 'sampler' = metropolis-hastings 
 cal_1 = calibrator(emu = emulator_1, y = y, x = xrep_std, thetaprior = prior_balldrop, 
                    method = 'MLcal', yvar = obsvar, 
                    args = {'theta0': np.array([0.4]), 
                            'numsamp' : 1000, 
                            'stepType' : 'normal', 
-                           'stepParam' : [0.6]})
+                           'stepParam' : [0.3]})
 
 plot_pred(x_std, xrep, y, cal_1, theta_range)
 
@@ -144,29 +172,3 @@ cal_3 = calibrator(emu = emulator_1, y = y, x = xrep_std, thetaprior = prior_bal
                    method = 'directbayes', yvar = obsvar)
 
 plot_pred(x_std, xrep, y, cal_3, theta_range)
-
-import pdb
-pdb.set_trace()
-# Calibrator 3
-# Fit a calibrator with emulator 2 via via method = 'MLcal' and 'sampler' = metropolis-hastings 
-cal_1_2 = calibrator(emu = emulator_2, y = y, x = xrep_std, thetaprior = prior_balldrop, 
-                   method = 'MLcal', yvar = obsvar, 
-                   args = {'theta0': np.array([0.4]), 
-                           'numsamp' : 1000, 
-                           'stepType' : 'normal', 
-                           'stepParam' : [0.6]})
-
-plot_pred(x_std, xrep, y, cal_1_2, theta_range)
-
-# Fit a calibrator via method = 'MLcal' and 'sampler' : 'plumlee'
-cal_2_2 = calibrator(emu = emulator_2, y = y, x = xrep_std, thetaprior = prior_balldrop, 
-                   method = 'MLcal', yvar = obsvar, 
-                   args = {'sampler' : 'plumlee'})
-
-plot_pred(x_std, xrep, y, cal_2_2, theta_range)
-
-# Fit a calibrator via method = 'directbayes' and 'sampler' : 'plumlee'
-cal_3_2 = calibrator(emu = emulator_2, y = y, x = xrep_std, thetaprior = prior_balldrop, 
-                   method = 'directbayes', yvar = obsvar)
-
-plot_pred(x_std, xrep, y, cal_3_2, theta_range)
