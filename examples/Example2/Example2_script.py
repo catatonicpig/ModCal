@@ -2,9 +2,7 @@ import numpy as np
 import scipy.stats as sps
 import sys
 import os
-import copy
 import matplotlib.pyplot as plt 
-from scipy.stats import kde
 
 current = os.path.abspath(os.getcwd())
 sys.path.append(os.path.normpath(os.path.join(os.path.dirname(current), '..')))

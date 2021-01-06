@@ -44,10 +44,11 @@ def fit(fitinfo, emu, x, y,  args=None):
     
     
         
-    if 'yvar' in fitinfo.keys():
-        obsvar = fitinfo['yvar']
-    else:
-        raise ValueError('Must provide yvar in this software.')
+    # if 'yvar' in fitinfo.keys():
+    #     obsvar = fitinfo['yvar']
+    # else:
+    #     raise ValueError('Must provide yvar in this software.')
+    
     thetaprior = fitinfo['thetaprior']
     try: 
         theta = thetaprior.rnd(10)
@@ -56,7 +57,10 @@ def fit(fitinfo, emu, x, y,  args=None):
         emureturn_grad = True
     except:
         emureturn_grad = False
+    
+    
     if emureturn_grad and 'lpdf_grad' not in dir(thetaprior):
+    # if an emulator returns a gradient but 
         def lpdf_grad(theta):
             f_base = thetaprior.lpdf(theta)
             if theta.ndim > 1.5:
@@ -81,45 +85,51 @@ def fit(fitinfo, emu, x, y,  args=None):
         thetaprior.lpdf_grad = lpdf_grad
     
     def logpostfull_wgrad(theta, return_grad = True):
+        # obtain the log-prior
         logpost = thetaprior.lpdf(theta)
+
         if emureturn_grad and return_grad:
+            # if an emulator returns a gradient & a gradient is being asked for the calibration
+            # obtain the gradient of the log-prior
             dlogpost =  thetaprior.lpdf_grad(theta)
+            
         if logpost.ndim > 0.5 and logpost.shape[0] > 1.5:
+            # multi-variate case
             inds = np.where(np.isfinite(logpost))[0]
             if emureturn_grad and return_grad:
+                # obtain the log-likelihood and the gradient of the log-likelihood
                 loglikinds, dloglikinds = loglik_grad(fitinfo, emu, theta[inds], y, x, args)
                 logpost[inds] += loglikinds
                 dlogpost[inds] += dloglikinds
             else:
+                # obtain the log-likelihood
                 logpost[inds] += loglik(fitinfo, emu, theta[inds], y, x, args)
         else:
+            # uni-variate case
             if np.isfinite(logpost):
                 if emureturn_grad and return_grad:
+                    # obtain the log-likelihood and the gradient of the log-likelihood
                     loglikinds, dloglikinds = loglik_grad(fitinfo, emu, theta, y, x, args)
                     logpost += loglikinds
                     dlogpost +=np.squeeze(dloglikinds)
                 else:
+                    # obtain the log-likelihood
                     logpost += loglik(fitinfo, emu, theta, y, x, args)
+        
         if emureturn_grad and return_grad:
             return logpost, dlogpost
         else:
             return logpost
     
-    # thetatest = thetaprior.rnd(2)
-    # logpost, dlogpost = logpostfull_wgrad(thetatest, return_grad = True)
-    # for k in range(0,thetatest.shape[1]):
-    #     thetaadj = copy.copy(thetatest)
-    #     thetaadj[:,k] += 10 ** (-6)
-    #     logpostadj, dlogpostadj = logpostfull_wgrad(thetaadj, return_grad = True)
-    #     print((logpostadj - logpost) * 10 ** (6))
-    #     print(dlogpost[:,k])
-    # asdada
     theta = thetaprior.rnd(1000)
     if 'thetarnd' in fitinfo:
         theta = np.vstack((fitinfo['thetarnd'],theta))
     if '_emulator__theta' in dir(emu):
         theta = np.vstack((theta,copy.copy(emu._emulator__theta)))
+        
+    # obtain theta draws from posterior distribution    
     theta = postsampler(theta, logpostfull_wgrad, options={'sampler': 'plumlee'})
+    # obtain log-posterior of theta values
     ladj = logpostfull_wgrad(theta, return_grad = False)
     mladj = np.max(ladj)
     fitinfo['lpdfapproxnorm'] = np.log(np.mean(np.exp(ladj - mladj))) + mladj
@@ -258,11 +268,10 @@ def loglik(fitinfo, emu, theta, y, x, args):
         emuoldvar = emuoldpredict.var()
         emuoldcxh = emuoldpredict.covxhalf()
         obsvar += np.mean(np.abs(emuoldvar- np.sum(np.square(emuoldcxh),2)),1)
+    
+    # compute loglikelihood for each theta value in theta
     for k in range(0, emumean.shape[1]):
         m0 = emumean[:,k]
-        
-        #### MATT: This part does not work with 1d theta!!!
-        
         S0 = np.squeeze(emucovxhalf[:,k,:]) # np.reshape(emucovxhalf[:,k,:], (emumean.shape[0], theta.shape[1])) # np.squeeze(emucovxhalf[:,k,:])
         stndresid = (np.squeeze(y) - m0) / np.sqrt(obsvar)
         term1 = np.sum(stndresid ** 2)

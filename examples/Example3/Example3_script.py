@@ -150,22 +150,25 @@ def plot_pred(x_std, xrep, y, cal, theta_range):
     
 obsvar = np.maximum(0.2*y, 0.1)
 
-# Fit a calibrator with emulator 1 via via method = 'MLcal' and 'sampler' = metropolis-hastings 
-cal_1 = calibrator(emu = emulator_1, y = y, x = xrep_std, thetaprior = prior_balldrop, 
-                   method = 'MLcal', yvar = obsvar, 
-                   args = {'theta0': np.array([0.4]), 
-                           'numsamp' : 1000, 
-                           'stepType' : 'normal', 
-                           'stepParam' : [0.3]})
+# # Fit a calibrator with emulator 1 via via method = 'MLcal' and 'sampler' = metropolis-hastings 
+# cal_1 = calibrator(emu = emulator_1, y = y, x = xrep_std, thetaprior = prior_balldrop, 
+#                    method = 'MLcal', yvar = obsvar, 
+#                    args = {'theta0': np.array([0.4]), 
+#                            'numsamp' : 1000, 
+#                            'stepType' : 'normal', 
+#                            'stepParam' : [0.3]})
 
-plot_pred(x_std, xrep, y, cal_1, theta_range)
+# plot_pred(x_std, xrep, y, cal_1, theta_range)
 
-# Fit a calibrator via method = 'MLcal' and 'sampler' : 'plumlee'
-cal_2 = calibrator(emu = emulator_1, y = y, x = xrep_std, thetaprior = prior_balldrop, 
-                   method = 'MLcal', yvar = obsvar, 
-                   args = {'sampler' : 'plumlee'})
+# # Fit a calibrator via method = 'MLcal' and 'sampler' : 'plumlee'
+# cal_2 = calibrator(emu = emulator_1, y = y, x = xrep_std, thetaprior = prior_balldrop, 
+#                    method = 'MLcal', yvar = obsvar, 
+#                    args = {'sampler' : 'plumlee'})
 
-plot_pred(x_std, xrep, y, cal_2, theta_range)
+# plot_pred(x_std, xrep, y, cal_2, theta_range)
+
+import pdb
+pdb.set_trace()
 
 # Fit a calibrator via method = 'directbayes' and 'sampler' : 'plumlee'
 cal_3 = calibrator(emu = emulator_1, y = y, x = xrep_std, thetaprior = prior_balldrop, 

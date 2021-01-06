@@ -83,6 +83,7 @@ class emulator(object):
                 else:
                     raise ValueError('The number of rows in f must match the number of rows in x.')
         
+        # note: NOT CONSISTENT: in lines 72--76 we take the transpose but then we raise an error in lines 85--88
         if theta is not None and (f.shape[1] != theta.shape[0]):
             if x is not None:
                 raise ValueError('The number of columns in f must match the number of rows in theta.')
@@ -131,7 +132,9 @@ class emulator(object):
         self.__optionsset(options)
         self._info = {}
         self._info = {'method': method}
-        if self.__f is not None and self.__options['autofit']:
+
+        #note: I dont think options are set properly. It does not assign options as an attribute
+        if (self.__f is not None) and (self.__options['autofit']):
             self.fit()
 
     def __repr__(self):
@@ -160,6 +163,8 @@ class emulator(object):
             Optional dictionary containing options you would like to pass to fit function. It will
             add/modify those in emu._args.
         """
+        
+        # note: not sure if args here in fit(self, args= None) makes sense
         if args is not None:
             argstemp = {**self._args, **copy.deepcopy(args)} #properly merge the arguments
         else:
@@ -588,6 +593,8 @@ class emulator(object):
             else:
                 raise ValueError('option xreps must be true or false')
         
+        # note: if thetarmnan and xrmnan take a string value other than the things below  np.isfinite(options['thetarmnan']) returns an error
+        
         if 'thetarmnan' in options.keys():
             if type(options['thetarmnan']) is bool:
                 if options['thetarmnan']:
@@ -675,10 +682,13 @@ class emulator(object):
             print('All infs were converted to nans.')
             f[isinff] = float("NaN")
         isnanf = np.isnan(f)
+        
+        # first, check missing thetas
         if self.__options['rmthetafirst']:
             j = np.where(np.mean(isnanf, 0) < self.__options['thetarmnan'])[0]
             f = f[:,j]
             theta = theta[j,:]
+        # then, check missing xs
         j = np.where(np.mean(isnanf, 1) < self.__options['xrmnan'])[0]
         f = f[j,:]
         if x is not None:
