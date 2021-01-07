@@ -198,6 +198,8 @@ class emulator(object):
         prediction : an instance of emulation class prediction
             prediction._info : Gives the dictionary of what was produced by the method.
         """
+        
+        #note: we never had a case that passes through that if statement: create a case to increase the coverage
         if self.__ptf is not None:
             info = {}
             if theta is not None:
@@ -223,6 +225,7 @@ class emulator(object):
                 raise ValueError('Your x shape seems to not agree with the emulator build.')
             elif x.shape[1] != self.__x.shape[1] and x.shape[0] == self.__x.shape[1]:
                 x = x.T
+            # i dont think the statement below is correct
             elif x.shape[1] != self.__x.shape[1] and x.shape[0] != self.__x.shape[1]:
                 raise ValueError('Your x shape seems to not agree with the emulator build.')
         if theta is None:
@@ -231,6 +234,7 @@ class emulator(object):
             theta = copy.copy(theta)
             if theta.ndim == 2 and self.__theta.ndim == 1:
                 raise ValueError('Your theta shape seems to not agree with the emulator build.')
+            #note: dont understand why we have this statement
             elif theta.ndim == 1 and self.__theta.ndim == 2 and theta.shape[0] == self.__theta.shape[1]:
                 theta = np.reshape(theta, (1,-1))
             elif theta.ndim == 1 and self.__theta.ndim == 2:

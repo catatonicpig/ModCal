@@ -23,7 +23,9 @@ f2 = f[:,0:25]
 theta1 = theta[0:25,:]
 #2-d x1 (15 x 2), 2-d theta (50 x 2), f (30 x 50)
 x1 = x[0:15,:]
+x3 = np.vstack(( np.array(list(np.arange(0, 10))*2), np.repeat([1, 2], 10), np.repeat([2, 3], 10))).T
 
 import pdb
 pdb.set_trace() 
-emu = emulator(x = x, theta = theta, f = f, method = 'PCGPwM', args = {'try': False})
+emu = emulator(x = x, theta = theta, f = f, method = 'PCGPwM')
+p = emu.predict(x = x, theta = theta) 

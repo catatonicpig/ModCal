@@ -229,3 +229,4 @@ class TestClass_3:
             assert emulator(x = x, theta = theta, f = f, method = 'PCGPwM', options = {'autofit': input1}) is not None
             
 # pytest test_u1.py -m set3 --disable-warnings
+# pytest --cov=ModCal/base/emulation test_u1.py
