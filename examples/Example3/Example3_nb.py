@@ -1,3 +1,27 @@
+# ---
+# jupyter:
+#   jupytext:
+#     formats: ipynb,py:percent
+#     text_representation:
+#       extension: .py
+#       format_name: percent
+#       format_version: '1.3'
+#       jupytext_version: 1.9.1
+#   kernelspec:
+#     display_name: Python 3
+#     language: python
+#     name: python3
+# ---
+
+# %% [markdown]
+# # Example 3: Acceleration due to gravity
+
+# %% [markdown]
+# To illustrate how to use `emulator` and `calibrator` objects, we will give another example of a free-falling objects.
+#
+# First, import the main libraries we use for this example:
+
+# %%
 import numpy as np
 import sys
 import os
@@ -8,6 +32,13 @@ sys.path.append(os.path.normpath(os.path.join(os.path.dirname(current), '..')))
 from base.emulation import emulator
 from base.calibration import calibrator
 
+# %% [markdown]
+# ## Data: Falling ball
+
+# %% [markdown]
+# The data include 63 field observations at 21 heights, with three replicates at each height. Let's read the real data first, and then visualize:
+
+# %%
 # Read the data
 ball = np.loadtxt('ball.csv', delimiter=',')
 m = len(ball)
@@ -17,12 +48,21 @@ x = xrep[0:21]
 # time
 y = np.reshape(ball[:, 1], ((m, 1)))
 
+# %%
 # Observe the data
 plt.scatter(xrep, y, color = 'red')
 plt.xlabel("height (meters)")
 plt.ylabel("time (seconds)")
 plt.show()
 
+
+# %% [markdown]
+# ## Computer model experiments
+
+# %% [markdown]
+# The time $t$ to drop the ball at a distance $h$ is $t = \sqrt{2h/g}$ for gravity $g$. Here, the gravity $g$ is our calibration parameter $\theta$ bacause we don't know the actual value of $g$ for the location the ball is dropped. We consider the computer implementation $f(x, \theta)$ of the mathematical model that maps $(h, g)$ to $(x, \theta)$ in $[0, 1]$ to compute $t$. 
+
+# %%
 # Computer implementation of the mathematical model
 def timedrop(x, theta, hr, gr):
     '''
@@ -55,6 +95,17 @@ def timedrop(x, theta, hr, gr):
         f[k, :] = np.sqrt(2*h/g).reshape(x.shape[0])
     return f.T
 
+
+# %% [markdown]
+# We run the `timedrop()` function at 21 different unique locations such that $\mathbf{x}$ is $m \times p$ input matrix with $m = 21$ and $p = 1$.
+
+# %% [markdown]
+# ## Prior specification
+
+# %% [markdown]
+# For this example, we define a uniform prior for $g$ such that $g$ ~ $U(6, 15)$. We perform computer model simulations at $n = 100$ random settings of the calibration parameter $g$, and obtain $m \times n$ model output matrix $\mathbf{f}$.
+
+# %%
 # Define prior
 class prior_balldrop:
     """ This defines the class instance of priors provided to the method. """
@@ -66,8 +117,9 @@ class prior_balldrop:
 
     def rnd(n):
         return np.vstack((sps.uniform.rvs(0, 1, size=n)))
-    
-    
+
+
+# %%
 # Draw 100 random parameters from uniform prior
 n = 100
 theta = prior_balldrop.rnd(n)
@@ -79,20 +131,32 @@ x_std = (x - min(x))/(max(x) - min(x))
 xrep_std = (xrep - min(xrep))/(max(xrep) - min(xrep))
 
 # Obtain computer model output
-f = timedrop(x_std, theta, x_range, theta_range) 
+f = timedrop(x_std, theta, x_range, theta_range)
 
 print(np.shape(theta))
 print(np.shape(x_std))
 print(np.shape(f))
 
-# Fit emualtors using two different methods 
-# Emulator 1
+# %% [markdown]
+# ## Model emulation
+
+# %% [markdown]
+# Let's build an emulator for computer model runs:
+
+# %%
 emulator_1 = emulator(x = x_std, theta = theta, f = f, method = 'PCGPwM')
-# Emulator 2
+
+# %%
 emulator_2 = emulator(x = x_std, theta = theta, f = f, method = 'PCGP_ozge')
 
-# Compare emulators
-# Generate random reasonable theta values
+# %% [markdown]
+# ### Comparison of emulation methodologies
+
+# %% [markdown]
+# One way to test the accuracy of the emulators is to create a hold-out simulation run, and compare the predicted values from the emulator and simulated values. To do this, let's first generate random draws of parameters, and evaluate the computer model at those values.
+
+# %%
+#Generate random reasonable theta values
 n_test = 1000
 theta_test = prior_balldrop.rnd(n_test)
 print(np.shape(theta_test))
@@ -107,6 +171,14 @@ p_1_mean, p_1_var = p_1.mean(), p_1.var()
 p_2 = emulator_2.predict(x_std, theta_test)
 p_2_mean, p_2_var = p_2.mean(), p_2.var()
 
+print('SSE PCGPwM = ', np.sum((p_1_mean - f_test)**2))
+print('SSE PCGP_ozge = ', np.sum((p_2_mean - f_test)**2))
+
+print('Rsq PCGPwM = ', 1 - np.sum(np.square(p_1_mean - f_test))/np.sum(np.square(f_test.T - np.mean(f_test, axis = 1))))
+print('Rsq PCGP_ozge = ', 1 - np.sum(np.square(p_2_mean - f_test))/np.sum(np.square(f_test.T - np.mean(f_test, axis = 1))))
+
+
+# %%
 # compare emulators
 def plot_residuals(f, pred_mean, pred_var):
     fig, axs = plt.subplots(1, figsize=(5, 5))
@@ -116,16 +188,17 @@ def plot_residuals(f, pred_mean, pred_var):
     plt.fill_between(range(21), p1_lb, p1_ub, color = 'grey', alpha=0.25)
     plt.hlines(0, 0, 21, linestyles = 'dashed', colors = 'black')
     plt.show()
-    
+
+
+# %%
 plot_residuals(f_test, p_1_mean, p_1_var) 
 plot_residuals(f_test, p_2_mean, p_2_var) 
-     
-print('SSE PCGPwM = ', np.sum((p_1_mean - f_test)**2))
-print('SSE PCGP_ozge = ', np.sum((p_2_mean - f_test)**2))
 
-print('Rsq PCGPwM = ', 1 - np.sum(np.square(p_1_mean - f_test))/np.sum(np.square(f_test.T - np.mean(f_test, axis = 1))))
-print('Rsq PCGP_ozge = ', 1 - np.sum(np.square(p_2_mean - f_test))/np.sum(np.square(f_test.T - np.mean(f_test, axis = 1))))
 
+# %% [markdown]
+# ## Model calibration
+
+# %%
 def plot_pred(x_std, xrep, y, cal, theta_range):
     
     fig, axs = plt.subplots(1, 4, figsize=(14, 3))
@@ -147,31 +220,34 @@ def plot_pred(x_std, xrep, y, cal, theta_range):
     axs[3].plot(xrep, y, 'ro', markersize = 5, color='red')
     
     plt.show()
-    
+
+
+# %%
 obsvar = np.maximum(0.2*y, 0.1)
 
-# # Fit a calibrator with emulator 1 via via method = 'MLcal' and 'sampler' = metropolis-hastings 
-# cal_1 = calibrator(emu = emulator_1, y = y, x = xrep_std, thetaprior = prior_balldrop, 
-#                    method = 'MLcal', yvar = obsvar, 
-#                    args = {'theta0': np.array([0.4]), 
-#                            'numsamp' : 1000, 
-#                            'stepType' : 'normal', 
-#                            'stepParam' : [0.3]})
+# Fit a calibrator with emulator 1 via via method = 'MLcal' and 'sampler' = 'mh' 
+cal_1 = calibrator(emu = emulator_1, y = y, x = xrep_std, thetaprior = prior_balldrop, 
+                   method = 'MLcal', yvar = obsvar, 
+                   args = {'theta0': np.array([0.4]), 
+                           'numsamp' : 1000, 
+                           'stepType' : 'normal', 
+                           'stepParam' : [0.3]})
 
-# plot_pred(x_std, xrep, y, cal_1, theta_range)
+plot_pred(x_std, xrep, y, cal_1, theta_range)
 
-# # Fit a calibrator via method = 'MLcal' and 'sampler' : 'plumlee'
-# cal_2 = calibrator(emu = emulator_1, y = y, x = xrep_std, thetaprior = prior_balldrop, 
-#                    method = 'MLcal', yvar = obsvar, 
-#                    args = {'sampler' : 'plumlee'})
+# %%
+# Fit a calibrator via method = 'MLcal' and 'sampler' : 'plumlee'
+cal_2 = calibrator(emu = emulator_1, y = y, x = xrep_std, thetaprior = prior_balldrop, 
+                   method = 'MLcal', yvar = obsvar, 
+                   args = {'sampler' : 'plumlee'})
 
-# plot_pred(x_std, xrep, y, cal_2, theta_range)
+plot_pred(x_std, xrep, y, cal_2, theta_range)
 
-import pdb
-pdb.set_trace()
-
+# %%
 # Fit a calibrator via method = 'directbayes' and 'sampler' : 'plumlee'
 cal_3 = calibrator(emu = emulator_1, y = y, x = xrep_std, thetaprior = prior_balldrop, 
                    method = 'directbayes', yvar = obsvar)
 
 plot_pred(x_std, xrep, y, cal_3, theta_range)
+
+# %%
