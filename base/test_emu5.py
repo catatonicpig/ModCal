@@ -29,9 +29,9 @@ theta1 = theta[0:25,:]
 #2-d x1 (15 x 2), 2-d theta (50 x 2), f (30 x 50)
 x1 = x[0:15,:]
 
-###################################################
-# Unit tests to fit method in the emulator class #
-###################################################
+#######################################################
+# Unit tests for update method of emulator class #
+#######################################################
 
 @contextmanager
 def does_not_raise():
@@ -40,18 +40,22 @@ def does_not_raise():
 @pytest.mark.set1
 class TestClass_1:
     '''
-    Class of tests to check the fit method in the emulator class
+    Class of tests to check the update()
     '''
-    # test to check args
+
+    # test to check update
     @pytest.mark.parametrize(
-        "input1,expectation",
+        "input1,input2,input3,input4,expectation",
         [
-            (1, does_not_raise()),
-            (None, does_not_raise()),
+            (x, theta, f, False, pytest.raises(ValueError)),
+            (x, None, f, False, does_not_raise()), 
+            (x, None, f, True, does_not_raise()), 
+            (x1, None, f, True, pytest.raises(ValueError)), 
+            (x, None, f1, True, pytest.raises(ValueError)), 
+            (x1, None, f1, True, does_not_raise()), 
             ],
         )
-    def test_args(self, input1, expectation):
+    def test_update(self, input1, input2, input3, input4, expectation):
+        emu = emulator(x = x, theta = theta, f = f, method = 'PCGPwM')
         with expectation:
-            assert emulator(x = x, theta = theta, f = f, method = 'PCGPwM', args = {'try': input1}) is not None
-    
-
+            assert emu.update(x=input1, theta=input2, f=input3, options = {'xreps' : input4}) is not None

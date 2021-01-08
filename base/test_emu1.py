@@ -9,7 +9,6 @@ current = os.path.abspath(os.getcwd())
 sys.path.append(os.path.normpath(os.path.join(os.path.dirname(current), '..')))
 from base.emulation import emulator
 
-
 ##############################################
 #            Simple scenarios                #
 ##############################################
@@ -29,7 +28,10 @@ f2 = f[:,0:25]
 theta1 = theta[0:25,:]
 #2-d x1 (15 x 2), 2-d theta (50 x 2), f (30 x 50)
 x1 = x[0:15,:]
-
+# 
+f0d = np.array(1)
+theta0d = np.array(1)
+x0d = np.array(1)
 ##############################################
 # Unit tests to initialize an emulator class #
 ##############################################
@@ -78,6 +80,19 @@ class TestClass_1:
     def test_size_input(self, input1, input2, input3, expectation):
         with expectation:
             assert emulator(x = input1, theta = input2, f = input3, method = 'PCGPwM') is not None
+            
+    # test to check the dimension of the inputs
+    @pytest.mark.parametrize(
+        "input1,input2,input3,expectation",
+        [
+            (x, theta, f0d, pytest.raises(ValueError)),
+            (x0d, theta, f, pytest.raises(ValueError)),
+            (x, theta0d, f, pytest.raises(ValueError)),
+            ],
+        )        
+    def test_0d_input(self, input1, input2, input3, expectation):
+        with expectation:
+            assert emulator(x = input1, theta = input2, f = input3, method = 'PCGPwM') is not None
 
      # TO DO: Add tests for univariate data
      # TO DO: Add tests for data including NAs and infs
@@ -106,7 +121,8 @@ class TestClass_2:
         "example_input,expectation",
         [
             ('PCGPwM', does_not_raise()),
-            ('fakeGP', pytest.raises(ValueError)),
+            ('fakeGP1', pytest.raises(ValueError)),
+            ('fakeGP2', pytest.raises(ValueError)),
             ],
         )
     def test_method2(self, example_input, expectation):

@@ -29,9 +29,9 @@ theta1 = theta[0:25,:]
 #2-d x1 (15 x 2), 2-d theta (50 x 2), f (30 x 50)
 x1 = x[0:15,:]
 
-###################################################
-# Unit tests to fit method in the emulator class #
-###################################################
+#######################################################
+# Unit tests for update method of emulator class #
+#######################################################
 
 @contextmanager
 def does_not_raise():
@@ -40,18 +40,17 @@ def does_not_raise():
 @pytest.mark.set1
 class TestClass_1:
     '''
-    Class of tests to check the fit method in the emulator class
+    Class of tests to check the remove()
     '''
-    # test to check args
+
+    # test to check remove
     @pytest.mark.parametrize(
         "input1,expectation",
         [
-            (1, does_not_raise()),
-            (None, does_not_raise()),
+            (theta1, does_not_raise()),
             ],
         )
-    def test_args(self, input1, expectation):
+    def test_remove(self, input1, expectation):
+        emu = emulator(x = x, theta = theta, f = f, method = 'PCGPwM')
         with expectation:
-            assert emulator(x = x, theta = theta, f = f, method = 'PCGPwM', args = {'try': input1}) is not None
-    
-
+            assert emu.remove(theta=input1) is not None

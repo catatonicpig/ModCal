@@ -28,4 +28,7 @@ x3 = np.vstack(( np.array(list(np.arange(0, 10))*2), np.repeat([1, 2], 10), np.r
 import pdb
 pdb.set_trace() 
 emu = emulator(x = x, theta = theta, f = f, method = 'PCGPwM')
-p = emu.predict(x = x, theta = theta) 
+#pred = emu.predict(x = x, theta = theta) 
+#supp = emu.supplement(size = 5, theta = theta, thetachoices = theta1)
+#updated_emu = emu.update(x=x1, theta = None, f=f1, options = {'xreps' : True})
+removed_emu = emu.remove(theta = theta1)

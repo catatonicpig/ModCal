@@ -66,6 +66,7 @@ class emulator(object):
                     raise ValueError('theta must have either 1 or 2 dimensions.')
         else:
             print('You have not provided f, ignoring everything and just warming up.')
+            # note: line 70 should raise an error for eveyrthing without f
             if (x is not None) and (theta is not None):
                 raise ValueError('You have not provided f, cannot include theta or x.')
         
@@ -133,7 +134,6 @@ class emulator(object):
         self._info = {}
         self._info = {'method': method}
 
-        #note: I dont think options are set properly. It does not assign options as an attribute
         if (self.__f is not None) and (self.__options['autofit']):
             self.fit()
 
@@ -326,7 +326,7 @@ class emulator(object):
             raise ValueError('You must either provide either x or (theta or cal).')
         
         if x is not None and self.__suppx is not None and (not overwrite):
-            raise ValueError('You must either evaulate the stuff in emu._emulator__suppx  or select'
+            raise ValueError('You must either evaluate the stuff in emu._emulator__suppx  or select'
                             + ' overwrite = True.')
         elif x is not None:
             x = copy.copy(x)
@@ -357,9 +357,10 @@ class emulator(object):
         elif xchoices is not None and xchoices.shape[0] != choicescost.shape[0]:
             raise ValueError('choicecost is not the right shape.')
         
-        
-        if thetachoices.shape[1] != theta.shape[1]:
-            raise ValueError('Your demensions of choices and predictions are not aligning.')
+        #note I inlcude a line of code below to make that function works
+        if thetachoices is not None:
+            if thetachoices.shape[1] != theta.shape[1]:
+                raise ValueError('Your demensions of choices and predictions are not aligning.')
         
         if theta is not None and self.__supptheta is not None and (not overwrite):
             raise ValueError('You must either evaulate the stuff in emu._emulator__supptheta or select'
@@ -374,6 +375,10 @@ class emulator(object):
                 raise ValueError('cal.theta(n) produces the wrong shape.')
         else:
             theta = None
+        
+        # adding those two lines below
+        supptheta = None
+        suppx = None
         if thetachoices is not None:
             supptheta, suppinfo = self.method.supplementtheta(self._info, copy.copy(size),
                                                               copy.copy(theta),
@@ -383,7 +388,8 @@ class emulator(object):
                                                               argstemp)
             suppx = None
         elif xchoices is not None:
-            supptheta, suppinfo = self.method.supplementx(self._info, copy.copy(size),
+            # fixing that part, too
+            suppx, suppinfo = self.method.supplementx(self._info, copy.copy(size),
                                                               copy.copy(x),
                                                               copy.copy(xchoices),
                                                               copy.copy(choicescost),
@@ -517,7 +523,8 @@ class emulator(object):
                     self.__theta = np.vstack((self.__theta,theta))
         
         if (f is not None) and (theta is None) and (x is not None):
-            if x.shape[0] != f.shape[1]:
+            #changing f.shape[1] to f.shape[0], ALSO there is sth wrong with the rest as well
+            if x.shape[0] != f.shape[0]:
                 raise ValueError('number of rows in f and rows in x does not align.')
             if x.shape[1] != self.__x.shape[1]:
                 raise ValueError('x shape does not match old one,'
@@ -535,8 +542,8 @@ class emulator(object):
                 if nc.shape[0] > 0.5:
                     self.__f = np.vstack(self.__f, f[c,:])
         if (f is not None) and (theta is not None) and (x is not None):
-                raise ValueError('Simultaneously adding new theta and x at once is currently'+
-                                 'not supported.  Please supply either theta OR x.')
+                raise ValueError('Simultaneously adding new theta and x at once is currently' +
+                                 ' not supported. Please supply either theta OR x.')
         if self.__options['autofit']:
             self.fit()
         return
