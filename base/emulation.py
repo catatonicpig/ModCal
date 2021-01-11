@@ -164,7 +164,7 @@ class emulator(object):
             add/modify those in emu._args.
         """
         
-        # note: not sure if args here in fit(self, args= None) makes sense
+        # note: not sure if args here in fit(self, args= None) makes sense--it is not necessary and I cant test it with the current setting
         if args is not None:
             argstemp = {**self._args, **copy.deepcopy(args)} #properly merge the arguments
         else:
@@ -245,7 +245,7 @@ class emulator(object):
                 raise ValueError('Your theta shape seems to not agree with the emulator build.')
         
         info = {}
-        self.method.predict(info, self._info, x, theta, args)
+        self.method.predict(info, self._info, x, theta, args = argstemp)
         return prediction(info, self)
     
     def supplement(self, size,  x=None, xchoices=None,  theta=None, thetachoices=None, choicescost=None,

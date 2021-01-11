@@ -68,7 +68,10 @@ class TestClass_1:
         "input1,input2,input3,expectation",
         [
             (x, theta, f, does_not_raise()),
-            (x, theta, f.T, does_not_raise()),
+            (x, theta, f.T, does_not_raise()), # failure
+            (x, None, f.T, does_not_raise()), # failure : preprocess
+            (x.T, theta, f, pytest.raises(ValueError)),
+            (x.T, None, f, pytest.raises(ValueError)),
             (x, theta.T, f, does_not_raise()),
             (x1, theta, f1, does_not_raise()),
             (x, theta, f1, pytest.raises(ValueError)),
@@ -244,6 +247,44 @@ class TestClass_3:
     def test_options6(self, input1, expectation):
         with expectation:
             assert emulator(x = x, theta = theta, f = f, method = 'PCGPwM', options = {'autofit': input1}) is not None
+            
+@pytest.mark.set4
+class TestClass_4:
+    '''
+    Class of tests to check the emulator repr()
+    '''
+    
+    # test to check if an emulator module is imported
+    @pytest.mark.parametrize(
+        "expectation",
+        [
+            (does_not_raise()),
+            ],
+        )
+    def test_repr(self, expectation):
+        emu = emulator(x = x, theta = theta, f = f, method = 'PCGPwM')
+        with expectation:
+            assert repr(emu) is not None
+
+@pytest.mark.set5
+class TestClass_5:
+    '''
+    Class of tests to check the emulator call()
+    '''
+    
+    # test to check if an emulator module is imported
+    @pytest.mark.parametrize(
+        "expectation",
+        [
+            (does_not_raise()),
+            ],
+        )
+    def test_call(self, expectation):
+        emu = emulator(x = x, theta = theta, f = f, method = 'PCGPwM')
+        with expectation:
+            assert emu(x = x, theta = theta) is not None
+            
+
             
 # pytest test_u1.py -m set3 --disable-warnings
 # pytest --cov=ModCal/base/emulation test_u1.py

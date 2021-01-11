@@ -49,29 +49,31 @@ class calibrator(object):
             raise ValueError('You have not provided any y.')
         if y.ndim > 1.5:
             y = np.squeeze(y)
-        # if y.shape[0] < 5:
-        #     raise ValueError('5 is the minimum number of observations at this time.')
+        if y.shape[0] < 5:
+            raise ValueError('5 is the minimum number of observations at this time.')
         self.y = y
         if emu is None:
             raise ValueError('You have not provided any emulator.')
         self.emu = emu
-        if thetaprior is None:
-            raise ValueError('You have not provided any prior function, stopping...')
+            
         try:
             thetatestsamp = thetaprior.rnd(100)
-            if thetatestsamp.shape[0] != 100:
-                raise ValueError('thetaprior.rnd(100) failed to give 100 values.')
         except:
             raise ValueError('thetaprior.rnd(100) failed.')
+            
+        if thetatestsamp.shape[0] != 100:
+            raise ValueError('thetaprior.rnd(100) failed to give 100 values.')
         
-        thetatestlpdf = thetaprior.lpdf(thetatestsamp)
+        try:
+            thetatestlpdf = thetaprior.lpdf(thetatestsamp)
+        except:
+            raise ValueError('thetaprior.lpdf(thetatestsamp) failed.')
+        
         if thetatestlpdf.shape[0] != 100:
             raise ValueError('thetaprior.lpdf(thetaprior.rnd(100)) failed to give 100 values.')
         if thetatestlpdf.ndim != 1:
             raise ValueError('thetaprior.lpdf(thetaprior.rnd(100)) is demension higher than 1.')
-       # except:
-        #    print(thetaprior.lpdf(thetaprior.rnd(100)))
-        #    raise ValueError('thetaprior.lpdf(thetaprior.rnd(100)) failed.')
+
         self.info = {}
         self.info['thetaprior'] = copy.deepcopy(thetaprior)
         
@@ -113,7 +115,7 @@ class calibrator(object):
             self.info['yvar'] = copy.deepcopy(yvar)
             if whichkeep is not None:
                 self.info['yvar'] = self.info['yvar'][whichkeep]
-        self.method = importlib.import_module('base.calibrationmethods.' + method)
+
         try:
             self.method = importlib.import_module('base.calibrationmethods.' + method)
         except:

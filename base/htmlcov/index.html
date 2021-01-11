@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <title>Coverage report</title>
+    <link rel="icon" sizes="32x32" href="favicon_32.png">
+    <link rel="stylesheet" href="style.css" type="text/css">
+    <script type="text/javascript" src="jquery.min.js"></script>
+    <script type="text/javascript" src="jquery.ba-throttle-debounce.min.js"></script>
+    <script type="text/javascript" src="jquery.tablesorter.min.js"></script>
+    <script type="text/javascript" src="jquery.hotkeys.js"></script>
+    <script type="text/javascript" src="coverage_html.js"></script>
+    <script type="text/javascript">
+        jQuery(document).ready(coverage.index_ready);
+    </script>
+</head>
+<body class="indexfile">
+<div id="header">
+    <div class="content">
+        <h1>Coverage report:
+            <span class="pc_cov">67%</span>
+        </h1>
+        <img id="keyboard_icon" src="keybd_closed.png" alt="Show keyboard shortcuts" />
+        <form id="filter_container">
+            <input id="filter" type="text" value="" placeholder="filter..." />
+        </form>
+    </div>
+</div>
+<div class="help_panel">
+    <img id="panel_icon" src="keybd_open.png" alt="Hide keyboard shortcuts" />
+    <p class="legend">Hot-keys on this page</p>
+    <div>
+    <p class="keyhelp">
+        <span class="key">n</span>
+        <span class="key">s</span>
+        <span class="key">m</span>
+        <span class="key">x</span>
+        <span class="key">c</span> &nbsp; change column sorting
+    </p>
+    </div>
+</div>
+<div id="index">
+    <table class="index">
+        <thead>
+            <tr class="tablehead" title="Click to sort">
+                <th class="name left headerSortDown shortkey_n">Module</th>
+                <th class="shortkey_s">statements</th>
+                <th class="shortkey_m">missing</th>
+                <th class="shortkey_x">excluded</th>
+                <th class="right shortkey_c">coverage</th>
+            </tr>
+        </thead>
+        <tfoot>
+            <tr class="total">
+                <td class="name left">Total</td>
+                <td>2223</td>
+                <td>736</td>
+                <td>0</td>
+                <td class="right" data-ratio="1487 2223">67%</td>
+            </tr>
+        </tfoot>
+        <tbody>
+            <tr class="file">
+                <td class="name left"><a href="__init___py.html">__init__.py</a></td>
+                <td>0</td>
+                <td>0</td>
+                <td>0</td>
+                <td class="right" data-ratio="0 0">100%</td>
+            </tr>
+            <tr class="file">
+                <td class="name left"><a href="calibration_py.html">calibration.py</a></td>
+                <td>213</td>
+                <td>93</td>
+                <td>0</td>
+                <td class="right" data-ratio="120 213">56%</td>
+            </tr>
+            <tr class="file">
+                <td class="name left"><a href="calibrationmethods_MLcal_py.html">calibrationmethods/MLcal.py</a></td>
+                <td>70</td>
+                <td>23</td>
+                <td>0</td>
+                <td class="right" data-ratio="47 70">67%</td>
+            </tr>
+            <tr class="file">
+                <td class="name left"><a href="emulation_py.html">emulation.py</a></td>
+                <td>518</td>
+                <td>165</td>
+                <td>0</td>
+                <td class="right" data-ratio="353 518">68%</td>
+            </tr>
+            <tr class="file">
+                <td class="name left"><a href="emulationmethods_PCGP_ozge_py.html">emulationmethods/PCGP_ozge.py</a></td>
+                <td>157</td>
+                <td>1</td>
+                <td>0</td>
+                <td class="right" data-ratio="156 157">99%</td>
+            </tr>
+            <tr class="file">
+                <td class="name left"><a href="emulationmethods_PCGPwM_py.html">emulationmethods/PCGPwM.py</a></td>
+                <td>457</td>
+                <td>98</td>
+                <td>0</td>
+                <td class="right" data-ratio="359 457">79%</td>
+            </tr>
+            <tr class="file">
+                <td class="name left"><a href="emulationmethods_fakeGP1_py.html">emulationmethods/fakeGP1.py</a></td>
+                <td>3</td>
+                <td>0</td>
+                <td>0</td>
+                <td class="right" data-ratio="3 3">100%</td>
+            </tr>
+            <tr class="file">
+                <td class="name left"><a href="test_cal1_py.html">test_cal1.py</a></td>
+                <td>84</td>
+                <td>4</td>
+                <td>0</td>
+                <td class="right" data-ratio="80 84">95%</td>
+            </tr>
+            <tr class="file">
+                <td class="name left"><a href="test_cal2_py.html">test_cal2.py</a></td>
+                <td>60</td>
+                <td>4</td>
+                <td>0</td>
+                <td class="right" data-ratio="56 60">93%</td>
+            </tr>
+            <tr class="file">
+                <td class="name left"><a href="test_emu1_py.html">test_emu1.py</a></td>
+                <td>70</td>
+                <td>0</td>
+                <td>0</td>
+                <td class="right" data-ratio="70 70">100%</td>
+            </tr>
+            <tr class="file">
+                <td class="name left"><a href="test_emu2_py.html">test_emu2.py</a></td>
+                <td>25</td>
+                <td>0</td>
+                <td>0</td>
+                <td class="right" data-ratio="25 25">100%</td>
+            </tr>
+            <tr class="file">
+                <td class="name left"><a href="test_emu3_py.html">test_emu3.py</a></td>
+                <td>70</td>
+                <td>0</td>
+                <td>0</td>
+                <td class="right" data-ratio="70 70">100%</td>
+            </tr>
+            <tr class="file">
+                <td class="name left"><a href="test_emu4_py.html">test_emu4.py</a></td>
+                <td>30</td>
+                <td>0</td>
+                <td>0</td>
+                <td class="right" data-ratio="30 30">100%</td>
+            </tr>
+            <tr class="file">
+                <td class="name left"><a href="test_emu5_py.html">test_emu5.py</a></td>
+                <td>26</td>
+                <td>0</td>
+                <td>0</td>
+                <td class="right" data-ratio="26 26">100%</td>
+            </tr>
+            <tr class="file">
+                <td class="name left"><a href="test_emu6_py.html">test_emu6.py</a></td>
+                <td>26</td>
+                <td>0</td>
+                <td>0</td>
+                <td class="right" data-ratio="26 26">100%</td>
+            </tr>
+            <tr class="file">
+                <td class="name left"><a href="utilities_py.html">utilities.py</a></td>
+                <td>18</td>
+                <td>4</td>
+                <td>0</td>
+                <td class="right" data-ratio="14 18">78%</td>
+            </tr>
+            <tr class="file">
+                <td class="name left"><a href="utilitiesmethods_metropolis_hasting_py.html">utilitiesmethods/metropolis_hasting.py</a></td>
+                <td>44</td>
+                <td>4</td>
+                <td>0</td>
+                <td class="right" data-ratio="40 44">91%</td>
+            </tr>
+            <tr class="file">
+                <td class="name left"><a href="utilitiesmethods_plumleeMCMC_py.html">utilitiesmethods/plumleeMCMC.py</a></td>
+                <td>141</td>
+                <td>136</td>
+                <td>0</td>
+                <td class="right" data-ratio="5 141">4%</td>
+            </tr>
+            <tr class="file">
+                <td class="name left"><a href="utilitiesmethods_plumleeMCMC_wgrad_py.html">utilitiesmethods/plumleeMCMC_wgrad.py</a></td>
+                <td>211</td>
+                <td>204</td>
+                <td>0</td>
+                <td class="right" data-ratio="7 211">3%</td>
+            </tr>
+        </tbody>
+    </table>
+    <p id="no_rows">
+        No items found using the specified filter.
+    </p>
+</div>
+<div id="footer">
+    <div class="content">
+        <p>
+            <a class="nav" href="https://coverage.readthedocs.io">coverage.py v5.3.1</a>,
+            created at 2021-01-10 18:29 -0600
+        </p>
+    </div>
+</div>
+</body>
+</html>

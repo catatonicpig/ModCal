@@ -40,18 +40,17 @@ def does_not_raise():
 @pytest.mark.set1
 class TestClass_1:
     '''
-    Class of tests to check the fit method in the emulator class
+    Class of tests to check the emulator args
     '''
-    # test to check args
+    
+    # test to check if an emulator module is imported
     @pytest.mark.parametrize(
         "input1,expectation",
         [
-            (1, does_not_raise()),
-            (None, does_not_raise()),
+            ({'epsilon': 1.5, 'hypregmean': -10, 'hypregLB': -20}, does_not_raise()),
             ],
         )
     def test_args(self, input1, expectation):
         with expectation:
-            assert emulator(x = x, theta = theta, f = f, method = 'PCGPwM', args = {'try': input1}) is not None
-    
-
+            assert emulator(x = x, theta = theta, f = f, method = 'PCGPwM',
+                       args = input1) is not None
