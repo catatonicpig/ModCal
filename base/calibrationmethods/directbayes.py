@@ -186,7 +186,6 @@ def predict(predinfo, fitinfo, emu, x, args=None):
         raise ValueError('Must provide yvar in this software.')
     emupredict = emu.predict(x, theta)
     predinfo['rnd'] = copy.deepcopy(emupredict()).T
-    predinfo['modelrnd'] = copy.deepcopy(emupredict()).T
     
     emupredict = emu.predict(x, theta)
     emumean = emupredict.mean()
@@ -195,7 +194,6 @@ def predict(predinfo, fitinfo, emu, x, args=None):
     for k in range(0, theta.shape[0]):
         re = emucovxhalf[:,k,:] @ sps.norm.rvs(0,1,size=(emucovxhalf.shape[2]))
         predinfo['rnd'][k,:] += re
-        predinfo['modelrnd'][k,:] += re
         
     predinfo['mean'] = np.mean(emumean, 0)
     varterm1 = np.var(emumean, 0)
@@ -297,57 +295,57 @@ def loglik(fitinfo, emu, theta, y, x, args):
     #return loglik
 
 
-def loglik_gradapprox(fitinfo, emu, theta, y, x, args):
-    r"""
-    This is a optional docstring for an internal function.
-    """
+# def loglik_gradapprox(fitinfo, emu, theta, y, x, args):
+#     r"""
+#     This is a optional docstring for an internal function.
+#     """
     
     
-    if 'yvar' in fitinfo.keys():
-        obsvar = 1*np.squeeze(fitinfo['yvar'])
-    else:
-        raise ValueError('Must provide yvar in this software.')
-    #y = np.squeeze(y)
-    emupredict = emu.predict(x, theta, args={'return_grad': True})
-    emumean = emupredict.mean()
-    emuvar = emupredict.var()
-    emucovxhalf = emupredict.covxhalf()
-    emumean_grad = emupredict.mean_gradtheta()
-    loglik = np.zeros(emumean.shape[1])
-    dloglik = np.zeros((emumean.shape[1],emu._info['theta'].shape[1]))
-    dterm1 = np.zeros(emu._info['theta'].shape[1])
-    dterm2 = np.zeros(emu._info['theta'].shape[1])
-    if np.any(np.abs(emuvar/(10 ** (-4) + (1+10 ** (-4))*np.sum(np.square(emucovxhalf),2))) > 1):
-        emuoldpredict = emu.predict(x)
-        emuoldvar = emuoldpredict.var()
-        emuoldcxh = emuoldpredict.covxhalf()
-        obsvar += np.mean(np.abs(emuoldvar- np.sum(np.square(emuoldcxh),2)),1)
-    if '_info' in dir(emu) and 'extravar' in emu._info:
-        obsvar = obsvar + np.mean(emu._info['extravar'])
-    for k in range(0, emumean.shape[1]):
-        m0 = emumean[:,k]
-        dm0 = np.squeeze(emumean_grad[:, k, :])
-        S0 = np.squeeze(emucovxhalf[:,k,:])
+#     if 'yvar' in fitinfo.keys():
+#         obsvar = 1*np.squeeze(fitinfo['yvar'])
+#     else:
+#         raise ValueError('Must provide yvar in this software.')
+#     #y = np.squeeze(y)
+#     emupredict = emu.predict(x, theta, args={'return_grad': True})
+#     emumean = emupredict.mean()
+#     emuvar = emupredict.var()
+#     emucovxhalf = emupredict.covxhalf()
+#     emumean_grad = emupredict.mean_gradtheta()
+#     loglik = np.zeros(emumean.shape[1])
+#     dloglik = np.zeros((emumean.shape[1],emu._info['theta'].shape[1]))
+#     dterm1 = np.zeros(emu._info['theta'].shape[1])
+#     dterm2 = np.zeros(emu._info['theta'].shape[1])
+#     if np.any(np.abs(emuvar/(10 ** (-4) + (1+10 ** (-4))*np.sum(np.square(emucovxhalf),2))) > 1):
+#         emuoldpredict = emu.predict(x)
+#         emuoldvar = emuoldpredict.var()
+#         emuoldcxh = emuoldpredict.covxhalf()
+#         obsvar += np.mean(np.abs(emuoldvar- np.sum(np.square(emuoldcxh),2)),1)
+#     if '_info' in dir(emu) and 'extravar' in emu._info:
+#         obsvar = obsvar + np.mean(emu._info['extravar'])
+#     for k in range(0, emumean.shape[1]):
+#         m0 = emumean[:,k]
+#         dm0 = np.squeeze(emumean_grad[:, k, :])
+#         S0 = np.squeeze(emucovxhalf[:,k,:])
         
-        stndresid = (np.squeeze(y) - m0) / np.sqrt(obsvar)
-        term1 = np.sum(stndresid ** 2)
-        stndresid_grad = - (dm0.T / np.sqrt(obsvar)).T
-        dterm1 = 2 * np.sum(stndresid * stndresid_grad.T, 1)
-        J = (S0.T / np.sqrt(obsvar)).T
-        if J.ndim < 1.5:
-            J = J[:,None].T
-        J2 =  J.T @ stndresid
-        W, V = np.linalg.eigh(np.eye(J.shape[1]) + J.T @ J)
-        J3 = np.squeeze(V) @ np.diag(1/W) @ np.squeeze(V).T @ np.squeeze(J2)
-        term2 = np.sum(J3 * J2)
-        for l in range(0,stndresid_grad.shape[1]):
-            dJ2 = J.T @ np.squeeze(stndresid_grad[:,l])
-            dterm2[l] = 2*np.sum(dJ2 * J3)
-        term3 = np.sum(np.log(W))
-        residsq = term1 - term2
-        loglik[k] = -0.5 * residsq - 0.5 * term3
-        dloglik[k, :] = -0.5 * (dterm1-dterm2)
-    return loglik, dloglik
+#         stndresid = (np.squeeze(y) - m0) / np.sqrt(obsvar)
+#         term1 = np.sum(stndresid ** 2)
+#         stndresid_grad = - (dm0.T / np.sqrt(obsvar)).T
+#         dterm1 = 2 * np.sum(stndresid * stndresid_grad.T, 1)
+#         J = (S0.T / np.sqrt(obsvar)).T
+#         if J.ndim < 1.5:
+#             J = J[:,None].T
+#         J2 =  J.T @ stndresid
+#         W, V = np.linalg.eigh(np.eye(J.shape[1]) + J.T @ J)
+#         J3 = np.squeeze(V) @ np.diag(1/W) @ np.squeeze(V).T @ np.squeeze(J2)
+#         term2 = np.sum(J3 * J2)
+#         for l in range(0,stndresid_grad.shape[1]):
+#             dJ2 = J.T @ np.squeeze(stndresid_grad[:,l])
+#             dterm2[l] = 2*np.sum(dJ2 * J3)
+#         term3 = np.sum(np.log(W))
+#         residsq = term1 - term2
+#         loglik[k] = -0.5 * residsq - 0.5 * term3
+#         dloglik[k, :] = -0.5 * (dterm1-dterm2)
+#     return loglik, dloglik
 
 
 def loglik_grad(fitinfo, emu, theta, y, x, args):

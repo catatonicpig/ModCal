@@ -73,3 +73,5 @@ cal_test = calibrator(emu = emulator_test, y = y, x = x, thetaprior = prior_exam
                            'stepType' : 'normal', 
                            'stepParam' : [0.3, 0.3]})
 cal_pred = cal_test.predict(x=x)
+
+lpdf = cal_pred.theta.lpdf()
