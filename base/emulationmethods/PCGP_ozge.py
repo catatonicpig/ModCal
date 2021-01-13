@@ -314,11 +314,15 @@ def emulation_fit(theta, pcaval, hypstarts=None, hypinds=None):
     
     #######  ####### ####### #######
     # Get a random sample of thetas to find the optimized hyperparameters
-    n_train = np.min((20*theta.shape[1], theta.shape[0]))
+    #n_train = np.min((20*theta.shape[1], theta.shape[0]))
+    n_train = np.min((10, theta.shape[0]))
     idx = np.random.choice(theta.shape[0], n_train, replace=False)
     
     # Start constructing the returning dictionary
-    subinfo['theta'] = theta[idx, :]
+    if theta.ndim == 1:
+        subinfo['theta'] = theta[idx]
+    else:
+        subinfo['theta'] = theta[idx, :]
     subinfo['f'] = pcaval[idx] 
     subinfo['n'] = subinfo['f'].shape[0]
     subinfo['p'] = covhyp0.shape[0]

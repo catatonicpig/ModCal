@@ -24,10 +24,14 @@ theta1 = theta[0:25,:]
 #2-d x1 (15 x 2), 2-d theta (50 x 2), f (30 x 50)
 x1 = x[0:15,:]
 x3 = np.vstack(( np.array(list(np.arange(0, 10))*2), np.repeat([1, 2], 10), np.repeat([2, 3], 10))).T
-
+# 
+f0d = np.array(1)
+theta0d = np.array(1)
+x0d = np.array(1)
 import pdb
 pdb.set_trace() 
-emu = emulator(x = x, theta = theta, f = f, method = 'PCGPwM', args = {'epsilon': 1.5, 'hypregmean': -10, 'hypregLB': -20})
+#emu = emulator(x = x, theta = theta, f = f, method = 'PCGPwM', args = {'epsilon': 1.5, 'hypregmean': -10, 'hypregLB': -20})
+emu = emulator(x = x, theta = theta.T, f = f, method = 'PCGPwM', options = {'xrmnan': 'XXX'})
 #pred = emu.predict(x = x, theta = theta) 
 #supp = emu.supplement(size = 5, theta = theta, thetachoices = theta1)
 #updated_emu = emu.update(x=x1, theta = None, f=f1, options = {'xreps' : True})

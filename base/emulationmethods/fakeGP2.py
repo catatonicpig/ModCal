@@ -21,3 +21,4 @@ import scipy.optimize as spo
 ##############################################################################
 """
 def fit(fitinfo, x, theta, f, args=None):
+    return 1

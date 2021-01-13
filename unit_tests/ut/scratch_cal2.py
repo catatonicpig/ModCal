@@ -83,13 +83,15 @@ def balldroptrue(x):
 
 obsvar = 4*np.ones(x.shape[0])  
 y = balldroptrue(xv)
-emulator_test = emulator(x = x, theta = theta_lin, f = f_lin, method = 'PCGP_ozge')
-
+import pdb
+pdb.set_trace() 
+emulator_test = emulator(x = x, theta = theta_lin, f = f_lin, method = 'PCGPwM')
+emulator_test.supplement(size = 5, theta = theta_lin, thetachoices = None)
 ##############################################
 # Unit tests to initialize an emulator class #
 ##############################################
 #import pdb
 #pdb.set_trace() 
-cal_bayes = calibrator(emu = emulator_test, y = y, x = x, thetaprior = priorphys_lin, method = 'directbayes', yvar = obsvar)
-pred_cal_bayes = cal_bayes.predict(x = x)
+#cal_bayes = calibrator(emu = emulator_test, y = y, x = x, thetaprior = priorphys_lin, method = 'directbayes', yvar = obsvar)
+#pred_cal_bayes = cal_bayes.predict(x = x)
 #lpdf = cal_bayes.theta.lpdf()

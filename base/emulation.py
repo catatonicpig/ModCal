@@ -65,60 +65,58 @@ class emulator(object):
                 if theta.ndim < 0.5 or theta.ndim > 2.5:
                     raise ValueError('theta must have either 1 or 2 dimensions.')
         else:
-            print('You have not provided f, ignoring everything and just warming up.')
-            # note: line 70 should raise an error for eveyrthing without f
-            if (x is not None) and (theta is not None):
-                raise ValueError('You have not provided f, cannot include theta or x.')
+            raise ValueError('You have not provided f, cannot include theta or x.')
+
         
         if x is not None and (f.shape[0] != x.shape[0]):
             if theta is not None:
                 if f.ndim == 2 and f.shape[1] == x.shape[0] and f.shape[0] == theta.shape[0]:
-                    print('transposing f to try to get agreement....')
+                    print('transposing f to try to get agreement...')
                     self.__f = copy.copy(f).T
+                    f = copy.copy(f).T
                 else:
                     raise ValueError('The number of rows in f must match the number of rows in x.')
             else:
                 if f.ndim == 2 and f.shape[1] == x.shape[0]:
-                    print('transposing f to try to get agreement....')
+                    print('transposing f to try to get agreement...')
                     self.__f = copy.copy(f).T
+                    f = copy.copy(f).T
                 else:
                     raise ValueError('The number of rows in f must match the number of rows in x.')
-        
-        # note: NOT CONSISTENT: in lines 72--76 we take the transpose but then we raise an error in lines 85--88
+
         if theta is not None and (f.shape[1] != theta.shape[0]):
             if x is not None:
-                raise ValueError('The number of columns in f must match the number of rows in theta.')
+                if f.ndim == 2 and f.shape[0] == theta.shape[0] and f.shape[1] == x.shape[0]:
+                    self.__f = copy.copy(f).T
+                    f = copy.copy(f).T
+                else:
+                    raise ValueError('The number of columns in f must match the number of rows in theta.')
             else:
                 if f.ndim == 2 and f.shape[0] == theta.shape[0]:
                     print('transposing f to try to get agreement....')
                     self.__f = copy.copy(f).T
+                    f = copy.copy(f).T
                 elif f.ndim == 1 and f.shape[0] == theta.shape[0]:
                     print('transposing f to try to get agreement....')
                     self.__f = np.reshape(copy.copy(f),(1,-1))
+                    f = np.reshape(copy.copy(f),(1,-1))
                 raise ValueError('The number of columns in f must match the number of rows in theta.')
             
-        if theta is not None and (f.shape[1] != theta.shape[0]):
-            if f.shape[1] == theta.shape[0] and f.shape[0] == x.shape[0]:
-                self.__f = copy.copy(f).T
-            else:
-                raise ValueError('The columns in f must match the rows in theta')
         
         if x is not None:
             self.__x = copy.copy(x)
         else:
             self.__x = None
-        self.__suppx = None
+
         if theta is not None:
             self.__theta = copy.copy(theta)
         else:
             self.__theta = None
+            
+        self.__suppx = None
         self.__supptheta = None
-        
-        if f is not None:
-            self.__f = copy.copy(f)
-        else:
-            self.__f = None
-        
+        self.__f = copy.copy(f)
+
         try:
             self.method = importlib.import_module('base.emulationmethods.' + method)
         except:
@@ -165,10 +163,10 @@ class emulator(object):
         """
         
         # note: not sure if args here in fit(self, args= None) makes sense--it is not necessary and I cant test it with the current setting
-        if args is not None:
-            argstemp = {**self._args, **copy.deepcopy(args)} #properly merge the arguments
-        else:
-            argstemp = copy.copy(self._args)
+        #if args is not None:
+        #    argstemp = {**self._args, **copy.deepcopy(args)} #properly merge the arguments
+        #else:
+        argstemp = copy.copy(self._args)
         x, theta, f = self.__preprocess()
         self.method.fit(self._info, x, theta, f, args = argstemp)
 
@@ -198,8 +196,7 @@ class emulator(object):
         prediction : an instance of emulation class prediction
             prediction._info : Gives the dictionary of what was produced by the method.
         """
-        
-        #note: we never had a case that passes through that if statement: create a case to increase the coverage
+    
         if self.__ptf is not None:
             info = {}
             if theta is not None:
@@ -217,17 +214,18 @@ class emulator(object):
             x = copy.copy(self.__x)
         else:
             x = copy.copy(x)
-            if x.ndim == 2 and self.__x.ndim == 1:
-                raise ValueError('Your x shape seems to not agree with the emulator build.')
-            elif x.ndim == 1 and self.__x.ndim == 2 and x.shape[0] == self.__x.shape[1]:
-                x = np.reshape(x, (1,-1))
-            elif x.ndim == 1 and self.__x.ndim == 2:
-                raise ValueError('Your x shape seems to not agree with the emulator build.')
-            elif x.shape[1] != self.__x.shape[1] and x.shape[0] == self.__x.shape[1]:
-                x = x.T
-            # i dont think the statement below is correct
-            elif x.shape[1] != self.__x.shape[1] and x.shape[0] != self.__x.shape[1]:
-                raise ValueError('Your x shape seems to not agree with the emulator build.')
+            if x.ndim == 1:
+                if self.__x.ndim == 2 and x.shape[0] == self.__x.shape[1]:
+                    x = np.reshape(x, (1,-1))
+                elif self.__x.ndim == 2:
+                    raise ValueError('Your x shape seems to not agree with the emulator build.')
+            elif x.ndim ==2:
+                if self.__x.ndim == 1:
+                    raise ValueError('Your x shape seems to not agree with the emulator build.')
+                elif x.shape[1] != self.__x.shape[1] and x.shape[0] == self.__x.shape[1]:
+                    x = x.T
+                elif x.shape[1] != self.__x.shape[1] and x.shape[0] != self.__x.shape[1]:
+                    raise ValueError('Your x shape seems to not agree with the emulator build.')
         if theta is None:
             theta = copy.copy(self.__theta)
         else:
@@ -313,14 +311,16 @@ class emulator(object):
                 return copy.deepcopy(self.__supptheta)
             else:
                 raise ValueError('The number of new values must be a positive integer.')
+        
         if cal is None and theta is None and x is None:
-            raise ValueError('Either a calibrator or thetas must be provided.')
+            raise ValueError('Either x or (theta or cal) must be provided.')
+            
         if cal is not None:
             try:
                 if theta is None:
                     theta = cal.theta(2000)
             except:
-                raise ValueError('cal.theta(5000) failed.')
+                raise ValueError('cal.theta(2000) failed.')
         
         if x is not None and theta is not None:
             raise ValueError('You must either provide either x or (theta or cal).')
@@ -350,14 +350,14 @@ class emulator(object):
         
         if choicescost is None and thetachoices is not None:
             choicescost = np.ones(thetachoices.shape[0])
-        elif choicescost is None and xchoices is not None:
-            choicescost = np.ones(xchoices.shape[0])
+        #elif choicescost is None and xchoices is not None:
+        #    choicescost = np.ones(xchoices.shape[0])
         elif thetachoices is not None and thetachoices.shape[0] != choicescost.shape[0]:
             raise ValueError('choicecost is not the right shape.')
-        elif xchoices is not None and xchoices.shape[0] != choicescost.shape[0]:
-            raise ValueError('choicecost is not the right shape.')
-        
-        #note I inlcude a line of code below to make that function works
+        #elif xchoices is not None and xchoices.shape[0] != choicescost.shape[0]:
+        #    raise ValueError('choicecost is not the right shape.')
+
+
         if thetachoices is not None:
             if thetachoices.shape[1] != theta.shape[1]:
                 raise ValueError('Your demensions of choices and predictions are not aligning.')
@@ -387,15 +387,15 @@ class emulator(object):
                                                               copy.copy(cal),
                                                               argstemp)
             suppx = None
-        elif xchoices is not None:
+        #elif xchoices is not None:
             # fixing that part, too
-            suppx, suppinfo = self.method.supplementx(self._info, copy.copy(size),
-                                                              copy.copy(x),
-                                                              copy.copy(xchoices),
-                                                              copy.copy(choicescost),
-                                                              copy.copy(cal),
-                                                              argstemp)
-            supptheta = None
+        #    suppx, suppinfo = self.method.supplementx(self._info, copy.copy(size),
+        #                                                      copy.copy(x),
+        #                                                      copy.copy(xchoices),
+        #                                                      copy.copy(choicescost),
+        #                                                      copy.copy(cal),
+        #                                                      argstemp)
+        #    supptheta = None
         
         if supptheta is not None and removereps:
             nctheta, ctheta, rtheta = _matrixmatching(self.__theta, supptheta)
@@ -488,7 +488,7 @@ class emulator(object):
             else:
                 self.__x = x
         if (theta is not None) and (f is None):
-            if theta.shape[1] != self.__f.shape[1]:
+            if theta.shape[0] != self.__f.shape[1]:
                 print('you have change the number of theta, but not provided a new f...')
             else:
                 self.__theta = theta
@@ -612,23 +612,28 @@ class emulator(object):
                     self.__options['thetarmnan'] = 0
                 else:
                     self.__options['thetarmnan'] =  1 + (10** (-12))
-            elif isinstance(options['thetarmnan'],str) and options['thetarmnan']=='any':
+            elif type(options['thetarmnan']) is str:
+                if isinstance(options['thetarmnan'],str) and options['thetarmnan']=='any':
                     self.__options['thetarmnan'] = 0
-            elif isinstance(options['thetarmnan'],str) and options['thetarmnan']=='some':
+                elif isinstance(options['thetarmnan'],str) and options['thetarmnan']=='some':
                     self.__options['thetarmnan'] = 0.2
-            elif isinstance(options['thetarmnan'],str) and options['thetarmnan']=='most':
+                elif isinstance(options['thetarmnan'],str) and options['thetarmnan']=='most':
                     self.__options['thetarmnan'] = 0.5
-            elif isinstance(options['thetarmnan'],str) and options['thetarmnan']=='alot':
+                elif isinstance(options['thetarmnan'],str) and options['thetarmnan']=='alot':
                     self.__options['thetarmnan'] = 0.8
-            elif isinstance(options['thetarmnan'],str) and options['thetarmnan']=='all':
+                elif isinstance(options['thetarmnan'],str) and options['thetarmnan']=='all':
                     self.__options['thetarmnan'] = 1 - (10** (-8))
-            elif isinstance(options['thetarmnan'],str)  and options['thetarmnan']=='never':
+                elif isinstance(options['thetarmnan'],str)  and options['thetarmnan']=='never':
                     self.__options['thetarmnan'] = 1 + (10** (-8))
+                else:
+                    raise ValueError('option thetarmnan must be True, False, ''any'', ''some''' +
+                                     ', ''most'', ''alot'', ''all'', ''never'' or an scaler bigger'+
+                                     'than zero and less than one.')
             elif np.isfinite(options['thetarmnan']) and options['thetarmnan']>=0\
                 and options['thetarmnan']<=1:
                 self.__options['thetarmnan'] = options['thetarmnan']
             else:
-                print(options['thetarmnan'])
+                #print(options['thetarmnan'])
                 raise ValueError('option thetarmnan must be True, False, ''any'', ''some''' +
                                  ', ''most'', ''alot'', ''all'', ''never'' or an scaler bigger'+
                                  'than zero and less than one.')
@@ -638,18 +643,23 @@ class emulator(object):
                     self.__options['xrmnan'] = 0
                 else:
                     self.__options['xrmnan'] =  1 + (10** (-12))
-            elif isinstance(options['xrmnan'],str) and options['xrmnan']=='any':
+            elif type(options['xrmnan']) is str:
+                if isinstance(options['xrmnan'],str) and options['xrmnan']=='any':
                     self.__options['xrmnan'] = 0
-            elif isinstance(options['xrmnan'],str) and options['xrmnan']=='some':
+                elif isinstance(options['xrmnan'],str) and options['xrmnan']=='some':
                     self.__options['xrmnan'] = 0.2
-            elif isinstance(options['xrmnan'],str) and options['xrmnan']=='most':
+                elif isinstance(options['xrmnan'],str) and options['xrmnan']=='most':
                     self.__options['xrmnan'] = 0.5
-            elif isinstance(options['xrmnan'],str) and options['xrmnan']=='alot':
+                elif isinstance(options['xrmnan'],str) and options['xrmnan']=='alot':
                     self.__options['xrmnan'] = 0.8
-            elif isinstance(options['xrmnan'],str) and options['xrmnan']=='all':
+                elif isinstance(options['xrmnan'],str) and options['xrmnan']=='all':
                     self.__options['xrmnan'] = 1- (10** (-8))
-            elif isinstance(options['xrmnan'],str) and  options['xrmnan']=='never':
+                elif isinstance(options['xrmnan'],str) and  options['xrmnan']=='never':
                     self.__options['xrmnan'] = 1 + (10** (-8))
+                else:
+                    raise ValueError('option xrmnan must be True, False, ''any'', ''some'''+
+                                     ', ''most'', ''alot'', ''all'', ''never'' or a scaler bigger '+
+                                     'than zero and less than one.')
             elif np.isfinite(options['xrmnan']) and options['xrmnan']>=0\
                 and options['xrmnan']<=1:
                 self.__options['xrmnan'] = options['xrmnan']
@@ -698,16 +708,26 @@ class emulator(object):
         if self.__options['rmthetafirst']:
             j = np.where(np.mean(isnanf, 0) < self.__options['thetarmnan'])[0]
             f = f[:,j]
-            theta = theta[j,:]
+            if theta.ndim == 1:
+                theta = theta[j]
+            else:
+                theta = theta[j,:]
         # then, check missing xs
         j = np.where(np.mean(isnanf, 1) < self.__options['xrmnan'])[0]
         f = f[j,:]
         if x is not None:
-            x = x[j,:]
+            if x.ndim == 1:
+                x = x[j]
+            else:
+                x = x[j,:]
+
         if not self.__options['rmthetafirst']:
             j = np.where(np.mean(isnanf, 0) < self.__options['thetarmnan'])[0]
             f = f[:,j]
-            theta = theta[j,:]
+            if theta.ndim == 1:
+                theta = theta[j]
+            else:
+                theta = theta[j,:]
         return x, theta, f
 
 class prediction(object):
