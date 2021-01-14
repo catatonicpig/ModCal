@@ -8,11 +8,11 @@ from contextlib import contextmanager
 current = os.path.abspath(os.getcwd())
 sys.path.append(os.path.normpath(os.path.join(os.path.dirname(current), '..')))
 from base.emulation import emulator
+from base.calibration import calibrator
 
 ##############################################
 #            Simple scenarios                #
 ##############################################
-
 def balldropmodel_linear(x, theta):
     f = np.zeros((theta.shape[0], x.shape[0]))
     for k in range(0, theta.shape[0]):
@@ -71,14 +71,25 @@ class priorphys_lin:
 
 theta = priorphys_lin.rnd(50) 
 f = balldropmodel_linear(xv, theta) 
-f1 = f[0:15,:]
-x1 = x[0:15,:]
+theta1 = theta[0:25,:]
+def balldroptrue(x):
+    def logcosh(x):
+        # preventing crashing
+        s = np.sign(x) * x
+        p = np.exp(-2 * s)
+        return s + np.log1p(p) - np.log(2)
+    t = x[:, 0]
+    h0 = x[:, 1]
+    vter = 20
+    g = 9.81
+    y = h0 - (vter ** 2) / g * logcosh(g * t / vter)
+    return y
 
-f1theta = f[:,0:15]
-theta1 = theta[0:15,:]
-theta_new = priorphys_lin.rnd(10)
+obsvar = 4*np.ones(x.shape[0])  
+y = balldroptrue(xv)
+
 #######################################################
-# Unit tests for update method of emulator class #
+# Unit tests for remove method of emulator class #
 #######################################################
 
 @contextmanager
@@ -88,68 +99,30 @@ def does_not_raise():
 @pytest.mark.set1
 class TestClass_1:
     '''
-    Class of tests to check the update()
+    Class of tests to check the remove()
     '''
 
-    # test to check update
+    # test to check remove
     @pytest.mark.parametrize(
-        "input1,input2,input3,input4,expectation",
+        "input1,expectation",
         [
-            (x, theta, f, False, pytest.raises(ValueError)),
-            (x, None, f, False, does_not_raise()), 
-            (x, None, f, True, does_not_raise()), 
-            (x1, None, f, True, pytest.raises(ValueError)), 
-            (x, None, f1, True, pytest.raises(ValueError)), 
-            (x1, None, f1, True, does_not_raise()), 
+            (theta1, does_not_raise()),
             ],
         )
-    def test_update_x(self, input1, input2, input3, input4, expectation):
+    def test_remove(self, input1, expectation):
         emu = emulator(x = x, theta = theta, f = f, method = 'PCGPwM')
         with expectation:
-            assert emu.update(x=input1, theta=input2, f=input3, options = {'xreps' : input4}) is None
-    
-    # test to check update
+            assert emu.remove(theta=input1) is None
+
+    # test to check remove
     @pytest.mark.parametrize(
-        "input1,input2,input3,input4,expectation",
+        "input1,expectation",
         [
-            (x, theta, f, False, pytest.raises(ValueError)),
-            (None, theta, f, False, does_not_raise()), 
-            (None, theta, f, True, does_not_raise()), 
-            (None, theta1, f, True, pytest.raises(ValueError)), 
-            (None, theta, f1theta, True, pytest.raises(ValueError)), 
-            (None, theta1, f1theta, True, does_not_raise()), 
+            (theta1, does_not_raise()),
             ],
         )
-    def test_update_theta(self, input1, input2, input3, input4, expectation):
+    def test_remove_cal(self, input1, expectation):
         emu = emulator(x = x, theta = theta, f = f, method = 'PCGPwM')
+        cal_bayes = calibrator(emu = emu, y = y, x = x, thetaprior = priorphys_lin, method = 'directbayes', yvar = obsvar)
         with expectation:
-            assert emu.update(x=input1, theta=input2, f=input3, options = {'thetareps' : input4}) is None
-            
-    # test to check update
-    @pytest.mark.parametrize(
-        "input1,input2,input3,expectation",
-        [
-            (None, None, f, pytest.raises(ValueError)),
-            (x1, None, None, pytest.raises(ValueError)),
-            (None, theta1, None, pytest.raises(ValueError)),
-            (None, theta, None, does_not_raise()),
-            (x, None, None, does_not_raise()),
-            ],
-        )
-    def test_update_f(self, input1, input2, input3, expectation):
-        emu = emulator(x = x, theta = theta, f = f, method = 'PCGPwM')
-        with expectation:
-            assert emu.update(x=input1, theta=input2, f=input3) is None
-            
-    # test to check update
-    @pytest.mark.parametrize(
-        "input1,input2,input3,expectation",
-        [
-            (None, theta, f, pytest.raises(ValueError)),
-            ],
-        )
-    def test_update_supptheta(self, input1, input2, input3, expectation):
-        emu = emulator(x = x, theta = theta, f = f, method = 'PCGPwM')
-        emu.supplement(size = 10, x = x, theta = theta_new)
-        with expectation:
-            assert emu.update(x=input1, theta=input2, f=input3) is None    
+            assert emu.remove(theta=input1, cal = cal_bayes) is None

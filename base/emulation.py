@@ -56,8 +56,7 @@ class emulator(object):
             if f.ndim < 1 or f.ndim > 2:
                 raise ValueError('f must have either 1 or 2 dimensions.')
             if (x is None) and (theta is None):
-                raise ValueError('You have not provided any theta or x, no emulator' +
-                                 ' inference possible.')
+                raise ValueError('You have not provided any theta or x, no emulator inference possible.')
             if x is not None:
                 if x.ndim < 0.5 or x.ndim > 2.5:
                     raise ValueError('x must have either 1 or 2 dimensions.')
@@ -86,10 +85,7 @@ class emulator(object):
 
         if theta is not None and (f.shape[1] != theta.shape[0]):
             if x is not None:
-                if f.ndim == 2 and f.shape[0] == theta.shape[0] and f.shape[1] == x.shape[0]:
-                    self.__f = copy.copy(f).T
-                    f = copy.copy(f).T
-                else:
+                if not (f.ndim == 2 and f.shape[0] == theta.shape[0] and f.shape[1] == x.shape[0]):
                     raise ValueError('The number of columns in f must match the number of rows in theta.')
             else:
                 if f.ndim == 2 and f.shape[0] == theta.shape[0]:
@@ -100,7 +96,8 @@ class emulator(object):
                     print('transposing f to try to get agreement....')
                     self.__f = np.reshape(copy.copy(f),(1,-1))
                     f = np.reshape(copy.copy(f),(1,-1))
-                raise ValueError('The number of columns in f must match the number of rows in theta.')
+                else:
+                    raise ValueError('The number of columns in f must match the number of rows in theta.')
             
         
         if x is not None:
@@ -112,6 +109,7 @@ class emulator(object):
             self.__theta = copy.copy(theta)
         else:
             self.__theta = None
+            raise ValueError('This feature has not developed yet.')
             
         self.__suppx = None
         self.__supptheta = None
@@ -346,7 +344,7 @@ class emulator(object):
             if theta.shape[0] > 30 * size:
                 thetachoices = theta[np.random.choice(theta.shape[0], 30 * size, replace=False),:]
             else:
-                thetachoices = copy.copy(thetachoices)
+                thetachoices = copy.copy(theta)
         
         if choicescost is None and thetachoices is not None:
             choicescost = np.ones(thetachoices.shape[0])
@@ -461,7 +459,7 @@ class emulator(object):
         if args is not None:
             self._args = {**self._args, **copy.deepcopy(args)} #properly merge the arguments
         if f is not None and theta is None and x is None:
-            if f.shape[0] == self.__f.shape[0]:
+            if f.shape[0] == self.__f.shape[0]:# I think this part is weird. theta can be same theta, f can same f and this will still merge them?
                 if self.__supptheta is not None:
                     if f.shape[1] == self.__supptheta.shape[0]:
                         self.__theta = np.vstack((self.__theta, self.__supptheta))
@@ -474,6 +472,7 @@ class emulator(object):
                     else:
                         raise ValueError('Could not resolve absense of theta,' +
                                      'please provide theta')
+                # in whihc cas this will be possible?
                 elif f.shape[1] == self.__theta.shape[1] and self.__x is None:
                     self.__f = f
                 else:
@@ -776,7 +775,7 @@ class prediction(object):
         opstr = 'mean' #operation string
         if (self.emu._emulator__ptf is None) and ((pfstr + opstr) in dir(self.emu.method)):
             if args is None:
-                args = self.emu.args
+                args = self.emu._args
             return copy.deepcopy(self.emu.method.predictmean(self._info, args))
         elif opstr in self._info.keys():
             return self._info[opstr]
@@ -805,7 +804,7 @@ class prediction(object):
         opstr = 'var' #operation string
         if (self.emu._emulator__ptf is None) and ((pfstr + opstr) in dir(self.emu.method)):
             if args is None:
-                args = self.emu.args
+                args = self.emu._args
             return copy.deepcopy(self.emu.method.predictvar(self._info, args))
         elif opstr in self._info.keys():
             return copy.deepcopy(self._info[opstr])
@@ -822,7 +821,7 @@ class prediction(object):
         opstr = 'covx' #operation string
         if (self.emu._emulator__ptf is None) and ((pfstr + opstr) in dir(self.emu.method)):
             if args is None:
-                args = self.emu.args
+                args = self.emu._args
             return copy.deepcopy(self.emu.method.predictcov(self._info, args))
         elif opstr in self._info.keys():
             return copy.deepcopy(self._info[opstr])
@@ -849,7 +848,7 @@ class prediction(object):
         opstr = 'covxhalf' #operation string
         if (self.emu._emulator__ptf is None) and ((pfstr + opstr) in dir(self.emu.method)):
             if args is None:
-                args = self.emu.args
+                args = self.emu._args
             return copy.deepcopy(self.emu.method.predictcov(self._info, args))
         elif opstr in self._info.keys():
             return copy.deepcopy(self._info[opstr])

@@ -76,7 +76,7 @@ x1 = x[0:15,:]
 
 f1theta = f[:,0:15]
 theta1 = theta[0:15,:]
-
+theta_new = priorphys_lin.rnd(10)
 #######################################################
 # Unit tests for update method of emulator class #
 #######################################################
@@ -140,3 +140,16 @@ class TestClass_1:
         emu = emulator(x = x, theta = theta, f = f, method = 'PCGPwM')
         with expectation:
             assert emu.update(x=input1, theta=input2, f=input3) is None
+            
+    # test to check update
+    @pytest.mark.parametrize(
+        "input1,input2,input3,expectation",
+        [
+            (None, theta, f, pytest.raises(ValueError)),
+            ],
+        )
+    def test_update_supptheta(self, input1, input2, input3, expectation):
+        emu = emulator(x = x, theta = theta, f = f, method = 'PCGPwM')
+        emu.supplement(size = 10, x = x, theta = theta_new)
+        with expectation:
+            assert emu.update(x=input1, theta=input2, f=input3) is None    

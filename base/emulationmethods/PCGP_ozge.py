@@ -136,6 +136,12 @@ def predict(predinfo, fitinfo, x, theta, args=None):
 
     return 
 
+def predictmean(predinfo, args = None):
+    return predinfo['mean']
+
+def predictvar(predinfo, args = None):
+    return predinfo['var']
+
 def emulation_covmat(theta1, theta2, gammav, returndir = False):
     '''
     Parameters

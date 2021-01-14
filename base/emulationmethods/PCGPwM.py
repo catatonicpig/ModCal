@@ -309,7 +309,7 @@ def supplementtheta(fitinfo, size, theta, thetachoices, choicecosts, cal, args):
     else:
         varpcause = 1*pendvar
     
-    thetachoicesave = np.zeros((4*size, fitinfo['theta'].shape[1]))
+    thetachoicesave = np.zeros((size, fitinfo['theta'].shape[1]))
     for j in range(0,size):
         critcount = np.zeros((crit.shape[0],len(infos)))
         if thetaposs.shape[0] < 1.5:

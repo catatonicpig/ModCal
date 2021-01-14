@@ -112,12 +112,12 @@ class TestClass_1:
         "input1,input2,input3,expectation",
         [
             (x, theta, f, does_not_raise()),
-            (x, None, f, does_not_raise()),
+            (x, None, f, pytest.raises(ValueError)), #has not developed yet
             (None, theta, f, does_not_raise()),
             (x, theta, None, pytest.raises(ValueError)),
             (x, None, None, pytest.raises(ValueError)),
             (None, theta, None, pytest.raises(ValueError)),
-            (None, None, f, pytest.raises(ValueError)),
+            (None, None, f, pytest.raises(ValueError)), #has not developed yet
             (None, None, None, pytest.raises(ValueError)),
             ],
         )
@@ -131,7 +131,7 @@ class TestClass_1:
         [
             (x, theta, f, does_not_raise()),
             (x, theta, f.T, does_not_raise()), # failure
-            (x, None, f.T, does_not_raise()), # failure : preprocess
+            (x, None, f.T, pytest.raises(ValueError)), #has not developed yet
             (x.T, theta, f, pytest.raises(ValueError)),
             (x.T, None, f, pytest.raises(ValueError)),
             (x, theta.T, f,pytest.raises(ValueError)),
@@ -139,6 +139,8 @@ class TestClass_1:
             (x, theta, f1, pytest.raises(ValueError)),
             (x, theta, f2, pytest.raises(ValueError)),
             (x, theta1, f, pytest.raises(ValueError)),
+            (None, theta1, f, pytest.raises(ValueError)),
+            (None, theta, f.T, does_not_raise()),
             (x1, theta, f, pytest.raises(ValueError)),
             ],
         )        
@@ -346,7 +348,23 @@ class TestClass_5:
         with expectation:
             assert emu(x = x, theta = theta) is not None
             
-
+@pytest.mark.set6
+class TestClass_6:
+    '''
+    Class of tests to check the emulator args
+    '''
+    
+    # test to check if an emulator module is imported
+    @pytest.mark.parametrize(
+        "input1,expectation",
+        [
+            ({'epsilon': 1.5, 'hypregmean': -10, 'hypregLB': -20}, does_not_raise()),
+            ],
+        )
+    def test_args(self, input1, expectation):
+        with expectation:
+            assert emulator(x = x, theta = theta, f = f, method = 'PCGPwM',
+                       args = input1) is not None
             
 # pytest test_u1.py -m set3 --disable-warnings
 # pytest --cov=ModCal/base/emulation test_u1.py

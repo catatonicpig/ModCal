@@ -74,22 +74,7 @@ f1 = f[0:15,:]
 f2 = f[:,0:25]
 theta1 = theta[0:25,:]
 x1 = x[0:15,:]
-#2-d x (30 x 2), 2-d theta (50 x 2), f (30 x 50)
-# x = np.vstack(( np.array(list(np.arange(0, 15))*2), np.repeat([1, 2], 15))).T
-# theta = np.vstack((sps.norm.rvs(0, 5, size=50), sps.gamma.rvs(2, 0, 10, size=50))).T
-# f = np.zeros((theta.shape[0], x.shape[0]))
-# for k in range(0, theta.shape[0]):
-#     f[k, :] = x[:, 0]*theta[k, 0] + x[:, 1]*theta[k, 1] 
-# # f = f.T
-# #2-d x (30 x 2), 2-d theta (50 x 2), f1 (15 x 50)
-# f1 = f[0:15,:]
-# #2-d x (30 x 2), 2-d theta (50 x 2), f2 (30 x 25)
-# f2 = f[:,0:25]
-# #2-d x (30 x 2), 2-d theta1 (25 x 2), f (30 x 50)
-# theta1 = theta[0:25,:]
-# #2-d x1 (15 x 2), 2-d theta (50 x 2), f (30 x 50)
-# x1 = x[0:15,:]
-# # 
+
 f0d = np.array(1)
 theta0d = np.array(1)
 x0d = np.array(1)
@@ -112,12 +97,12 @@ class TestClass_1:
         "input1,input2,input3,expectation",
         [
             (x, theta, f, does_not_raise()),
-            (x, None, f, does_not_raise()),
+            (x, None, f, pytest.raises(ValueError)), #has not developed yet
             (None, theta, f, does_not_raise()),
             (x, theta, None, pytest.raises(ValueError)),
             (x, None, None, pytest.raises(ValueError)),
             (None, theta, None, pytest.raises(ValueError)),
-            (None, None, f, pytest.raises(ValueError)),
+            (None, None, f, pytest.raises(ValueError)), #has not developed yet
             (None, None, None, pytest.raises(ValueError)),
             ],
         )
@@ -131,7 +116,7 @@ class TestClass_1:
         [
             (x, theta, f, does_not_raise()),
             (x, theta, f.T, does_not_raise()), # failure
-            (x, None, f.T, does_not_raise()), # failure : preprocess
+            (x, None, f.T, pytest.raises(ValueError)), #has not developed yet
             (x.T, theta, f, pytest.raises(ValueError)),
             (x.T, None, f, pytest.raises(ValueError)),
             (x, theta.T, f,pytest.raises(ValueError)),
@@ -139,6 +124,8 @@ class TestClass_1:
             (x, theta, f1, pytest.raises(ValueError)),
             (x, theta, f2, pytest.raises(ValueError)),
             (x, theta1, f, pytest.raises(ValueError)),
+            (None, theta1, f, pytest.raises(ValueError)),
+            (None, theta, f.T, does_not_raise()),
             (x1, theta, f, pytest.raises(ValueError)),
             ],
         )        
@@ -346,7 +333,23 @@ class TestClass_5:
         with expectation:
             assert emu(x = x, theta = theta) is not None
             
-
+@pytest.mark.set6
+class TestClass_6:
+    '''
+    Class of tests to check the emulator args
+    '''
+    
+    # test to check if an emulator module is imported
+    @pytest.mark.parametrize(
+        "input1,expectation",
+        [
+            ({'epsilon': 1.5, 'hypregmean': -10, 'hypregLB': -20}, does_not_raise()),
+            ],
+        )
+    def test_args(self, input1, expectation):
+        with expectation:
+            assert emulator(x = x, theta = theta, f = f, method = 'PCGPwM',
+                       args = input1) is not None
             
 # pytest test_u1.py -m set3 --disable-warnings
 # pytest --cov=ModCal/base/emulation test_u1.py

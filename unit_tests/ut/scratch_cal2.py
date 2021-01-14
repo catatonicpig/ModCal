@@ -67,6 +67,8 @@ class priorphys_lin:
                           sps.gamma.rvs(2, 0, 10, size=n))).T  # terminal velocity
 
 theta_lin = priorphys_lin.rnd(50)  
+theta_lin_1 = theta_lin[0:10,:]
+theta_lin_new = priorphys_lin.rnd(10)  
 f_lin = balldropmodel_linear(xv, theta_lin) 
 def balldroptrue(x):
     def logcosh(x):
@@ -85,8 +87,12 @@ obsvar = 4*np.ones(x.shape[0])
 y = balldroptrue(xv)
 import pdb
 pdb.set_trace() 
-emulator_test = emulator(x = x, theta = theta_lin, f = f_lin, method = 'PCGPwM')
-emulator_test.supplement(size = 5, theta = theta_lin, thetachoices = None)
+emu = emulator(x = x, theta = theta_lin, f = f_lin, method = 'PCGPwM')
+thetaneworig, info = emu.supplement(size = 10, theta = theta_lin, thetachoices = theta_lin_new)
+#thetaneworig, info = emu.supplement(size = 10, x = None, theta = theta_lin_new)
+#emu.update(x=None, theta=None, f=f_lin)        
+#emulator_test = emulator(x = None, theta = theta_lin, f = f_lin, method = 'PCGPwM')
+#emulator_test.supplement(size = 5, theta = theta_lin, thetachoices = None)
 ##############################################
 # Unit tests to initialize an emulator class #
 ##############################################
